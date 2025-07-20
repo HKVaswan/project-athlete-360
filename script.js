@@ -2,6 +2,8 @@
 document.addEventListener('DOMContentLoaded', () => {
 
     // 1. Initialize Lucide Icons
+    // This assumes you have included the Lucide script (e.g., <script src="https://unpkg.com/lucide"></script>)
+    // in your HTML <head>.
     if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
         lucide.createIcons();
         console.log('Lucide icons initialized.');
@@ -9,22 +11,30 @@ document.addEventListener('DOMContentLoaded', () => {
         console.warn('Lucide library not found or createIcons function missing. Icons may not render.');
     }
 
-    // 2. Smooth scroll on anchor click
-    // IMPORTANT: Ensure this ONLY applies to internal anchor links (e.g., href="#section-id")
-    // and DOES NOT interfere with external links or other buttons.
-    document.querySelectorAll('a[href]').forEach(anchor => { // Select all 'a' tags with an href
+    // 2. Robust Smooth Scroll for Internal Anchor Links
+    // This logic ensures that only internal hash links trigger smooth scrolling
+    // and that NO external links (http/https, mailto, or those with target="_blank")
+    // have their default navigation behavior prevented.
+    document.querySelectorAll('a[href]').forEach(anchor => {
         anchor.addEventListener('click', function (e) {
             const href = this.getAttribute('href');
+            const targetAttr = this.getAttribute('target');
 
-            // Check if the href starts with '#' AND it's not just '#' (which often means a placeholder)
-            if (href && href.startsWith('#') && href.length > 1) {
-                e.preventDefault(); // Prevent default only for valid internal anchor links
+            // Condition to trigger smooth scroll and prevent default:
+            // 1. The href exists and starts with '#' (e.g., "#mySection")
+            // 2. The href is not just '#' (which can be a placeholder)
+            // 3. The link does NOT have a 'target' attribute (like _blank, _self, etc.)
+            // 4. The link does NOT start with 'http', 'https', or 'mailto'
+            if (href && href.startsWith('#') && href.length > 1 && !targetAttr && !href.startsWith('http') && !href.startsWith('mailto')) {
+                e.preventDefault(); // ONLY prevent default for these specific internal hash links
+
                 const targetElement = document.querySelector(href);
                 if (targetElement) {
                     targetElement.scrollIntoView({ behavior: 'smooth' });
                 }
             }
-            // For all other links (external, mailto, etc.), allow default behavior
+            // For all other links (external, mailto, or those with target="_blank"),
+            // the default navigation behavior will be allowed to proceed.
         });
     });
 
