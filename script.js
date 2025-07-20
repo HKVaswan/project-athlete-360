@@ -2,8 +2,6 @@
 document.addEventListener('DOMContentLoaded', () => {
 
     // 1. Initialize Lucide Icons
-    // This assumes you have included the Lucide script (e.g., <script src="https://unpkg.com/lucide"></script>)
-    // in your HTML <head> as provided in the modified index.html.
     if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
         lucide.createIcons();
         console.log('Lucide icons initialized.');
@@ -11,15 +9,22 @@ document.addEventListener('DOMContentLoaded', () => {
         console.warn('Lucide library not found or createIcons function missing. Icons may not render.');
     }
 
-    // 2. Smooth scroll on anchor click (if anchors added later)
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    // 2. Smooth scroll on anchor click
+    // IMPORTANT: Ensure this ONLY applies to internal anchor links (e.g., href="#section-id")
+    // and DOES NOT interfere with external links or other buttons.
+    document.querySelectorAll('a[href]').forEach(anchor => { // Select all 'a' tags with an href
         anchor.addEventListener('click', function (e) {
-            e.preventDefault();
-            const targetId = this.getAttribute('href');
-            const targetElement = document.querySelector(targetId);
-            if (targetElement) {
-                targetElement.scrollIntoView({ behavior: 'smooth' });
+            const href = this.getAttribute('href');
+
+            // Check if the href starts with '#' AND it's not just '#' (which often means a placeholder)
+            if (href && href.startsWith('#') && href.length > 1) {
+                e.preventDefault(); // Prevent default only for valid internal anchor links
+                const targetElement = document.querySelector(href);
+                if (targetElement) {
+                    targetElement.scrollIntoView({ behavior: 'smooth' });
+                }
             }
+            // For all other links (external, mailto, etc.), allow default behavior
         });
     });
 
@@ -47,10 +52,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const highlightSection = document.querySelector('.pa360-net-highlight');
 
     if (highlightSection) {
-        // Initially hide the section to prepare for animation via CSS
-        // The CSS will handle the initial hidden state and transition properties
-        // We just need to add the 'show' class when it intersects.
-
         const highlightObserverOptions = {
             root: null, // relative to the viewport
             rootMargin: '0px',
@@ -60,7 +61,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const highlightObserver = new IntersectionObserver((entries, observer) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
-                    // Element is in view, add the 'show' class (defined in CSS)
                     entry.target.classList.add('show');
                     observer.unobserve(entry.target); // Stop observing once animated
                 }
@@ -75,8 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (petAISection) {
         const textElement = petAISection.querySelector('p');
         if (textElement) {
-            // Initially hide the text via CSS, and add transition properties
-            textElement.classList.add('hidden-text');
+            textElement.classList.add('hidden-text'); // Initially hide the text via CSS
 
             const petAIOptions = {
                 root: null,
