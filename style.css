@@ -1,61 +1,508 @@
-/* style.css */
-
 /* Global Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
 
-{ margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Added Inter for modern look */
+    background-color: #0b0d12;
+    color: #f5f5f5;
+    line-height: 1.6;
+    overflow-x: hidden; /* Prevent horizontal scroll on small screens */
+}
+
+/* General Section Styling for consistency */
+.pa360-section {
+    padding: 80px 20px; /* Increased vertical spacing for better flow */
+    text-align: center;
+}
+
+.pa360-container {
+    max-width: 1200px; /* Max width for content */
+    margin: 0 auto; /* Center the container */
+    padding: 0 20px; /* Horizontal padding for smaller screens */
+}
+
+/* Hero Section */
+.hero-section {
+    position: relative;
+    background: url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c') no-repeat center center/cover;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #fff;
+}
+
+.hero-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(0,0,0,0.8), rgba(1,20,11,0.8));
+    z-index: 1;
+}
+
+.hero-content {
+    position: relative;
+    z-index: 2;
+    max-width: 800px;
+    padding: 20px;
+}
+
+.main-heading {
+    font-size: 4rem;
+    color: #DAA520;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+    animation: fadeInDown 1s ease-out;
+}
+
+.tagline {
+    font-size: 1.5rem;
+    margin: 20px 0;
+    color: #d2ffd6;
+}
+
+.yt-button {
+    background-color: #006400;
+    color: #fff;
+    padding: 12px 24px;
+    text-decoration: none;
+    font-weight: bold;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+}
+
+.yt-button:hover {
+    background-color: #228B22;
+}
+
+/* Vision Section */
+.vision-section {
+    background-color: #10141b;
+    padding: 80px 20px; /* Consistent padding */
+    text-align: center;
+}
+
+.vision-section h2 {
+    font-size: 2.8rem; /* Slightly larger */
+    color: #DAA520;
+    margin-bottom: 25px;
+}
+
+.vision-section p {
+    font-size: 1.15rem; /* Slightly adjusted */
+    color: #c0c0c0;
+    max-width: 900px; /* Wider text area */
+    margin: 0 auto;
+}
+
+/* Modules Section */
+.modules-section {
+    padding: 80px 20px; /* Consistent padding */
+    background-color: #0f1117;
+}
+
+.modules-section h2 {
+    font-size: 2.8rem; /* Consistent heading size */
+    text-align: center;
+    color: #DAA520;
+    margin-bottom: 50px; /* More space below heading */
+}
+
+.modules-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 30px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.module-card {
+    background-color: #1a1f27;
+    padding: 30px; /* Slightly more padding */
+    border-radius: 12px;
+    border: 1px solid #2b2f36;
+    transition: transform 0.4s ease, box-shadow 0.4s ease, opacity 0.6s ease, transform 0.6s ease; /* Added opacity and transform for JS animation */
+    opacity: 0; /* Hidden by default for JS animation */
+    transform: translateY(20px); /* Slightly below for JS animation */
+    text-align: left; /* Align text left within cards */
+}
+
+.module-card.hidden-card {
+    opacity: 0;
+    transform: translateY(20px);
+}
+
+.module-card.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.module-card:hover {
+    transform: translateY(-8px); /* More pronounced lift */
+    box-shadow: 0 8px 20px rgba(0,255,128,0.15); /* Stronger shadow */
+}
+
+.module-card h3 {
+    color: #00ff91;
+    margin-bottom: 15px; /* More space */
+    font-size: 1.6rem;
+}
+
+.module-card p {
+    color: #ccc;
+    font-size: 1rem; /* Slightly larger text */
+    margin-bottom: 15px;
+}
+
+.status {
+    display: inline-block;
+    margin-top: 10px; /* Adjusted margin */
+    font-size: 0.85rem;
+    padding: 6px 12px; /* More padding */
+    border-radius: 25px; /* More rounded */
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.coming-soon {
+    background-color: #333;
+    color: #ffbb33;
+    border: 1px solid #ffbb33;
+}
+
+.in-progress {
+    background-color: #004d00;
+    color: #00ff91;
+    border: 1px solid #00ff91;
+}
+
+.status-tag {
+    background: #002d13;
+    color: #00ff91;
+    padding: 5px 12px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    margin-left: 10px;
+}
+
+/* Athlete AI Section */
+.petai-section {
+    padding: 80px 20px; /* Consistent padding */
+    background: linear-gradient(to bottom, #0d0f14, #0b1e16);
+    text-align: center;
+}
+
+.petai-section h2 {
+    font-size: 2.8rem; /* Consistent heading size */
+    color: #DAA520;
+    margin-bottom: 25px;
+}
+
+.petai-section p {
+    max-width: 900px; /* Wider text area */
+    margin: auto;
+    color: #bbb;
+    font-size: 1.15rem; /* Consistent text size */
+    opacity: 0; /* Hidden by default for JS animation */
+    transition: opacity 1s ease-out; /* Smooth transition */
+}
+
+.petai-section p.hidden-text {
+    opacity: 0;
+}
+
+.petai-section p.show-text {
+    opacity: 1;
+}
 
 
-body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0b0d12; color: #f5f5f5; line-height: 1.6; }
+/* --- PA360.net Highlight Section Styling --- */
+.pa360-net-highlight {
+    background: linear-gradient(135deg, #1a2a6c, #b21f1f); /* Gradient background */
+    color: #ffffff; /* White text for contrast */
+    border-radius: 12px;
+    margin: 60px auto; /* Centering and spacing */
+    max-width: 1000px; /* Specific max-width for this banner */
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3); /* More pronounced shadow */
+    overflow: hidden; /* Ensures content stays within rounded corners */
+    opacity: 0; /* Hidden by default for JS animation */
+    transform: translateY(40px); /* Slightly below for JS animation */
+    transition: opacity 0.8s ease-out, transform 0.8s ease-out; /* Smooth transition */
+}
 
-/* Hero Section */ .hero-section { position: relative; background: url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c') no-repeat center center/cover; height: 100vh; display: flex; align-items: center; justify-content: center; text-align: center; color: #fff; }
+.pa360-net-highlight.show {
+    opacity: 1;
+    transform: translateY(0);
+}
 
-.hero-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, rgba(0,0,0,0.8), rgba(1,20,11,0.8)); z-index: 1; }
+.pa360-net-highlight .highlight-content {
+    display: flex;
+    flex-direction: column; /* Stack content on small screens */
+    align-items: center;
+    gap: 25px; /* Space between elements */
+    padding: 40px 30px; /* Adjusted padding */
+}
 
-.hero-content { position: relative; z-index: 2; max-width: 800px; padding: 20px; }
+.pa360-net-highlight .highlight-icon i {
+    font-size: 4.5rem; /* Larger icon */
+    color: #ffcc00; /* Accent color for icon */
+}
 
-.main-heading { font-size: 4rem; color: #DAA520; text-shadow: 0 2px 4px rgba(0,0,0,0.8); animation: fadeInDown 1s ease-out; }
+.pa360-net-highlight .highlight-text h2 {
+    font-size: 2.6rem; /* Adjusted size */
+    margin-bottom: 15px;
+    font-weight: 700;
+    line-height: 1.2;
+}
 
-.tagline { font-size: 1.5rem; margin: 20px 0; color: #d2ffd6; }
+.pa360-net-highlight .highlight-text p {
+    font-size: 1.15rem; /* Adjusted size */
+    line-height: 1.6;
+    max-width: 700px;
+    margin: 0 auto;
+    color: #e0e0e0; /* Slightly off-white for body text */
+}
 
-.yt-button { background-color: #006400; color: #fff; padding: 12px 24px; text-decoration: none; font-weight: bold; border-radius: 5px; transition: background-color 0.3s ease; }
+.pa360-btn-explore {
+    display: inline-block;
+    background-color: #ffcc00; /* Button color */
+    color: #1a2a6c; /* Button text color */
+    padding: 18px 35px; /* Larger button */
+    border-radius: 50px; /* Pill shape */
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 1.15rem; /* Larger font */
+    transition: background-color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2); /* Button shadow */
+}
 
-.yt-button:hover { background-color: #228B22; }
+.pa360-btn-explore:hover {
+    background-color: #e6b800; /* Darker yellow on hover */
+    transform: translateY(-5px); /* More pronounced lift effect */
+    box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+}
 
-/* Vision Section */ .vision-section { background-color: #10141b; padding: 60px 20px; text-align: center; }
+/* Media query for larger screens for the highlight section */
+@media (min-width: 768px) {
+    .pa360-net-highlight .highlight-content {
+        flex-direction: row; /* Row layout on larger screens */
+        justify-content: space-between;
+        text-align: left;
+        padding: 50px 70px; /* More padding */
+    }
 
-.vision-section h2 { font-size: 2.5rem; color: #DAA520; margin-bottom: 20px; }
+    .pa360-net-highlight .highlight-text {
+        flex-grow: 1; /* Allow text to take available space */
+        margin-right: 40px; /* Space before button */
+    }
 
-.vision-section p { font-size: 1.2rem; color: #c0c0c0; max-width: 800px; margin: 0 auto; }
+    .pa360-net-highlight .highlight-text p {
+        margin: 0; /* Remove auto margins */
+    }
+}
 
-/* Modules Section */ .modules-section { padding: 60px 20px; background-color: #0f1117; }
 
-.modules-section h2 { font-size: 2.5rem; text-align: center; color: #DAA520; margin-bottom: 40px; }
+/* --- Footer Section Styling --- */
+.pa360-site-footer {
+    background-color: #151a21; /* Slightly lighter dark background for footer */
+    color: #ecf0f1; /* Light text color */
+    padding: 80px 0 40px; /* More padding */
+    text-align: left; /* Align text left within columns */
+}
 
-.modules-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 30px; max-width: 1200px; margin: 0 auto; }
+.pa360-site-footer h2 {
+    font-size: 2.8rem; /* Consistent heading size */
+    color: #ffffff;
+    margin-bottom: 15px;
+    text-align: center; /* Center main footer title */
+}
 
-.module-card { background-color: #1a1f27; padding: 25px; border-radius: 12px; border: 1px solid #2b2f36; transition: transform 0.3s ease, box-shadow 0.3s ease; }
+.pa360-site-footer .caption {
+    font-size: 1rem; /* Slightly larger */
+    color: #bdc3c7;
+    margin-bottom: 50px; /* More space */
+    text-align: center; /* Center caption */
+}
 
-.module-card:hover { transform: translateY(-5px); box-shadow: 0 4px 12px rgba(0,255,128,0.1); }
+.pa360-footer-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); /* Adjusted minmax for better flexibility */
+    gap: 40px; /* Space between columns */
+    margin-bottom: 50px;
+}
 
-.module-card h3 { color: #00ff91; margin-bottom: 12px; }
+.pa360-footer-column h3 {
+    font-size: 1.6rem; /* Consistent with module card headings */
+    color: #ffffff;
+    margin-bottom: 25px;
+}
 
-.module-card p { color: #ccc; font-size: 0.95rem; }
+.pa360-footer-column ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
 
-.status { display: inline-block; margin-top: 15px; font-size: 0.85rem; padding: 4px 10px; border-radius: 20px; font-weight: bold; }
+.pa360-footer-column ul li {
+    margin-bottom: 12px; /* Slightly more space */
+}
 
-.coming-soon { background-color: #333; color: #ffbb33; }
+.pa360-footer-column ul li a {
+    color: #bdc3c7;
+    text-decoration: none;
+    transition: color 0.3s ease;
+    display: flex; /* For icon alignment */
+    align-items: center;
+    gap: 10px; /* More space between icon and text */
+    font-size: 1rem;
+}
 
-.in-progress { background-color: #004d00; color: #00ff91; }
+.pa360-footer-column ul li a:hover {
+    color: #3498db; /* Blue on hover */
+}
 
-.status-tag { background: #002d13; color: #00ff91; padding: 5px 12px; border-radius: 12px; font-size: 0.8rem; }
+.pa360-social-icons {
+    display: flex;
+    gap: 20px; /* More space between social icons */
+    flex-wrap: wrap; /* Allow icons to wrap */
+}
 
-/* PET AI Section */ .petai-section { padding: 60px 20px; background: linear-gradient(to bottom, #0d0f14, #0b1e16); text-align: center; }
+.pa360-social-icons a {
+    color: #ecf0f1;
+    font-size: 2.2rem; /* Larger social icons */
+    transition: color 0.3s ease, transform 0.3s ease;
+    text-decoration: none; /* Remove underline */
+}
 
-.petai-section h2 { font-size: 2.2rem; color: #DAA520; margin-bottom: 20px; }
+.pa360-social-icons a:hover {
+    color: #3498db; /* Blue on hover */
+    transform: translateY(-5px); /* More pronounced lift */
+}
 
-.petai-section p { max-width: 800px; margin: auto; color: #bbb; font-size: 1rem; }
+.pa360-footer-column a[href^="mailto:"] {
+    color: #ecf0f1;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: color 0.3s ease;
+    font-size: 1rem;
+}
 
-/* Footer */ .footer { background-color: #070a0f; text-align: center; padding: 20px; color: #666; font-size: 0.85rem; }
+.pa360-footer-column a[href^="mailto:"]:hover {
+    color: #3498db;
+}
 
-/* Animations */ @keyframes fadeInDown { 0% { opacity: 0; transform: translateY(-40px); } 100% { opacity: 1; transform: translateY(0); } }
+.pa360-footer-bottom {
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 30px;
+    margin-top: 50px; /* More space from grid */
+    display: flex;
+    flex-direction: column; /* Stack on small screens */
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    text-align: center;
+}
 
+.pa360-footer-bottom .tagline {
+    font-style: italic;
+    color: #bdc3c7;
+    font-size: 1rem;
+}
+
+.pa360-footer-bottom .copyright {
+    font-size: 0.9rem;
+    color: #bdc3c7;
+}
+
+/* Media query for footer bottom on larger screens */
+@media (min-width: 768px) {
+    .pa360-footer-bottom {
+        flex-direction: row; /* Row layout on larger screens */
+    }
+}
+
+/* Animations */
+@keyframes fadeInDown {
+    0% { opacity: 0; transform: translateY(-40px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Responsive Adjustments for smaller screens */
+@media (max-width: 767px) {
+    .main-heading {
+        font-size: 2.8rem;
+    }
+
+    .tagline {
+        font-size: 1.2rem;
+    }
+
+    .vision-section h2,
+    .modules-section h2,
+    .petai-section h2,
+    .pa360-site-footer h2 {
+        font-size: 2rem;
+    }
+
+    .vision-section p,
+    .petai-section p {
+        font-size: 1rem;
+    }
+
+    .module-card {
+        padding: 20px;
+    }
+
+    .module-card h3 {
+        font-size: 1.4rem;
+    }
+
+    .module-card p {
+        font-size: 0.9rem;
+    }
+
+    .pa360-net-highlight .highlight-text h2 {
+        font-size: 2rem;
+    }
+
+    .pa360-net-highlight .highlight-text p {
+        font-size: 1rem;
+    }
+
+    .pa360-btn-explore {
+        padding: 15px 25px;
+        font-size: 1rem;
+    }
+
+    .pa360-footer-grid {
+        grid-template-columns: 1fr; /* Stack columns on very small screens */
+        text-align: center; /* Center footer columns */
+    }
+
+    .pa360-footer-column h3 {
+        margin-bottom: 15px;
+    }
+
+    .pa360-footer-column ul {
+        margin-bottom: 20px;
+    }
+
+    .pa360-social-icons {
+        justify-content: center; /* Center social icons */
+    }
+
+    .pa360-footer-column a[href^="mailto:"] {
+        justify-content: center; /* Center email link */
+    }
+}
