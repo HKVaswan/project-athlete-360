@@ -3,18 +3,339 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Project Athlete 360</title>
-    <link rel="stylesheet" href="style.css" />
-    <!-- Lucide Icons script - Essential for data-lucide icons to render -->
-    <script src="https://unpkg.com/lucide"></script>
+    <title>Project Athlete 360 - Trust, Hope, Inspiration</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        /* CSS RESET & ROOT VARIABLES */
+        :root {
+            --primary-dark-blue: #0A192F; /* Trust, Professionalism */
+            --primary-light-blue: #172A45;
+            --accent-gold: #FFC300;       /* Inspiration, Hope, Premium */
+            --text-light: #E0E0E0;        /* Readability */
+            --text-dark: #333333;
+            --status-inprogress: #00A8E8; /* A hopeful blue */
+            --status-comingsoon: #8892B0;
+            --background-light: #F8F9FA;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Lato', sans-serif;
+            background-color: var(--background-light);
+            color: var(--text-dark);
+            line-height: 1.6;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 700;
+            color: var(--primary-dark-blue);
+        }
+
+        section {
+            padding: 100px 5%;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* HERO SECTION - HOPE & INSPIRATION */
+        .hero-section {
+            background-image: linear-gradient(rgba(10, 25, 47, 0.7), rgba(10, 25, 47, 0.7)), url('https://images.unsplash.com/photo-1579952363873-27f3bade9f55?q=80&w=1935&auto=format&fit=crop'); /* Inspirational sports field at dawn */
+            background-size: cover;
+            background-position: center;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: white;
+        }
+
+        .hero-content {
+            max-width: 800px;
+        }
+
+        .main-heading {
+            font-size: 4rem;
+            color: white;
+            text-shadow: 2px 2px 8px rgba(0,0,0,0.5);
+            margin-bottom: 0.5rem;
+        }
+
+        .tagline {
+            font-size: 1.25rem;
+            color: var(--text-light);
+            margin-bottom: 2rem;
+        }
+
+        .yt-button {
+            display: inline-block;
+            background-color: var(--accent-gold);
+            color: var(--primary-dark-blue);
+            padding: 15px 35px;
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            text-decoration: none;
+            border-radius: 50px;
+            transition: transform 0.3s ease, background-color 0.3s ease;
+        }
+
+        .yt-button:hover {
+            transform: translateY(-5px);
+            background-color: #ffd54f;
+        }
+
+        /* VISION SECTION - TRUST & CLARITY */
+        .vision-section {
+            text-align: center;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .vision-section h2 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .vision-section p {
+            font-size: 1.1rem;
+            color: #555;
+        }
+
+        /* MODULES SECTION - POLISHED & PROFESSIONAL */
+        .modules-section {
+            background-color: white;
+        }
+
+        .modules-section h2 {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 50px;
+        }
+
+        .modules-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .module-card {
+            background-color: var(--background-light);
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .module-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.08);
+        }
+
+        .module-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .module-card h3 i {
+            margin-right: 0.5rem;
+            color: var(--accent-gold);
+        }
+
+        .module-card p {
+            flex-grow: 1;
+            margin-bottom: 1.5rem;
+            color: #555;
+        }
+
+        .status-tag {
+            font-size: 0.8rem;
+            font-weight: 700;
+            padding: 5px 12px;
+            border-radius: 20px;
+            margin-left: 0.5rem;
+            vertical-align: middle;
+            color: white;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .in-progress { background-color: var(--status-inprogress); }
+        .coming-soon { background-color: var(--status-comingsoon); }
+        
+        /* ATHLETE AI SECTION */
+        .petai-section {
+            text-align: center;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .petai-section h2 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        /* PA360.NET HIGHLIGHT SECTION */
+        .pa360-net-highlight {
+            background-color: var(--primary-dark-blue);
+            color: white;
+            border-radius: 15px;
+            margin: 0 5%;
+            padding: 60px 5%;
+        }
+
+        .pa360-net-highlight h2, .pa360-net-highlight p {
+            color: white;
+        }
+        
+        .highlight-content {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }
+        
+        .highlight-icon {
+            color: var(--accent-gold);
+        }
+        
+        .highlight-text {
+            flex: 1;
+        }
+        
+        .highlight-text h2 {
+            margin-bottom: 1rem;
+        }
+
+        .pa360-btn-explore {
+            background: none;
+            border: 2px solid var(--accent-gold);
+            color: var(--accent-gold);
+            padding: 12px 28px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 700;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .pa360-btn-explore:hover {
+            background-color: var(--accent-gold);
+            color: var(--primary-dark-blue);
+        }
+
+        /* FOOTER SECTION - TRUSTWORTHY & COMPREHENSIVE */
+        .pa360-site-footer {
+            background-color: var(--primary-dark-blue);
+            color: var(--text-light);
+            padding: 80px 5% 40px;
+            text-align: center;
+        }
+
+        .pa360-site-footer h2, .pa360-site-footer h3 {
+            color: white;
+        }
+
+        .pa360-site-footer .caption {
+            color: var(--status-comingsoon);
+            margin-bottom: 4rem;
+        }
+
+        .pa360-footer-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            text-align: left;
+            margin-bottom: 4rem;
+        }
+        
+        .pa360-footer-column h3 {
+            margin-bottom: 1.5rem;
+            color: var(--accent-gold);
+        }
+
+        .pa360-footer-column ul {
+            list-style: none;
+        }
+        
+        .pa360-footer-column ul li {
+            margin-bottom: 0.8rem;
+        }
+
+        .pa360-footer-column a {
+            color: var(--text-light);
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+        
+        .pa360-footer-column a:hover {
+            color: var(--accent-gold);
+        }
+        
+        .pa360-footer-column a i {
+            margin-right: 0.5rem;
+        }
+        
+        .pa360-social-icons a {
+            margin-right: 1rem;
+            font-size: 1.5rem;
+        }
+
+        .pa360-footer-bottom {
+            border-top: 1px solid var(--primary-light-blue);
+            padding-top: 2rem;
+            margin-top: 2rem;
+        }
+
+        .pa360-footer-bottom .tagline {
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .pa360-footer-bottom .copyright {
+            font-size: 0.9rem;
+            color: var(--status-comingsoon);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .main-heading { font-size: 2.5rem; }
+            .tagline { font-size: 1.1rem; }
+            section { padding: 60px 5%; }
+            .highlight-content { flex-direction: column; text-align: center; }
+            .pa360-footer-grid { text-align: center; }
+        }
+
+    </style>
 </head>
 <body>
     <header class="hero-section">
-        <div class="hero-overlay"></div>
         <div class="hero-content">
             <h1 class="main-heading">Project Athlete 360</h1>
             <p class="tagline">Empowering Indian Athletes with Knowledge, Intelligence, and Community</p>
-            <a href="https://www.youtube.com/@projectathlete360" class="yt-button" target="_blank">Visit Our YouTube Channel</a>
+            <a href="https://www.youtube.com/@projectathlete360" class="yt-button" target="_blank" rel="noopener noreferrer">Visit Our YouTube Channel</a>
         </div>
     </header>
 
@@ -26,70 +347,64 @@
     </section>
 
     <section class="modules-section">
-        <h2>Platform Modules <span class="status-tag">In Progress</span></h2>
+        <h2>Platform Modules</h2>
         <div class="modules-grid">
             <div class="module-card">
-                <h3>Learn360</h3>
+                <h3><i data-lucide="graduation-cap"></i>Learn360</h3>
                 <p>A digital academy delivering expert knowledge on sports science, nutrition, recovery, and more. Designed to make every athlete smarter and stronger.</p>
-                <span class="status coming-soon">Coming Soon</span>
+                <span class="status-tag coming-soon">Coming Soon</span>
             </div>
             <div class="module-card">
-                <h3>Certification & Career Module</h3>
+                <h3><i data-lucide="award"></i>Certification & Career Module</h3>
                 <p>This module helps users discover the right path in the sports industry by providing expert guidance, trusted qualifications, and clear steps to build a successful future in their chosen field.</p>
-                <span class="status in-progress">In Progress</span>
+                <span class="status-tag in-progress">In Progress</span>
             </div>
             <div class="module-card">
-                <h3>AthleteCore</h3>
+                <h3><i data-lucide="bar-chart-3"></i>AthleteCore</h3>
                 <p>A personal dashboard visualizing performance trends, injury risks, and recommendations to enhance growth.</p>
-                <span class="status coming-soon">Coming Soon</span>
+                <span class="status-tag coming-soon">Coming Soon</span>
             </div>
             <div class="module-card">
-                <h3>The Huddle</h3>
+                <h3><i data-lucide="users"></i>The Huddle</h3>
                 <p>A social space for athletes to connect, share progress, and engage in like-minded groups across India.</p>
-                <span class="status coming-soon">Coming Soon</span>
+                <span class="status-tag coming-soon">Coming Soon</span>
             </div>
             <div class="module-card">
-                <h3>CoachConnect</h3>
+                <h3><i data-lucide="user-check"></i>CoachConnect</h3>
                 <p>Focused groups led by verified coaches who assign tasks, monitor progress, and guide athletes directly.</p>
-                <span class="status in-progress">In Progress</span>
+                <span class="status-tag in-progress">In Progress</span>
             </div>
             <div class="module-card">
-                <h3>Press Box</h3>
+                <h3><i data-lucide="megaphone"></i>Press Box</h3>
                 <p>Our official media and communication hub for announcements, PR, and professional visibility.</p>
-                <span class="status coming-soon">Coming Soon</span>
+                <span class="status-tag coming-soon">Coming Soon</span>
             </div>
         </div>
     </section>
 
     <section class="petai-section">
-        <h2>Athlete AI <span class="status-tag">Upcoming</span></h2>
+        <h2>Athlete AI <span class="status-tag coming-soon">Upcoming</span></h2>
         <p>Athlete AI is our long-term innovation designed to become the ultimate performance engine. It will integrate advanced data science and personalized coaching intelligence to automate athlete support like never before.</p>
     </section>
 
-    <!-- PA360.net Highlight Section -->
-<section class="pa360-section pa360-net-highlight">
-    <div class="pa360-container">
+    <section class="pa360-net-highlight">
         <div class="highlight-content">
             <div class="highlight-icon">
-                <i data-lucide="share-2"></i>
+                <i data-lucide="rocket" size="48"></i>
             </div>
             <div class="highlight-text">
-                <h2>🚀 Explore Our New Initiative: PA360.net</h2>
+                <h2>Explore Our New Initiative: PA360.net</h2>
                 <p>
                     PA360.net is a vital branch of the Project Athlete 360 ecosystem.
                     It’s our new live landing page dedicated to presenting the core mission and long-term vision of our movement — focused on transforming sports education in India.
                 </p>
             </div>
-            <!-- Added target="_blank" and rel="noopener noreferrer" -->
             <a href="https://www.pa360.net/" target="_blank" rel="noopener noreferrer" class="pa360-btn-explore">Explore Now →</a>
         </div>
-    </div>
-</section>
+    </section>
 
-
-    <!-- Site Footer Section -->
-    <footer class="pa360-section pa360-site-footer">
-        <div class="pa360-container">
+    <footer class="pa360-site-footer">
+        <div class="container">
             <h2>Project Athlete 360 Ecosystem</h2>
             <p class="caption"><em>All platforms are currently in active development phase.</em></p>
 
@@ -97,10 +412,10 @@
                 <div class="pa360-footer-column">
                     <h3>Web Platforms</h3>
                     <ul>
-                        <li><a href="https://projectathlete360.com" target="_blank" rel="noopener noreferrer">🔗 projectathlete360.com (Main)</a></li>
-                        <li><a href="https://projectathlete360.in" target="_blank" rel="noopener noreferrer">🔗 projectathlete360.in (Alternate)</a></li>
-                        <li><a href="https://pa360.in" target="_blank" rel="noopener noreferrer">🔗 pa360.in (Institutional)</a></li>
-                        <li><a href="https://pa360.net" target="_blank" rel="noopener noreferrer">🔗 pa360.net (Ecosystem Overview)</a></li>
+                        <li><a href="https://projectathlete360.com" target="_blank" rel="noopener noreferrer">projectathlete360.com (Main)</a></li>
+                        <li><a href="https://projectathlete360.in" target="_blank" rel="noopener noreferrer">projectathlete360.in (Alternate)</a></li>
+                        <li><a href="https://pa360.in" target="_blank" rel="noopener noreferrer">pa360.in (Institutional)</a></li>
+                        <li><a href="https://pa360.net" target="_blank" rel="noopener noreferrer">pa360.net (Ecosystem Overview)</a></li>
                     </ul>
                 </div>
 
@@ -120,7 +435,7 @@
                 <div class="pa360-footer-column">
                     <h3>Contact Us</h3>
                     <a href="mailto:teampa360@gmail.com">
-                        <i data-lucide="mail"></i>teampa360@gmail.com
+                        <i data-lucide="mail"></i> teampa360@gmail.com
                     </a>
                 </div>
             </div>
@@ -132,6 +447,8 @@
         </div>
     </footer>
 
-    <script src="script.js"></script>
+    <script>
+      lucide.createIcons();
+    </script>
 </body>
 </html>
