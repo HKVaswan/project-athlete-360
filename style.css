@@ -109,19 +109,16 @@ body {
 }
 
 .section-heading {
+  position: relative;
   text-align: center;
   font-size: 2.5rem;
   font-weight: 700;
+  margin-bottom: 60px;
   color: #ffffff;
   letter-spacing: 1px;
-  margin: 0 auto;
-  margin-bottom: 60px;
-  width: 100%;
-  display: block;
-  position: relative;
+  display: inline-block;
   padding-bottom: 10px;
 }
-
 .section-heading .underline {
   position: absolute;
   bottom: 0;
@@ -133,7 +130,6 @@ body {
   transform-origin: center;
   animation: underlineGrow 1s ease forwards 0.4s;
 }
-
 @keyframes underlineGrow {
   to {
     transform: translateX(-50%) scaleX(1);
