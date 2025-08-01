@@ -184,24 +184,24 @@ body {
 .founder-image img {
   width: 220px;
   height: 220px;
-  object-fit: cover;
-  border-radius: 50%;
-  box-shadow: 0 0 20px rgba(0, 255, 209, 0.6);
+  border-radius: 50%;                 /* Makes the image circular */
+  object-fit: cover;                  /* Ensures image fills circle properly */
+  box-shadow: 0 0 20px rgba(0, 255, 209, 0.5);
   transition: transform 0.4s ease, box-shadow 0.4s ease;
-  animation: pulseGlow 3s infinite;
+  animation: pulseGlow 3s ease-in-out infinite;
 }
 
-/* On Hover: Slight Scale + Brighter Glow */
+/* Hover effect: subtle scale and stronger glow */
 .founder-image img:hover {
   transform: scale(1.05);
-  box-shadow: 0 0 30px rgba(0, 255, 209, 0.8);
+  box-shadow: 0 0 28px rgba(0, 255, 209, 0.7);
 }
 
 /* Pulse Glow Animation */
 @keyframes pulseGlow {
-  0%   { box-shadow: 0 0 20px rgba(0, 255, 209, 0.6); }
-  50%  { box-shadow: 0 0 28px rgba(0, 255, 209, 0.8); }
-  100% { box-shadow: 0 0 20px rgba(0, 255, 209, 0.6); }
+  0%   { box-shadow: 0 0 20px rgba(0, 255, 209, 0.4); }
+  50%  { box-shadow: 0 0 28px rgba(0, 255, 209, 0.7); }
+  100% { box-shadow: 0 0 20px rgba(0, 255, 209, 0.4); }
 }
 
 /* Underline Animation */
