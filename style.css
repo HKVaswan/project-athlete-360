@@ -109,12 +109,12 @@ body {
 }
 
 .section-heading {
-  text-align: center;
-  font-size: 2.5rem;
-  font-weight: 700;
-  margin-bottom: 50px;
-  color: #ffffff;
-  letter-spacing: 1px;
+  text-align: center;
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 70px;  /* ← Add or adjust this line */
+  color: #ffffff;
+  letter-spacing: 1px;
 }
 
 /* Layout Grid */
