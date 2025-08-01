@@ -109,12 +109,35 @@ body {
 }
 
 .section-heading {
-  text-align: center;
-  font-size: 2.5rem;
-  font-weight: 700;
-  margin-bottom: 90px;  /* ← Add or adjust this line */
-  color: #ffffff;
-  letter-spacing: 1px;
+  text-align: center;
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 1px;
+  margin: 0 auto;
+  margin-bottom: 60px;
+  width: 100%;
+  display: block;
+  position: relative;
+  padding-bottom: 10px;
+}
+
+.section-heading .underline {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 80px;
+  height: 3px;
+  background: linear-gradient(90deg, #00ffd1, #00bfff);
+  transform: translateX(-50%) scaleX(0);
+  transform-origin: center;
+  animation: underlineGrow 1s ease forwards 0.4s;
+}
+
+@keyframes underlineGrow {
+  to {
+    transform: translateX(-50%) scaleX(1);
+  }
 }
 
 /* Layout Grid */
