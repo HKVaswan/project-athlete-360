@@ -180,17 +180,28 @@ body {
   font-style: italic;
 }
 
-/* Image Block */
+/* Founder Image - Circular with Animated Glow */
 .founder-image img {
-  width: 280px;
-  height: auto;
-  border-radius: 12px;
-  box-shadow: 0 0 20px rgba(0, 255, 209, 0.3);
-  transition: transform 0.4s ease;
+  width: 220px;
+  height: 220px;
+  object-fit: cover;
+  border-radius: 50%;
+  box-shadow: 0 0 20px rgba(0, 255, 209, 0.6);
+  transition: transform 0.4s ease, box-shadow 0.4s ease;
+  animation: pulseGlow 3s infinite;
 }
 
+/* On Hover: Slight Scale + Brighter Glow */
 .founder-image img:hover {
-  transform: scale(1.03);
+  transform: scale(1.05);
+  box-shadow: 0 0 30px rgba(0, 255, 209, 0.8);
+}
+
+/* Pulse Glow Animation */
+@keyframes pulseGlow {
+  0%   { box-shadow: 0 0 20px rgba(0, 255, 209, 0.6); }
+  50%  { box-shadow: 0 0 28px rgba(0, 255, 209, 0.8); }
+  100% { box-shadow: 0 0 20px rgba(0, 255, 209, 0.6); }
 }
 
 /* Underline Animation */
