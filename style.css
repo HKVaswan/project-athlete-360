@@ -654,3 +654,130 @@ body {
         justify-content: center; /* Center email link */
     }
 }
+
+<!-- ===== PA360: Header styles (paste into your main CSS file or inside <style>) ===== -->
+:root{
+  --bg: #0b0b0b;             /* header background (dark) */
+  --text: #ffffff;
+  --muted: #bdbdbd;
+  --accent: #9ACD32;         /* your green-ish color (adjust) */
+  --max-width: 1100px;
+  --gap: 12px;
+  --radius: 10px;
+}
+
+.pa360-header{
+  background: linear-gradient(180deg, rgba(0,0,0,0.9), rgba(0,0,0,0.85));
+  color: var(--text);
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.45);
+}
+
+.pa360-inner{
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  justify-content: space-between;
+}
+
+/* Brand */
+.pa360-brand{
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: var(--text);
+  font-weight: 700;
+  font-family: -apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;
+}
+
+.pa360-logo{
+  display:block;
+  height: 44px; /* adjusts on smaller screens */
+  width: auto;
+  object-fit: contain;
+  border-radius: 6px;
+  background: transparent;
+  image-rendering: -webkit-optimize-contrast;
+}
+
+/* Title next to logo */
+.pa360-title{
+  font-size: 15px;
+  letter-spacing: 0.3px;
+  display: none; /* keep compact on mobile; show on larger screens */
+}
+
+/* Nav */
+.pa360-menu-btn{
+  background: transparent;
+  border: none;
+  display: inline-flex;
+  padding: 8px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.pa360-nav{
+  display: none; /* hidden on mobile, toggled by JS */
+  gap: 12px;
+  align-items: center;
+}
+
+/* nav links */
+.pa360-nav .nav-link{
+  color: var(--muted);
+  text-decoration: none;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.pa360-nav .nav-link:hover,
+.pa360-nav .nav-link:focus{
+  color: var(--text);
+  background: rgba(255,255,255,0.03);
+  outline: none;
+}
+
+/* CTA */
+.pa360-nav .cta{
+  background: var(--accent);
+  color: #0a0a0a;
+  padding: 8px 12px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-weight: 700;
+  margin-left: 6px;
+}
+
+/* Desktop layout */
+@media (min-width: 880px){
+  .pa360-menu-btn{ display: none; }
+  .pa360-nav{ display: flex; }
+  .pa360-title{ display: inline-block; font-size: 16px; }
+  .pa360-inner{ padding: 14px 20px; }
+  .pa360-logo{ height: 56px; }
+}
+
+/* Mobile "open" state styling when .open class is toggled */
+.pa360-nav.open{
+  display: flex;
+  position: absolute;
+  right: 16px;
+  top: calc(100% + 10px);
+  flex-direction: column;
+  background: rgba(6,6,6,0.98);
+  padding: 12px;
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+}
+<!-- ===== end styles ===== -->
+
