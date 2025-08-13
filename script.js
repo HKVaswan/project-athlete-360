@@ -117,3 +117,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 });
+
+document.addEventListener('DOMContentLoaded', function () {
+  const btn = document.getElementById('pa360-menu-btn');
+  const nav = document.getElementById('pa360-nav');
+
+  if (!btn || !nav) return;
+
+  btn.addEventListener('click', function () {
+    const open = nav.classList.toggle('open');
+
+    // accessibility: update aria-expanded on the button
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+
+  // close nav if clicked outside (mobile)
+  document.addEventListener('click', function (e) {
+    if (!nav.classList.contains('open')) return;
+    if (btn.contains(e.target) || nav.contains(e.target)) return;
+    nav.classList.remove('open');
+    btn.setAttribute('aria-expanded', 'false');
+  });
+});
+
