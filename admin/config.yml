@@ -23,5 +23,6 @@ paginate: 10
 
 # minimal mistakes settings (optional)
 minimal_mistakes_skin: "blue"
+
 sass:
   style: compressed
