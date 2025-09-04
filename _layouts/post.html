@@ -1,34 +1,32 @@
 ---
-layout: default
+layout: single
 ---
 
-<article>
-  <h1>{{ page.title }}</h1>
-  <p><small>Posted on {{ page.date | date: "%B %d, %Y" }} by {{ page.author }}</small></p>
+{%- comment -%}
+This is a theme-specific override. It re-uses the theme's layout 'single' but renders page content and injects giscus.
+{%- endcomment -%}
+
+<article class="post">
+  <header class="page-header">
+    <h1 class="page-title">{{ page.title }}</h1>
+    <p class="byline">By {{ page.author | default: site.author.name }} • {{ page.date | date: "%B %-d, %Y" }}</p>
+  </header>
 
   {% if page.cover %}
-    <img src="{{ page.cover }}" alt="cover image" style="max-width:100%; border-radius:8px;" />
+  <figure class="post-cover">
+    <img src="{{ page.cover }}" alt="Cover for {{ page.title }}" style="width:100%; border-radius:8px;">
+  </figure>
   {% endif %}
 
   <div class="post-content">
     {{ content }}
   </div>
+
+  <hr>
+
+  {% comment %}
+    Insert giscus comments box. This partial uses the values you got from giscus.app.
+    If you ever need to update repo-id or category-id, change _includes/giscus.html
+  {% endcomment %}
+  {% include giscus.html %}
 </article>
-
-<hr />
-
-<!-- giscus comments -->
-<section id="comments">
-  <script src="https://giscus.app/client.js"
-          data-repo="HKVaswan/project-athlete-360"
-          data-repo-id="R_kgDOPKn6pg"
-          data-category="Comments"
-          data-category-id="DIC_kwDOPKn6ps4Cu7Yl"
-          data-mapping="pathname"
-          data-reactions-enabled="1"
-          data-emit-metadata="0"
-          data-theme="light"
-          crossorigin="anonymous"
-          async>
-  </script>
-</section>
