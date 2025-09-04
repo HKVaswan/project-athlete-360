@@ -1,0 +1,42 @@
+/* assets/css/overrides.css - quick branding overrides */
+:root{
+  --brand: #0b66ff;    /* your primary color - change as you like (Project Athlete 360 color) */
+  --muted: #6b7280;
+}
+
+/* Header tweaks */
+.site-header {
+  background: linear-gradient(90deg, rgba(11,102,255,0.08), rgba(255,255,255,0));
+  border-bottom: 1px solid #eee;
+}
+
+/* Link & button brand color */
+a, .btn-primary {
+  color: var(--brand);
+}
+.site-footer {
+  background: #f7fafc;
+  padding: 2rem 0;
+}
+
+/* Post title bigger */
+.page-title {
+  font-size: 2.1rem;
+  margin-bottom: 0.25rem;
+}
+
+/* Make images a tiny bit rounded */
+.post-content img {
+  border-radius: 8px;
+  max-width: 100%;
+}
+
+/* Comments spacing */
+#comments {
+  margin-top: 2rem;
+}
+
+/* responsive tweaks */
+@media (min-width: 900px) {
+  .page-title { font-size: 2.6rem; }
+}
