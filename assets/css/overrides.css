@@ -40,3 +40,46 @@ a, .btn-primary {
 @media (min-width: 900px) {
   .page-title { font-size: 2.6rem; }
 }
+
+/* Project Athlete 360 custom overrides */
+
+/* Global font (same as homepage) */
+body, h1, h2, h3, h4, h5, h6 {
+  font-family: 'Poppins', sans-serif;
+  color: #ffffff;
+  background-color: #0a0a0a;
+}
+
+/* Links */
+a {
+  color: #9ACD32; /* accent green */
+}
+a:hover {
+  color: #E1306C; /* playful Instagram pink for hover */
+}
+
+/* Header & navigation */
+.masthead, .site-header {
+  background-color: #0a0a0a;
+  border-bottom: 2px solid #9ACD32;
+}
+.site-title a {
+  color: #ffffff !important;
+}
+
+/* Footer */
+.site-footer {
+  background: #0a0a0a;
+  color: #cccccc;
+}
+.site-footer a {
+  color: #9ACD32;
+}
+
+/* Blog post styling */
+.page__title {
+  color: #9ACD32;
+}
+.page__meta, .page__content {
+  color: #cccccc;
+}
