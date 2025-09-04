@@ -1,1 +1,25 @@
+# _config.yml
+title: "Project Athlete 360"
+description: "Reforming Indian sports from the ground up — Science | Growth | Community"
+url: "https://www.projectathlete360.com"   # your canonical URL (use www since you use it)
+baseurl: ""                                # leave blank for root
+timezone: "Asia/Kolkata"
+theme: minima               # fallback; remote_theme below is the primary
+remote_theme: "mmistakes/minimal-mistakes"  # premium-like theme
+plugins:
+  - jekyll-remote-theme
 
+# author defaults
+author:
+  name: "H.K. Vaswan"
+
+# build settings
+markdown: kramdown
+kramdown:
+  input: GFM
+
+# collections & posts (default works fine)
+paginate: 10
+
+# minimal mistakes settings (optional)
+minimal_mistakes_skin: "blue"
