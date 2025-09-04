@@ -83,3 +83,19 @@ a:hover {
 .page__meta, .page__content {
   color: #cccccc;
 }
+
+/* ---- Custom Blog Footer ---- */
+.site-footer {
+  background: #0a0a0a;
+  text-align: center;
+  padding: 2rem 1rem;
+  font-size: 0.95rem;
+  border-top: 2px solid #9ACD32;
+}
+
+.site-footer .copyright {
+  color: #cccccc;
+  font-weight: 500;
+  display: block;
+  margin-top: 0.5rem;
+}
