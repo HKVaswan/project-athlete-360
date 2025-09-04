@@ -1,0 +1,9 @@
+# _data/navigation.yml
+- title: "Home"
+  url: "/"
+- title: "Blog"
+  url: "/blog/"
+- title: "Mission"
+  url: "/mission/"
+- title: "Contact"
+  url: "/contact/"
