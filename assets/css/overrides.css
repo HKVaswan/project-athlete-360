@@ -99,3 +99,58 @@ a:hover {
   display: block;
   margin-top: 0.5rem;
 }
+
+/* ---- Blog Post List Styling ---- */
+
+/* Blog index page */
+.archive__item {
+  background: #111; /* slightly lighter than body background */
+  border: 1px solid #1f1f1f;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.archive__item:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+}
+
+/* Blog post title in list */
+.archive__item-title a {
+  color: #9ACD32; /* accent green */
+  font-size: 1.5rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.archive__item-title a:hover {
+  color: #E1306C; /* playful hover */
+}
+
+/* Post meta (date, categories) */
+.archive__item-meta {
+  color: #aaaaaa;
+  font-size: 0.9rem;
+  margin-bottom: 0.75rem;
+}
+
+/* Post excerpt */
+.archive__item-excerpt {
+  color: #cccccc;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+/* Category labels */
+.page__taxonomy-item {
+  background: #9ACD32;
+  color: #0a0a0a;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  margin-right: 0.3rem;
+  text-transform: uppercase;
+  font-weight: 600;
+}
