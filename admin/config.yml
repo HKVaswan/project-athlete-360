@@ -18,8 +18,12 @@ markdown: kramdown
 kramdown:
   input: GFM
 
-# collections & posts (default works fine)
+# collections & posts
 paginate: 10
+paginate_path: "/blog/page:num"
+category_archive:
+  type: liquid
+  path: /categories/
 
 # minimal mistakes settings (optional)
 minimal_mistakes_skin: "blue"
