@@ -6,32 +6,19 @@ permalink: /blog/
 
 <h1>All Posts</h1>
 
-<div class="blog-grid">
-  {% for post in paginator.posts %}
-    <article class="blog-card">
+<div class="posts-list">
+  {% for post in site.posts %}
+    <article class="archive__item">
       {% if post.cover %}
-        <a href="{{ post.url | relative_url }}">
-          <img src="{{ post.cover }}" alt="{{ post.title }}" class="blog-cover">
-        </a>
+        <img src="{{ post.cover | relative_url }}" alt="{{ post.title }}">
       {% endif %}
-
-      <div class="blog-content">
-        <h2><a href="{{ post.url | relative_url }}">{{ post.title }}</a></h2>
-        <p class="meta">{{ post.date | date: "%B %d, %Y" }} · {{ post.author }}</p>
-        <p>{{ post.excerpt | strip_html | truncate: 150 }}</p>
-        <a href="{{ post.url | relative_url }}" class="read-more">Read More →</a>
+      <div class="archive__item-body">
+        <h2 class="archive__item-title">
+          <a href="{{ post.url | relative_url }}">{{ post.title }}</a>
+        </h2>
+        <p class="archive__item-meta">{{ post.date | date: "%B %d, %Y" }}</p>
+        <p class="archive__item-excerpt">{{ post.excerpt | strip_html | truncate: 150 }}</p>
       </div>
     </article>
   {% endfor %}
 </div>
-
-{% if paginator.total_pages > 1 %}
-<nav class="pagination" role="navigation">
-  {% if paginator.previous_page %}
-    <a class="newer" href="{{ paginator.previous_page_path | relative_url }}">&larr; Newer Posts</a>
-  {% endif %}
-  {% if paginator.next_page %}
-    <a class="older" href="{{ paginator.next_page_path | relative_url }}">Older Posts &rarr;</a>
-  {% endif %}
-</nav>
-{% endif %}
