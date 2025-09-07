@@ -1,0 +1,40 @@
+---
+layout: null
+permalink: /debug-site-info.html
+---
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>PA360 — Jekyll Debug</title></head>
+<body style="font-family:system-ui,Arial;margin:24px;">
+<h1>Project Athlete 360 — Jekyll Debug</h1>
+
+<p><strong>site.url:</strong> {{ site.url }}</p>
+<p><strong>site.baseurl:</strong> {{ site.baseurl }}</p>
+<p><strong>site.time:</strong> {{ site.time }}</p>
+
+<h2>_posts detected: {{ site.posts | size }}</h2>
+
+<ul>
+{% for p in site.posts %}
+  <li style="margin-bottom:12px;">
+    <strong>Title:</strong> {{ p.title | default: "(no title)" }}<br>
+    <strong>Path:</strong> {{ p.path | default: "(no path)" }}<br>
+    <strong>URL:</strong> <a href="{{ p.url | relative_url }}">{{ p.url | relative_url }}</a><br>
+    <strong>Date:</strong> {{ p.date }}<br>
+    <strong>Excerpt:</strong> {{ p.excerpt | strip_html | truncate:120 }}
+  </li>
+{% endfor %}
+</ul>
+
+<h2>paginator?</h2>
+<p>{% if paginator %}paginator present — posts on page: {{ paginator.posts | size }}{% else %}no paginator object{% endif %}</p>
+
+<h2>Pages ({{ site.pages | size }})</h2>
+<ul>
+{% for pg in site.pages %}
+  <li>{{ pg.path }} — {{ pg.url }}</li>
+{% endfor %}
+</ul>
+
+</body>
+</html>
