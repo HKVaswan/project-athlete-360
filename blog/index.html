@@ -1,16 +1,22 @@
 ---
-layout: blog
+layout: default
 title: "Blog"
 permalink: /blog/
 ---
 
 <h1>All Posts</h1>
 
-<ul>
-{% for post in site.posts %}
-  <li>
-    <a href="{{ post.url | relative_url }}">{{ post.title }}</a>
-    <small>{{ post.date | date: "%B %d, %Y" }}</small>
-  </li>
-{% endfor %}
-</ul>
+<div class="posts-list">
+  {% for post in site.posts %}
+    <article class="post-preview">
+      {% if post.cover %}
+        <a href="{{ post.url | relative_url }}">
+          <img src="{{ post.cover | relative_url }}" alt="{{ post.title }}" style="border-radius: 8px; margin-bottom: 1rem; width: 100%;">
+        </a>
+      {% endif %}
+      <h2><a href="{{ post.url | relative_url }}">{{ post.title }}</a></h2>
+      <p class="post-meta">{{ post.date | date: "%B %d, %Y" }}</p>
+      <p class="post-excerpt">{{ post.excerpt | strip_html | truncate: 160 }}</p>
+    </article>
+  {% endfor %}
+</div>
