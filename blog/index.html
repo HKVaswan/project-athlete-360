@@ -1,36 +1,35 @@
----
-layout: default
-title: "Blog"
-permalink: /blog/
----
-
 <section class="blog-hero">
-  <h1>Project Athlete 360 — Blog</h1>
-  <p>Insights, updates and analysis on sports science, community, and growth — curated by Project Athlete 360.</p>
-  
-  <div class="blog-panel">
-    <a href="/">Home</a>
-    <a href="/blog/">Blog</a>
-    <a href="/mission/">Mission</a>
-    <a href="https://pa360.in" target="_blank">PA360.in Main Site</a>
+  <div class="hero-inner">
+    <div class="hero-text">
+      <h1>Project Athlete 360 — Blog</h1>
+      <p class="hero-sub">Insights, updates and analysis on sports science, community, and growth — curated by Project Athlete 360.</p>
+    </div>
+    <nav class="blog-panel">
+      <a href="/" class="panel-item">Home</a>
+      <a href="/blog/" class="panel-item is-active">Blog</a>
+      <a href="/mission/" class="panel-item">Mission</a>
+      <a href="https://pa360.in" class="panel-item" target="_blank">PA360.in</a>
+      <a href="https://www.projectathlete360.com" class="panel-item" target="_blank">Main Site</a>
+    </nav>
   </div>
 </section>
 
-<hr>
-
-<div class="posts-list">
+<section class="archive">
   {% for post in site.posts %}
-    <article class="archive__item">
+    <article class="archive__item tile">
       {% if post.cover %}
-        <img src="{{ post.cover }}" alt="{{ post.title }}">
+        <div class="tile-media">
+          <img src="{{ post.cover | relative_url }}" alt="{{ post.title }}">
+        </div>
       {% endif %}
-      <div class="archive__item-body">
-        <h2 class="archive__item-title">
-          <a href="{{ post.url | relative_url }}">{{ post.title }}</a>
-        </h2>
+      <div class="tile-body">
+        <h3 class="archive__item-title"><a href="{{ post.url | relative_url }}">{{ post.title }}</a></h3>
         <p class="archive__item-meta">{{ post.date | date: "%B %d, %Y" }}</p>
-        <p class="archive__item-excerpt">{{ post.excerpt | strip_html | truncate: 150 }}</p>
+        <p class="archive__item-excerpt">{{ post.excerpt | strip_html | truncate: 140 }}</p>
+        <div class="tile-footer">
+          <a class="tile-cta" href="{{ post.url | relative_url }}">Read →</a>
+        </div>
       </div>
     </article>
   {% endfor %}
-</div>
+</section>
