@@ -5,13 +5,3 @@ permalink: /blog/
 author_profile: false
 sidebar: none
 ---
-
-{% include base_path %}
-
-<h2 class="archive__subtitle">All Posts</h2>
-
-{% for post in paginator.posts %}
-  {% include archive-single.html %}
-{% endfor %}
-
-{% include paginator.html %}
