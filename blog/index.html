@@ -6,17 +6,29 @@ permalink: /blog/
 
 <h1>All Posts</h1>
 
-<div class="posts-list">
+<div class="archive">
   {% for post in site.posts %}
-    <article class="post-preview">
+    <article class="archive__item">
       {% if post.cover %}
         <a href="{{ post.url | relative_url }}">
-          <img src="{{ post.cover | relative_url }}" alt="{{ post.title }}" style="border-radius: 8px; margin-bottom: 1rem; width: 100%;">
+          <img src="{{ post.cover | relative_url }}" alt="{{ post.title }}">
         </a>
       {% endif %}
-      <h2><a href="{{ post.url | relative_url }}">{{ post.title }}</a></h2>
-      <p class="post-meta">{{ post.date | date: "%B %d, %Y" }}</p>
-      <p class="post-excerpt">{{ post.excerpt | strip_html | truncate: 160 }}</p>
+      <div class="archive__item-body">
+        <h2 class="archive__item-title">
+          <a href="{{ post.url | relative_url }}">{{ post.title }}</a>
+        </h2>
+        <p class="archive__item-meta">
+          {{ post.date | date: "%B %d, %Y" }}
+          {% if post.categories %}
+            · 
+            {% for category in post.categories %}
+              <a href="{{ '/categories/#' | append: category | relative_url }}">{{ category }}</a>
+            {% endfor %}
+          {% endif %}
+        </p>
+        <p class="archive__item-excerpt">{{ post.excerpt | strip_html | truncate: 150 }}</p>
+      </div>
     </article>
   {% endfor %}
 </div>
