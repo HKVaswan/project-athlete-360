@@ -1,73 +1,36 @@
 ---
-layout: default
+layout: blog
 title: "Blog"
 permalink: /blog/
 ---
 
-<!-- ===== Blog Hero / Intro ===== -->
-<section class="blog-hero" aria-label="Blog intro">
-  <div class="blog-hero-inner">
-    <div class="hero-text">
-      <h1>Project Athlete 360 — Blog</h1>
-      <p class="hero-sub">Insights, updates and analysis on sports science, community, and growth — curated by Project Athlete 360.</p>
-    </div>
-
-    <nav class="blog-panel" role="navigation" aria-label="Blog quick links">
-      <a href="{{ '/' | relative_url }}" class="panel-item">Home</a>
-      <a href="{{ '/blog/' | relative_url }}" class="panel-item is-active">Blog</a>
-      <a href="{{ '/mission/' | relative_url }}" class="panel-item">Mission</a>
-      <a href="https://pa360.in" class="panel-item" target="_blank" rel="noopener">PA360.in</a>
-      <a href="https://www.projectathlete360.com" class="panel-item" target="_blank" rel="noopener">Main Site</a>
-    </nav>
+<section class="blog-hero">
+  <h1>Project Athlete 360 — Blog</h1>
+  <p>Insights, updates and analysis on sports science, community, and growth — curated by Project Athlete 360.</p>
+  
+  <div class="blog-panel">
+    <a href="/">Home</a>
+    <a href="/blog/">Blog</a>
+    <a href="/mission/">Mission</a>
+    <a href="https://pa360.in" target="_blank">PA360.in Main Site</a>
   </div>
 </section>
 
-<!-- ===== All Posts (tile grid) ===== -->
-<section class="archive" aria-label="All posts">
-  {% for post in paginator.posts %}
-    <article class="archive__item tile">
+<hr>
+
+<div class="posts-list">
+  {% for post in site.posts %}
+    <article class="archive__item">
       {% if post.cover %}
-        <a class="tile-media" href="{{ post.url | relative_url }}">
-          <img src="{{ post.cover | relative_url }}" alt="{{ post.title }}">
-        </a>
-      {% else %}
-        <a class="tile-media tile-media--placeholder" href="{{ post.url | relative_url }}" aria-hidden="true"></a>
+        <img src="{{ post.cover }}" alt="{{ post.title }}">
       {% endif %}
-
-      <div class="tile-body">
-        <h3 class="archive__item-title"><a href="{{ post.url | relative_url }}">{{ post.title }}</a></h3>
-
-        <p class="archive__item-meta">
-          {{ post.date | date: "%B %d, %Y" }}
-          {% if post.author %} · {{ post.author }}{% endif %}
-        </p>
-
-        <p class="archive__item-excerpt">{{ post.excerpt | strip_html | truncate: 140 }}</p>
-
-        <div class="tile-footer">
-          {% if post.categories %}
-            <div class="tile-tags">
-              {% for c in post.categories %}
-                <a class="tile-tag" href="{{ '/categories/#' | append: c | relative_url }}">{{ c }}</a>
-              {% endfor %}
-            </div>
-          {% endif %}
-          <a class="tile-cta" href="{{ post.url | relative_url }}">Read →</a>
-        </div>
+      <div class="archive__item-body">
+        <h2 class="archive__item-title">
+          <a href="{{ post.url | relative_url }}">{{ post.title }}</a>
+        </h2>
+        <p class="archive__item-meta">{{ post.date | date: "%B %d, %Y" }}</p>
+        <p class="archive__item-excerpt">{{ post.excerpt | strip_html | truncate: 150 }}</p>
       </div>
     </article>
   {% endfor %}
-</section>
-
-<!-- Pagination (if >1 page) -->
-{% if paginator.total_pages > 1 %}
-<nav class="pagination" role="navigation" aria-label="Pagination">
-  {% if paginator.previous_page %}
-    <a class="newer" href="{{ paginator.previous_page_path | relative_url }}">&larr; Newer</a>
-  {% endif %}
-  <span class="page-indicator">Page {{ paginator.page }} of {{ paginator.total_pages }}</span>
-  {% if paginator.next_page %}
-    <a class="older" href="{{ paginator.next_page_path | relative_url }}">Older &rarr;</a>
-  {% endif %}
-</nav>
-{% endif %}
+</div>
