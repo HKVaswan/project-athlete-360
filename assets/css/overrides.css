@@ -1,164 +1,132 @@
-/* assets/css/overrides.css - quick branding overrides */
-:root{
-  --brand: #0b66ff;    /* your primary color - change as you like (Project Athlete 360 color) */
-  --muted: #6b7280;
+/* assets/css/overrides.css - Project Athlete 360 */
+
+/* ---- Root Colors ---- */
+:root {
+  --brand: #9ACD32;   /* accent green */
+  --hover: #E1306C;   /* playful pink */
+  --bg-dark: #0a0a0a;
+  --bg-card: #111;
+  --text-light: #cccccc;
+  --text-muted: #aaaaaa;
 }
 
-/* Header tweaks */
-.site-header {
-  background: linear-gradient(90deg, rgba(11,102,255,0.08), rgba(255,255,255,0));
-  border-bottom: 1px solid #eee;
-}
-
-/* Link & button brand color */
-a, .btn-primary {
-  color: var(--brand);
-}
-.site-footer {
-  background: #f7fafc;
-  padding: 2rem 0;
-}
-
-/* Post title bigger */
-.page-title {
-  font-size: 2.1rem;
-  margin-bottom: 0.25rem;
-}
-
-/* Make images a tiny bit rounded */
-.post-content img {
-  border-radius: 8px;
-  max-width: 100%;
-}
-
-/* Comments spacing */
-#comments {
-  margin-top: 2rem;
-}
-
-/* responsive tweaks */
-@media (min-width: 900px) {
-  .page-title { font-size: 2.6rem; }
-}
-
-/* Project Athlete 360 custom overrides */
-
-/* Global fonts */
+/* ---- Global ---- */
 body {
   font-family: 'Inter', sans-serif;
-  color: #ffffff;
-  background-color: #0a0a0a;
-  line-height: 1.7;   /* better readability */
-  font-size: 1.05rem; /* slightly larger text */
+  background-color: var(--bg-dark);
+  color: var(--text-light);
+  line-height: 1.7;
+  font-size: 1.05rem;
+  margin: 0;
 }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: 'Poppins', sans-serif;
-  line-height: 1.3;   /* tighter for headings */
+  line-height: 1.3;
   margin-bottom: 0.6rem;
+  color: var(--brand);
 }
 
 /* Links */
 a {
-  color: #9ACD32; /* accent green */
+  color: var(--brand);
+  text-decoration: none;
+  transition: color 0.2s ease;
 }
 a:hover {
-  color: #E1306C; /* playful Instagram pink for hover */
+  color: var(--hover);
 }
 
-/* Header & navigation */
+/* ---- Header & Navigation ---- */
 .masthead, .site-header {
-  background-color: #0a0a0a;
-  border-bottom: 2px solid #9ACD32;
+  background-color: var(--bg-dark);
+  border-bottom: 2px solid var(--brand);
 }
 .site-title a {
-  color: #ffffff !important;
+  color: #fff !important;
 }
 
-/* Footer */
+/* ---- Footer ---- */
 .site-footer {
-  background: #0a0a0a;
-  color: #cccccc;
-}
-.site-footer a {
-  color: #9ACD32;
-}
-
-/* Blog post styling */
-.page__title {
-  color: #9ACD32;
-}
-.page__meta, .page__content {
-  color: #cccccc;
-}
-
-/* ---- Custom Blog Footer ---- */
-.site-footer {
-  background: #0a0a0a;
+  background: var(--bg-dark);
   text-align: center;
   padding: 2rem 1rem;
   font-size: 0.95rem;
-  border-top: 2px solid #9ACD32;
+  border-top: 2px solid var(--brand);
 }
-
+.site-footer a {
+  color: var(--brand);
+}
 .site-footer .copyright {
-  color: #cccccc;
+  color: var(--text-light);
   font-weight: 500;
-  display: block;
   margin-top: 0.5rem;
 }
 
-/* ---- Blog Post List Styling ---- */
+/* ---- Blog Index ---- */
+.posts-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  margin: 2rem 0;
+}
 
-/* Blog index page */
-.archive__item {
-  background: #111; /* slightly lighter than body background */
+.post-preview, .archive__item {
+  background: var(--bg-card);
   border: 1px solid #1f1f1f;
   border-radius: 12px;
   padding: 1.5rem;
-  margin-bottom: 1.5rem;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
-
-.archive__item:hover {
+.post-preview:hover, .archive__item:hover {
   transform: translateY(-4px);
   box-shadow: 0 6px 16px rgba(0,0,0,0.4);
 }
 
-/* Blog post title in list */
-.archive__item-title a {
-  color: #9ACD32; /* accent green */
+/* Blog Post Title */
+.post-preview h2 a, .archive__item-title a {
+  color: var(--brand);
   font-size: 1.5rem;
   font-weight: 600;
-  text-decoration: none;
+}
+.post-preview h2 a:hover, .archive__item-title a:hover {
+  color: var(--hover);
 }
 
-.archive__item-title a:hover {
-  color: #E1306C; /* playful hover */
-}
-
-/* Post meta (date, categories) */
-.archive__item-meta {
-  color: #aaaaaa;
+/* Meta info */
+.post-meta, .archive__item-meta {
+  color: var(--text-muted);
   font-size: 0.9rem;
   margin-bottom: 0.75rem;
 }
 
-/* Post excerpt */
-.archive__item-excerpt {
-  color: #cccccc;
+/* Excerpt */
+.post-excerpt, .archive__item-excerpt {
+  color: var(--text-light);
   font-size: 1rem;
   line-height: 1.6;
 }
 
 /* Category labels */
 .page__taxonomy-item {
-  background: #9ACD32;
-  color: #0a0a0a;
+  background: var(--brand);
+  color: var(--bg-dark);
   padding: 0.25rem 0.5rem;
   border-radius: 6px;
   font-size: 0.8rem;
   margin-right: 0.3rem;
   text-transform: uppercase;
   font-weight: 600;
+}
+
+/* ---- Responsive ---- */
+@media (min-width: 768px) {
+  .posts-list {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (min-width: 1200px) {
+  .posts-list {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
 }
