@@ -193,3 +193,68 @@ a:hover {
 .read-more:hover {
   text-decoration: underline;
 }
+
+/* ---- Single Post Page ---- */
+.post {
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 2rem;
+  background: var(--bg-card);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+/* Post title */
+.post h1 {
+  font-size: 2.2rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  color: var(--brand);
+}
+
+/* Meta info (date, author) */
+.post .post-meta {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-bottom: 1.5rem;
+}
+
+/* Paragraphs */
+.post p {
+  margin-bottom: 1.2rem;
+  line-height: 1.8;
+  font-size: 1.05rem;
+  color: var(--text-light);
+}
+
+/* Images inside post */
+.post img {
+  max-width: 100%;
+  border-radius: 10px;
+  margin: 1.5rem 0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+}
+
+/* Blockquotes */
+.post blockquote {
+  border-left: 4px solid var(--brand);
+  padding-left: 1rem;
+  font-style: italic;
+  color: var(--text-muted);
+  margin: 1.5rem 0;
+}
+
+/* Code snippets */
+.post code {
+  background: #222;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  color: #ffcc66;
+}
+
+.post pre code {
+  display: block;
+  padding: 1rem;
+  overflow-x: auto;
+}
