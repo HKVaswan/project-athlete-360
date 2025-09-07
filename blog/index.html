@@ -6,14 +6,24 @@ permalink: /blog/
 
 <h1>All Posts</h1>
 
-<ul>
-{% for post in paginator.posts %}
-  <li>
-    <a href="{{ post.url | relative_url }}">{{ post.title }}</a>
-    <small>{{ post.date | date: "%B %d, %Y" }}</small>
-  </li>
-{% endfor %}
-</ul>
+<div class="blog-grid">
+  {% for post in paginator.posts %}
+    <article class="blog-card">
+      {% if post.cover %}
+        <a href="{{ post.url | relative_url }}">
+          <img src="{{ post.cover }}" alt="{{ post.title }}" class="blog-cover">
+        </a>
+      {% endif %}
+
+      <div class="blog-content">
+        <h2><a href="{{ post.url | relative_url }}">{{ post.title }}</a></h2>
+        <p class="meta">{{ post.date | date: "%B %d, %Y" }} · {{ post.author }}</p>
+        <p>{{ post.excerpt | strip_html | truncate: 150 }}</p>
+        <a href="{{ post.url | relative_url }}" class="read-more">Read More →</a>
+      </div>
+    </article>
+  {% endfor %}
+</div>
 
 {% if paginator.total_pages > 1 %}
 <nav class="pagination" role="navigation">
