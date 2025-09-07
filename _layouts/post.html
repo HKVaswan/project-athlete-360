@@ -2,10 +2,6 @@
 layout: single
 ---
 
-{%- comment -%}
-This is a theme-specific override. It re-uses the theme's layout 'single' but renders page content and injects giscus.
-{%- endcomment -%}
-
 <article class="post">
   <header class="page-header">
     <h1 class="page-title">{{ page.title }}</h1>
@@ -22,12 +18,23 @@ This is a theme-specific override. It re-uses the theme's layout 'single' but re
     {{ content }}
   </div>
 
+  <!-- 🔽 Add navigation right here, before comments -->
+  <div class="post-navigation">
+    {% if page.previous %}
+      <a class="post-nav prev" href="{{ page.previous.url | relative_url }}">
+        ⬅ {{ page.previous.title }}
+      </a>
+    {% endif %}
+    {% if page.next %}
+      <a class="post-nav next" href="{{ page.next.url | relative_url }}">
+        {{ page.next.title }} ➡
+      </a>
+    {% endif %}
+  </div>
+  <!-- 🔼 End navigation -->
+
   <hr>
 
-  {% comment %}
-    Insert giscus comments box. This partial uses the values you got from giscus.app.
-    If you ever need to update repo-id or category-id, change _includes/giscus.html
-  {% endcomment %}
   {% include giscus.html %}
 </article>
 
