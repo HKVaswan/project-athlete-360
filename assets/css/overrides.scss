@@ -258,3 +258,23 @@ a:hover {
   padding: 1rem;
   overflow-x: auto;
 }
+
+/* ---- Post Navigation ---- */
+.post-navigation {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #222;
+}
+
+.post-navigation a {
+  color: var(--brand);
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.post-navigation a:hover {
+  color: var(--hover);
+}
