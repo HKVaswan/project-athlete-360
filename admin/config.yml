@@ -5,8 +5,7 @@ url: "https://www.projectathlete360.com"   # canonical URL (use www since you us
 baseurl: ""                                # leave blank for root
 timezone: "Asia/Kolkata"
 
-# Theme
-theme: minima               # fallback; remote_theme below is the primary
+# Theme (Minimal Mistakes only)
 remote_theme: "mmistakes/minimal-mistakes"
 minimal_mistakes_skin: "blue"
 
@@ -14,6 +13,7 @@ minimal_mistakes_skin: "blue"
 author:
   name: "H.K. Vaswan"
 
+# Plugins
 plugins:
   - jekyll-remote-theme
   - jekyll-paginate
