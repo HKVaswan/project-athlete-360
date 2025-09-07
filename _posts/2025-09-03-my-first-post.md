@@ -2,6 +2,7 @@
 layout: post
 title: "My First Post"
 date: 2025-09-03
+categories: [tips]
 author: "H.K. Vaswan"
 cover: /assets/images/sample.jpg   # optional, can remove if no image
 ---
