@@ -1,15 +1,8 @@
 ---
-# Only needed to tell Jekyll this is SCSS
+# Required front matter so Jekyll treats this as SCSS
 ---
 
-/* your existing CSS starts below */
-:root {
-  --brand: #0b66ff;
-  --muted: #6b7280;
-}
-/* rest of your overrides… */
-
-/* assets/css/overrides.css - Project Athlete 360 */
+/* assets/css/overrides.scss - Project Athlete 360 */
 
 /* ---- Root Colors ---- */
 :root {
@@ -75,78 +68,10 @@ a:hover {
 }
 
 /* ---- Blog Index ---- */
-.posts-list {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 2rem;
-  margin: 2rem 0;
-}
-
-.post-preview, .archive__item {
-  background: var(--bg-card);
-  border: 1px solid #1f1f1f;
-  border-radius: 12px;
-  padding: 1.5rem;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-.post-preview:hover, .archive__item:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 6px 16px rgba(0,0,0,0.4);
-}
-
-/* Blog Post Title */
-.post-preview h2 a, .archive__item-title a {
-  color: var(--brand);
-  font-size: 1.5rem;
-  font-weight: 600;
-}
-.post-preview h2 a:hover, .archive__item-title a:hover {
-  color: var(--hover);
-}
-
-/* Meta info */
-.post-meta, .archive__item-meta {
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  margin-bottom: 0.75rem;
-}
-
-/* Excerpt */
-.post-excerpt, .archive__item-excerpt {
-  color: var(--text-light);
-  font-size: 1rem;
-  line-height: 1.6;
-}
-
-/* Category labels */
-.page__taxonomy-item {
-  background: var(--brand);
-  color: var(--bg-dark);
-  padding: 0.25rem 0.5rem;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  margin-right: 0.3rem;
-  text-transform: uppercase;
-  font-weight: 600;
-}
-
-/* ---- Responsive ---- */
-@media (min-width: 768px) {
-  .posts-list {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-@media (min-width: 1200px) {
-  .posts-list {
-    grid-template-columns: 1fr 1fr 1fr;
-  }
-}
-
-/* Blog index cards with image */
 .archive__item {
   display: flex;
   flex-direction: column;
-  background: #111;
+  background: var(--bg-card);
   border: 1px solid #1f1f1f;
   border-radius: 12px;
   overflow: hidden;
@@ -165,7 +90,54 @@ a:hover {
   padding: 1.2rem;
 }
 
+.archive__item-title a {
+  color: var(--brand);
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+.archive__item-title a:hover {
+  color: var(--hover);
+}
+
+.archive__item-meta {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-bottom: 0.75rem;
+}
+
+.archive__item-excerpt {
+  color: var(--text-light);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
 .archive__item:hover {
   transform: translateY(-4px);
   box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+}
+
+/* Category labels */
+.page__taxonomy-item {
+  background: var(--brand);
+  color: var(--bg-dark);
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  margin-right: 0.3rem;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+/* ---- Responsive ---- */
+@media (min-width: 768px) {
+  .archive {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+  }
+}
+@media (min-width: 1200px) {
+  .archive {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
 }
