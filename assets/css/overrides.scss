@@ -301,3 +301,168 @@ a:hover {
   color: #fff;
   transform: translateY(-2px);
 }
+
+/* ===== Blog hero + panel + tile card styles ===== */
+
+/* Hero */
+.blog-hero {
+  padding: 2rem 1rem;
+  border-radius: 10px;
+  margin: 1rem 0 1.5rem;
+}
+.blog-hero-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: flex-start;
+}
+.hero-text h1 {
+  margin: 0 0 0.25rem;
+  font-size: 2.2rem;
+  color: var(--brand);
+}
+.hero-sub {
+  margin: 0;
+  color: var(--text-muted);
+  max-width: 70ch;
+}
+
+/* Panel / quick menu */
+.blog-panel {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.6rem;
+}
+.blog-panel .panel-item {
+  display: inline-block;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.02);
+  color: var(--text-light);
+  text-decoration: none;
+  border: 1px solid rgba(255,255,255,0.03);
+  font-weight: 600;
+  transition: background .15s ease, color .15s ease, transform .12s ease;
+}
+.blog-panel .panel-item:hover { transform: translateY(-2px); background: rgba(154,205,50,0.07); color: var(--brand); }
+.blog-panel .panel-item.is-active { background: linear-gradient(180deg, rgba(154,205,50,0.06), rgba(154,205,50,0.02)); border-color: rgba(154,205,50,0.14); color: var(--brand); }
+
+/* Archive grid container (tiles) */
+.archive {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+  margin: 1.5rem 0 3rem;
+}
+
+/* tile card */
+.archive__item.tile {
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #0f1315, #0b0b0b);
+  border: 1px solid rgba(154,205,50,0.06);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: transform .18s ease, box-shadow .18s ease;
+  min-height: 220px;
+}
+
+/* image area */
+.tile-media {
+  display: block;
+  width: 100%;
+  height: 160px;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(0,0,0,0.04), rgba(0,0,0,0.12));
+}
+.tile-media img { width: 100%; height: 100%; object-fit: cover; display:block; }
+
+/* placeholder for posts without image */
+.tile-media--placeholder {
+  height: 160px;
+  background: linear-gradient(90deg, rgba(154,205,50,0.04), rgba(154,205,50,0.01));
+}
+
+/* text body */
+.tile-body {
+  padding: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  flex: 1 1 auto;
+}
+.archive__item-title a {
+  color: var(--brand);
+  text-decoration: none;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+.archive__item-meta {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+.archive__item-excerpt {
+  color: var(--text-light);
+  margin-top: 0.2rem;
+  flex: 1 1 auto;
+}
+
+/* footer row inside tile */
+.tile-footer {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+}
+.tile-tags { display:flex; gap:0.4rem; flex-wrap:wrap; }
+.tile-tag {
+  font-size: 0.72rem;
+  color: var(--bg-dark);
+  background: var(--brand);
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  text-transform:uppercase;
+  font-weight:700;
+  text-decoration:none;
+}
+.tile-cta {
+  color: var(--bg-dark);
+  background: var(--brand);
+  padding: 0.4rem 0.7rem;
+  border-radius: 6px;
+  font-weight:700;
+  text-decoration:none;
+}
+
+/* hover */
+.archive__item.tile:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.45);
+}
+
+/* pagination */
+.pagination {
+  display:flex;
+  gap:1rem;
+  align-items:center;
+  justify-content:center;
+  padding: 1.25rem 0 2rem;
+}
+.pagination a { color: var(--brand); text-decoration:none; font-weight:700; padding:0.5rem 0.9rem; border-radius:6px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.03); }
+.page-indicator { color: var(--text-muted); font-weight:600; }
+
+/* responsive grid */
+@media (min-width: 700px) {
+  .archive { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 1100px) {
+  .archive { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* small tweaks for hero on wide screens */
+@media (min-width: 900px) {
+  .blog-hero-inner { flex-direction: row; align-items: center; justify-content: space-between; gap: 2rem; }
+  .hero-text { max-width: 55%; }
+}
