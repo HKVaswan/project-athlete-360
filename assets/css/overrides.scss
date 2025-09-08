@@ -583,3 +583,86 @@ a:hover {
   .pa360-footer-grid { grid-template-columns: 1fr 1fr 280px; }
   .pa360-footer-bottom { flex-direction:row; justify-content:space-between; width:100%; }
 }
+
+/* ---- PA360: Footer overrides (paste into assets/css/overrides.scss or overrides.css) ---- */
+
+.pa360-site-footer {
+  background-color: #151a21;
+  color: #ecf0f1;
+  padding: 60px 0 40px;
+  text-align: left;
+}
+.pa360-site-footer .pa360-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+.pa360-site-footer h2 {
+  font-size: 2.2rem;
+  color: #ffffff;
+  margin-bottom: 10px;
+  text-align: center;
+}
+.pa360-site-footer .caption {
+  font-size: 1rem;
+  color: #bdc3c7;
+  margin-bottom: 40px;
+  text-align: center;
+}
+
+/* grid */
+.pa360-footer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 30px;
+  margin-bottom: 30px;
+}
+.pa360-footer-column h3 {
+  font-size: 1.15rem;
+  color: #ffffff;
+  margin-bottom: 18px;
+}
+.pa360-footer-column ul { list-style: none; padding: 0; margin: 0; }
+.pa360-footer-column ul li { margin-bottom: 10px; }
+.pa360-footer-column ul li a {
+  color: #bdc3c7;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  transition: color .2s ease;
+}
+.pa360-footer-column ul li a:hover { color: #3498db; }
+
+/* social icons */
+.pa360-social-icons { display:flex; gap:18px; flex-wrap:wrap; align-items:center; }
+.pa360-social-icons a {
+  color: #ecf0f1;
+  font-size: 1.6rem;
+  text-decoration: none;
+  transition: color .2s, transform .2s;
+}
+.pa360-social-icons a:hover { color: #3498db; transform: translateY(-4px); }
+
+/* mail link */
+.pa360-footer-column a[href^="mailto:"] {
+  color: #ecf0f1;
+  display:inline-flex; gap:10px; align-items:center; text-decoration:none;
+}
+.pa360-footer-column a[href^="mailto:"]:hover { color:#3498db; }
+
+/* footer bottom row */
+.pa360-footer-bottom {
+  border-top: 1px solid rgba(255,255,255,0.06);
+  padding-top: 28px;
+  margin-top: 30px;
+  display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center;
+}
+.pa360-footer-bottom .tagline { font-style: italic; color:#bdc3c7; }
+.pa360-footer-bottom .copyright { font-size:.95rem; color:#bdc3c7; }
+
+/* responsive */
+@media (min-width:768px) {
+  .pa360-footer-bottom { flex-direction:row; justify-content:space-between; }
+  .pa360-site-footer h2 { font-size:2.6rem; }
+}
