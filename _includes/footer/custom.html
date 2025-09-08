@@ -1,6 +1,55 @@
-<footer class="site-footer">
-  <p class="copyright">
-    © 2025 Project Athlete 360. All rights reserved.
-  </p>
+<!-- _includes/footer/custom.html -->
+<footer class="pa360-section pa360-site-footer" role="contentinfo">
+  <div class="pa360-container">
+    <h2>Project Athlete 360 Ecosystem</h2>
+    <p class="caption"><em>All platforms are currently in development phase.</em></p>
+
+    <div class="pa360-footer-grid">
+      <div class="pa360-footer-column">
+        <h3>Web Platforms</h3>
+        <ul>
+          <li><a href="https://projectathlete360.com" target="_blank" rel="noopener noreferrer">🔗 projectathlete360.com (Main)</a></li>
+          <li><a href="https://projectathlete360.in" target="_blank" rel="noopener noreferrer">🔗 projectathlete360.in (Alternate)</a></li>
+          <li><a href="https://pa360.in" target="_blank" rel="noopener noreferrer">🔗 pa360.in (Institutional)</a></li>
+          <li><a href="https://pa360.net" target="_blank" rel="noopener noreferrer">🔗 pa360.net (Ecosystem Overview)</a></li>
+        </ul>
+      </div>
+
+      <div class="pa360-footer-column">
+        <h3>Follow Us</h3>
+        <div class="pa360-social-icons" aria-label="Social links">
+          <a href="https://www.youtube.com/channel/UCJNW5OsuAvhKKkPnPG8YR_g" target="_blank" rel="noopener noreferrer" title="YouTube"><i data-lucide="youtube" aria-hidden="true"></i><span class="sr-only">YouTube</span></a>
+          <a href="https://www.instagram.com/projectathlete360" target="_blank" rel="noopener noreferrer" title="Instagram"><i data-lucide="instagram" aria-hidden="true"></i><span class="sr-only">Instagram</span></a>
+          <a href="https://m.facebook.com/projectathlete360" target="_blank" rel="noopener noreferrer" title="Facebook"><i data-lucide="facebook" aria-hidden="true"></i><span class="sr-only">Facebook</span></a>
+          <a href="https://x.com/theathlete360" target="_blank" rel="noopener noreferrer" title="X (Twitter)"><i data-lucide="twitter" aria-hidden="true"></i><span class="sr-only">X</span></a>
+          <a href="https://www.linkedin.com/company/project-athlete-360" target="_blank" rel="noopener noreferrer" title="LinkedIn"><i data-lucide="linkedin" aria-hidden="true"></i><span class="sr-only">LinkedIn</span></a>
+          <a href="https://medium.com/@projectathlete360" target="_blank" rel="noopener noreferrer" title="Medium"><i data-lucide="book-open" aria-hidden="true"></i><span class="sr-only">Medium</span></a>
+          <a href="https://creators.spotify.com/pod/profile/project-athlete-360" target="_blank" rel="noopener noreferrer" title="Spotify"><i data-lucide="spotify" aria-hidden="true"></i><span class="sr-only">Spotify</span></a>
+        </div>
+      </div>
+
+      <div class="pa360-footer-column">
+        <h3>Contact Us</h3>
+        <a class="pa360-contact" href="mailto:teampa360@gmail.com">
+          <i data-lucide="mail" aria-hidden="true"></i>
+          <span>teampa360@gmail.com</span>
+        </a>
+      </div>
+    </div>
+
+    <div class="pa360-footer-bottom">
+      <p class="tagline">Uniting Sports &amp; Science. ❤️</p>
+      <p class="copyright">© {{ site.time | date: "%Y" }} Project Athlete 360. All rights reserved.</p>
+    </div>
+  </div>
+
+  <!-- small helper for screen-readers -->
+  <style> .sr-only{position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden;} </style>
 </footer>
 
+<!-- Initialize lucide icons (if not already initialized by your site) -->
+<script>
+  if (typeof lucide !== 'undefined' && lucide.replace) {
+    lucide.replace();
+  }
+</script>
