@@ -10,7 +10,11 @@
   <!-- Header -->
   <header>
     {% if page.url == "/" %}
+  {% if page.url == "/" %}
   <h1><a href="/">Project Athlete 360</a></h1>
+{% else %}
+  <div class="site-title"><a href="/">Project Athlete 360</a></div>
+{% endif %}
 {% else %}
   <div class="site-title"><a href="/">Project Athlete 360</a></div>
 {% endif %}
