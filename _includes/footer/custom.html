@@ -2,9 +2,10 @@
 <footer class="pa360-section pa360-site-footer" role="contentinfo">
   <div class="pa360-container">
     <h2>Project Athlete 360 Ecosystem</h2>
-    <p class="caption"><em>All platforms is currently under development phase.</em></p>
+    <p class="caption"><em> The platforms is currently under development phase.</em></p>
 
     <div class="pa360-footer-grid">
+      <!-- Web Platforms Column -->
       <div class="pa360-footer-column">
         <h3>Web Platforms</h3>
         <ul>
@@ -15,19 +16,42 @@
         </ul>
       </div>
 
+      <!-- Social Icons Column -->
       <div class="pa360-footer-column">
         <h3>Follow Us</h3>
         <div class="pa360-social-icons" aria-label="Social links">
-          <a href="https://www.youtube.com/channel/UCJNW5OsuAvhKKkPnPG8YR_g" target="_blank" rel="noopener noreferrer" title="YouTube"><i data-lucide="youtube" aria-hidden="true"></i><span class="sr-only">YouTube</span></a>
-          <a href="https://www.instagram.com/projectathlete360" target="_blank" rel="noopener noreferrer" title="Instagram"><i data-lucide="instagram" aria-hidden="true"></i><span class="sr-only">Instagram</span></a>
-          <a href="https://m.facebook.com/projectathlete360" target="_blank" rel="noopener noreferrer" title="Facebook"><i data-lucide="facebook" aria-hidden="true"></i><span class="sr-only">Facebook</span></a>
-          <a href="https://x.com/theathlete360" target="_blank" rel="noopener noreferrer" title="X (Twitter)"><i data-lucide="twitter" aria-hidden="true"></i><span class="sr-only">X</span></a>
-          <a href="https://www.linkedin.com/company/project-athlete-360" target="_blank" rel="noopener noreferrer" title="LinkedIn"><i data-lucide="linkedin" aria-hidden="true"></i><span class="sr-only">LinkedIn</span></a>
-          <a href="https://medium.com/@projectathlete360" target="_blank" rel="noopener noreferrer" title="Medium"><i data-lucide="book-open" aria-hidden="true"></i><span class="sr-only">Medium</span></a>
-          <a href="https://creators.spotify.com/pod/profile/project-athlete-360" target="_blank" rel="noopener noreferrer" title="Spotify"><i data-lucide="spotify" aria-hidden="true"></i><span class="sr-only">Spotify</span></a>
+          <a href="https://www.youtube.com/channel/UCJNW5OsuAvhKKkPnPG8YR_g" target="_blank" rel="noopener noreferrer" title="YouTube">
+            <i data-lucide="youtube" aria-hidden="true"></i>
+            <span class="sr-only">YouTube</span>
+          </a>
+          <a href="https://www.instagram.com/projectathlete360" target="_blank" rel="noopener noreferrer" title="Instagram">
+            <i data-lucide="instagram" aria-hidden="true"></i>
+            <span class="sr-only">Instagram</span>
+          </a>
+          <a href="https://m.facebook.com/projectathlete360" target="_blank" rel="noopener noreferrer" title="Facebook">
+            <i data-lucide="facebook" aria-hidden="true"></i>
+            <span class="sr-only">Facebook</span>
+          </a>
+          <a href="https://x.com/theathlete360" target="_blank" rel="noopener noreferrer" title="X (Twitter)">
+            <i data-lucide="twitter" aria-hidden="true"></i>
+            <span class="sr-only">X</span>
+          </a>
+          <a href="https://www.linkedin.com/company/project-athlete-360" target="_blank" rel="noopener noreferrer" title="LinkedIn">
+            <i data-lucide="linkedin" aria-hidden="true"></i>
+            <span class="sr-only">LinkedIn</span>
+          </a>
+          <a href="https://medium.com/@projectathlete360" target="_blank" rel="noopener noreferrer" title="Medium">
+            <i data-lucide="book-open" aria-hidden="true"></i>
+            <span class="sr-only">Medium</span>
+          </a>
+          <a href="https://creators.spotify.com/pod/profile/project-athlete-360" target="_blank" rel="noopener noreferrer" title="Spotify">
+            <i data-lucide="spotify" aria-hidden="true"></i>
+            <span class="sr-only">Spotify</span>
+          </a>
         </div>
       </div>
 
+      <!-- Contact Column -->
       <div class="pa360-footer-column">
         <h3>Contact Us</h3>
         <a class="pa360-contact" href="mailto:teampa360@gmail.com">
@@ -37,34 +61,54 @@
       </div>
     </div>
 
+    <!-- Footer Bottom -->
     <div class="pa360-footer-bottom">
       <p class="tagline">Uniting Sports &amp; Science. ❤️</p>
       <p class="copyright">© {{ site.time | date: "%Y" }} Project Athlete 360. All rights reserved.</p>
     </div>
   </div>
 
-  <!-- small helper for screen-readers -->
-  <style> .sr-only{position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden;} </style>
-
+  <!-- Screen-reader helper -->
   <style>
-/* Lucide social icons */
-.pa360-social-icons i[data-lucide] {
-  width: 24px;
-  height: 24px;
-  stroke: #ffffff; /* change to match your theme */
-  margin-right: 12px;
-  vertical-align: middle;
-}
-.pa360-social-icons a:hover i[data-lucide] {
-  stroke: #ffcc00; /* hover color */
-}
+    .sr-only {
+      position: absolute;
+      left: -10000px;
+      top: auto;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+    }
   </style>
-  
+
+  <!-- Lucide icon fixes -->
+  <style>
+    .pa360-social-icons i[data-lucide] {
+      display: inline-block !important;
+      width: 28px !important;
+      height: 28px !important;
+      stroke: #ecf0f1 !important;  /* main color */
+      stroke-width: 2 !important;
+      vertical-align: middle;
+    }
+
+    .pa360-social-icons a:hover i[data-lucide] {
+      stroke: #3498db !important;   /* hover color */
+    }
+
+    .pa360-social-icons a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+  </style>
+
 </footer>
 
-<!-- Initialize lucide icons (if not already initialized by your site) -->
+<!-- Initialize Lucide icons after DOM is ready -->
 <script>
-  if (typeof lucide !== 'undefined' && lucide.replace) {
-    lucide.replace();
-  }
+  document.addEventListener("DOMContentLoaded", function() {
+    if (typeof lucide !== 'undefined' && lucide.replace) {
+      lucide.replace();
+    }
+  });
 </script>
