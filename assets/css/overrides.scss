@@ -666,3 +666,24 @@ a:hover {
   .pa360-footer-bottom { flex-direction:row; justify-content:space-between; }
   .pa360-site-footer h2 { font-size:2.6rem; }
 }
+
+/* Lucide social icons fix */
+.pa360-social-icons i[data-lucide] {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  stroke: #ecf0f1; /* main color */
+  stroke-width: 2;  /* optional for thicker lines */
+  vertical-align: middle;
+}
+
+.pa360-social-icons a:hover i[data-lucide] {
+  stroke: #3498db; /* hover color */
+}
+
+/* optional spacing between icons */
+.pa360-social-icons a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
