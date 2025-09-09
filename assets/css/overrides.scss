@@ -11,7 +11,7 @@
   --accent-blue: #1d4ed8;  /* calm blue accent for links/hover */
   --hover: #E1306C;        /* playful pink (kept) */
   --bg-dark: #0a0a0a;
-  --bg-card: #111;
+  --bg-card: #1a1a1a;        /* CHANGED: Was #111, now a lighter gray for contrast */
   --card-light: #f9fafb;   /* card background (light) */
   --card-border: #e5e7eb;  /* card border (light) */
   --text-light: #cccccc;
@@ -94,7 +94,7 @@ a:hover {
 
 /* Titles */
 .archive__item-title a {
-  color: var(--brand);
+  color: #EAEAEA; /* CHANGED: Was var(--brand). A bright off-white for high contrast. */
   font-size: 1.5rem;
   font-weight: 600;
 }
@@ -339,15 +339,16 @@ a:hover {
 .tile-media {
   display: block;
   width: 100%;
-  height: 180px;  /* fixed height for visual consistency */
+  height: 180px;  /* This fixed height creates a uniform grid */
   overflow: hidden;
-  background: linear-gradient(180deg, rgba(0,0,0,0.02), rgba(0,0,0,0.06));
+  background-color: #222; /* Placeholder color for posts without images */
 }
+
 .tile-media img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  display:block;
+  object-fit: cover;  /* This is the key: crops the image to fit, preventing stretching */
+  display: block;
 }
 
 /* placeholder for posts without image (keeps space) */
@@ -591,11 +592,3 @@ a:hover {
   .pa360-site-footer h2 { font-size:2.6rem; }
 }
 
-/* Fix blog post image size */
-.tile-media img {
-  width: 100%;
-  height: 180px;       /* fixed height */
-  object-fit: cover;   /* crops instead of stretching */
-  border-radius: 0.75rem 0.75rem 0 0;
-  display: block;
-}
