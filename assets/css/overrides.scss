@@ -273,3 +273,93 @@ a:hover { color: var(--hover); }
 .post-card .read-more { color: var(--accent-blue); font-weight: 600; text-decoration: none; }
 .post-card:hover { transform: translateY(-6px); box-shadow: 0 12px 28px rgba(0,0,0,0.18); }
 
+/* ===== Fix blog card design ===== */
+
+/* Post Card (blog/index.html) */
+.post-card {
+  background: #111 !important;
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+  color: #e5e5e5;
+  display: flex;
+  flex-direction: column;
+}
+
+.post-card-body {
+  padding: 1.2rem;
+}
+
+.post-card-title a {
+  color: #9acd32; /* neon green accent */
+  font-weight: 700;
+  text-decoration: none;
+}
+.post-card-title a:hover {
+  color: #5eb8ff; /* secondary blue hover */
+}
+
+.post-card-meta {
+  font-size: 0.9rem;
+  color: #aaa;
+  margin-bottom: 0.5rem;
+}
+
+.post-card-excerpt {
+  flex: 1 1 auto;
+  line-height: 1.6;
+  color: #ccc;
+}
+
+.post-card .read-more {
+  display: inline-block;
+  margin-top: 0.8rem;
+  color: #5eb8ff;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* Remove ugly empty image bar if no image */
+.post-card-media {
+  display: none;
+}
+
+/* ===== Post Preview (layouts/blog.html) ===== */
+.post-preview {
+  background: #111 !important;
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 12px;
+  padding: 1.2rem;
+  margin-bottom: 1.5rem;
+  color: #e5e5e5;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+}
+
+.post-preview h2 a {
+  color: #9acd32;
+  font-weight: 700;
+  text-decoration: none;
+}
+.post-preview h2 a:hover {
+  color: #5eb8ff;
+}
+
+.post-preview .post-meta {
+  color: #aaa;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+.post-preview .post-excerpt {
+  color: #ccc;
+  line-height: 1.6;
+}
+
+.post-preview .read-more {
+  color: #5eb8ff;
+  font-weight: 600;
+  text-decoration: none;
+}
+
