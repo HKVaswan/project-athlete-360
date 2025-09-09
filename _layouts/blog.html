@@ -2,21 +2,5 @@
 layout: default
 ---
 
-<div class="blog-header">
-  <h1 class="page-title">{{ page.title }}</h1>
-  <p class="page-subtitle">Latest updates, insights, and stories from Project Athlete 360</p>
-</div>
-
-<div class="posts-list">
-  {% for post in paginator.posts %}
-    <article class="post-preview">
-      <h2><a href="{{ post.url | relative_url }}">{{ post.title }}</a></h2>
-      <p class="post-meta">{{ post.date | date: "%B %d, %Y" }}</p>
-      <p class="post-excerpt">{{ post.excerpt | strip_html | truncate: 160 }}</p>
-      <a href="{{ post.url | relative_url }}" class="read-more">Read more →</a>
-    </article>
-  {% endfor %}
-</div>
-
 {% include paginator.html %}
 
