@@ -590,3 +590,12 @@ a:hover {
   .pa360-footer-bottom { flex-direction:row; justify-content:space-between; }
   .pa360-site-footer h2 { font-size:2.6rem; }
 }
+
+/* Fix blog post image size */
+.tile-media img {
+  width: 100%;
+  height: 180px;       /* fixed height */
+  object-fit: cover;   /* crops instead of stretching */
+  border-radius: 0.75rem 0.75rem 0 0;
+  display: block;
+}
