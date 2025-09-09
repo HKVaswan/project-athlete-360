@@ -22,20 +22,19 @@ permalink: /blog/
 
 <section class="archive">
   {% for post in site.posts %}
-    <article class="archive__item tile">
-      {% if post.cover %}
-        <div class="tile-media">
-          <img src="{{ post.cover | relative_url }}" alt="{{ post.title }}">
-        </div>
-      {% endif %}
-      <div class="tile-body">
-        <h3 class="archive__item-title"><a href="{{ post.url | relative_url }}">{{ post.title }}</a></h3>
-        <p class="archive__item-meta">{{ post.date | date: "%B %d, %Y" }}</p>
-        <p class="archive__item-excerpt">{{ post.excerpt | strip_html | truncate: 140 }}</p>
-        <div class="tile-footer">
-          <a class="tile-cta" href="{{ post.url | relative_url }}">Read →</a>
-        </div>
-      </div>
-    </article>
+    <div class="post-card">
+  {% if post.cover %}
+    <div class="post-card-media">
+      <img src="{{ post.cover | relative_url }}" alt="{{ post.title }}">
+    </div>
+  {% endif %}
+  <div class="post-card-body">
+    <h2 class="post-card-title"><a href="{{ post.url | relative_url }}">{{ post.title }}</a></h2>
+    <p class="post-card-meta">{{ post.date | date: "%B %d, %Y" }}</p>
+    <p class="post-card-excerpt">{{ post.excerpt | strip_html | truncate: 140 }}</p>
+    <a href="{{ post.url | relative_url }}" class="read-more">Read →</a>
+  </div>
+</div>
+
   {% endfor %}
 </section>
