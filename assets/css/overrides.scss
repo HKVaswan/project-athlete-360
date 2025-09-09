@@ -221,3 +221,55 @@ a:hover { color: var(--hover); }
 /* small responsive tweaks */
 @media (min-width: 760px) { .pa360-footer-grid { grid-template-columns: 1fr 1fr 280px; } }
 @media (min-width:768px) { .pa360-site-footer h2 { font-size:2.6rem; } }
+
+/* ===== Post-card compatibility (applies when blog/index.html uses .post-card) ===== */
+.archive .post-card,
+.post-card {
+  background: var(--card-light) !important;
+  border: 1px solid var(--card-border) !important;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 320px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+
+/* image container fixed height */
+.archive .post-card-media,
+.post-card-media {
+  width: 100%;
+  height: 180px;              /* adjust to taste: 160/200/220 */
+  overflow: hidden;
+  background-color: #222;
+}
+
+/* force image to fit the box and not grow card */
+.archive .post-card-media img,
+.post-card-media img {
+  width: 100% !important;
+  height: 100% !important;
+  max-height: none !important;
+  object-fit: cover !important;
+  display: block !important;
+}
+
+/* body: spacing and typography */
+.archive .post-card-body,
+.post-card-body {
+  padding: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  flex: 1 1 auto;
+}
+
+/* title / meta / read-more */
+.post-card-title a { color: #0f1720; text-decoration: none; font-weight:700; font-size: 1.15rem; }
+.post-card-title a:hover { color: var(--accent-blue); }
+.post-card-meta { color: #6b7280; font-size: 0.88rem; }
+.post-card-excerpt { color: #334155; flex: 1 1 auto; margin-top: 0.2rem; }
+.post-card .read-more { color: var(--accent-blue); font-weight: 600; text-decoration: none; }
+.post-card:hover { transform: translateY(-6px); box-shadow: 0 12px 28px rgba(0,0,0,0.18); }
+
