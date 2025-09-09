@@ -687,3 +687,32 @@ a:hover {
   align-items: center;
   justify-content: center;
 }
+
+/* Blog Post Card Styling */
+.post-card {
+  background: #101C3A; /* Deep navy */
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Hover Effect */
+.post-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.8);
+}
+
+/* Make Titles Pop */
+.post-card h2, 
+.post-card h3, 
+.post-card h4 {
+  color: #9FEF00; /* Neon green accent */
+}
+
+/* Make Date / Metadata Subtle */
+.post-card .post-meta {
+  color: #BBBBBB;
+  font-size: 0.9em;
+}
