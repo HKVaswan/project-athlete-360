@@ -19,6 +19,19 @@
         .prose p, .prose li {
             color: #d1d5db;
         }
+        .prose pre {
+            background-color: #1a202c;
+            color: #d1d5db;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+        }
+        .prose code {
+            background-color: #1a202c;
+            color: #d1d5db;
+            padding: 0.2rem 0.4rem;
+            border-radius: 0.25rem;
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-200 antialiased">
@@ -27,7 +40,7 @@
     <header class="bg-dark-blue shadow-lg">
         <div class="container mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center">
             <div class="flex items-center space-x-4">
-                <a href="../blog/index.html" class="flex-shrink-0">
+                <a href="projectathlete360.com/blog" class="flex-shrink-0">
                     <img src="https://i.ibb.co/bgZjVKDs/image.png" alt="Project Athlete 360 Logo" class="h-10 w-auto rounded-full">
                 </a>
                 <h1 class="text-2xl md:text-3xl font-bold text-white">Project Athlete 360</h1>
@@ -61,7 +74,7 @@
             </header>
             
             <div id="post-content" class="prose max-w-none text-gray-300 mt-6">
-                <!-- Content will be loaded here by JavaScript -->
+                <!-- A simple loading state while fetching content -->
                 <div class="animate-pulse flex flex-col space-y-4">
                     <div class="h-4 bg-gray-700 rounded w-3/4"></div>
                     <div class="h-4 bg-gray-700 rounded"></div>
@@ -72,30 +85,33 @@
             </div>
             
             <!-- Author Section -->
-            <div id="author-section" class="mt-12 pt-8 border-t border-gray-700 flex items-center space-x-4 hidden">
+            <div id="author-section" class="mt-12 pt-8 border-t border-gray-700 flex items-center space-x-4">
                 <img id="author-photo" class="w-16 h-16 rounded-full" src="https://placehold.co/100x100/1f2937/d1d5db?text=Author" alt="Author's Photo">
                 <div>
-                    <p id="author-name" class="font-bold text-white text-lg"></p>
-                    <p id="author-bio" class="text-sm text-gray-400"></p>
+                    <p id="author-name" class="font-bold text-white text-lg">Author Name</p>
+                    <p id="author-bio" class="text-sm text-gray-400">Author bio goes here. This section can be used to introduce the writer and their expertise.</p>
                 </div>
             </div>
 
-            <!-- Giscus Comments Section -->
-            <section id="comments" aria-label="Comments" class="mt-12 pt-8 border-t border-gray-700">
-                <script src="https://giscus.app/client.js"
-                    data-repo="HKVaswan/project-athlete-360"
-                    data-repo-id="R_kgDOPKn6pg"
-                    data-category="Comments"
-                    data-category-id="DIC_kwDOPKn6ps4Cu7Yl"
-                    data-mapping="pathname"
-                    data-reactions-enabled="1"
-                    data-emit-metadata="0"
-                    data-input-position="bottom"
-                    data-theme="dark"
-                    crossorigin="anonymous"
-                    async>
-                </script>
-            </section>
+            <!-- Comments Section - Giscus -->
+            <div id="giscus-comments-section" class="mt-12 pt-8 border-t border-gray-700">
+                <h4 class="text-2xl font-bold text-white mb-6">Comments</h4>
+                <section id="comments" aria-label="Comments">
+                    <script src="https://giscus.app/client.js"
+                        data-repo="HKVaswan/project-athlete-360"
+                        data-repo-id="R_kgDOPKn6pg"
+                        data-category="Comments"
+                        data-category-id="DIC_kwDOPKn6ps4Cu7Yl"
+                        data-mapping="pathname"
+                        data-reactions-enabled="1"
+                        data-emit-metadata="0"
+                        data-input-position="bottom"
+                        data-theme="dark_protanopia"
+                        crossorigin="anonymous"
+                        async>
+                    </script>
+                </section>
+            </div>
         </article>
     </main>
 
@@ -146,9 +162,12 @@
         document.addEventListener('DOMContentLoaded', () => {
             const params = new URLSearchParams(window.location.search);
             const postName = params.get('post');
+            const postContentDiv = document.getElementById('post-content');
+            const authorSection = document.getElementById('author-section');
 
             if (postName) {
-                fetch(`../myposts/${postName}`)
+                // Fetch the Markdown content using a more robust absolute path
+                fetch(`/myposts/${postName}`)
                     .then(response => {
                         if (!response.ok) {
                             throw new Error('Post not found');
@@ -156,90 +175,57 @@
                         return response.text();
                     })
                     .then(markdownText => {
-                        const contentDiv = document.getElementById('post-content');
-                        const titleTag = document.getElementById('post-title-tag');
-                        const postTitle = document.getElementById('post-title');
-                        const postDate = document.getElementById('post-date');
-                        const authorSection = document.getElementById('author-section');
-                        const authorNameEl = document.getElementById('author-name');
-                        const authorBioEl = document.getElementById('author-bio');
-                        const authorPhotoEl = document.getElementById('author-photo');
+                        // Regular expressions for parsing metadata
+                        const titleRegex = /Title:\s*(.*)/;
+                        const dateRegex = /Date:\s*(.*)/;
+                        const authorRegex = /Author:\s*(.*)/;
+                        const authorBioRegex = /Author Bio:\s*(.*)/;
+                        const authorPhotoRegex = /Author Photo:\s*(.*)/;
 
-                        // Simple Markdown parsing for headers and key info
-                        const lines = markdownText.split('\n');
-                        let title = 'Untitled Post';
-                        let date = 'N/A';
-                        let authorName = '';
-                        let authorBio = '';
-                        let authorPhoto = '';
-                        let bodyLines = [];
+                        // Extract metadata
+                        const title = markdownText.match(titleRegex)?.[1] || 'Untitled Post';
+                        const date = markdownText.match(dateRegex)?.[1] || 'N/A';
+                        const author = markdownText.match(authorRegex)?.[1] || 'Author Name';
+                        const authorBio = markdownText.match(authorBioRegex)?.[1] || 'Author bio not available.';
+                        const authorPhoto = markdownText.match(authorPhotoRegex)?.[1] || 'https://placehold.co/100x100/1f2937/d1d5db?text=Author';
 
-                        lines.forEach(line => {
-                            if (line.startsWith('Title: ')) title = line.substring(7).trim();
-                            else if (line.startsWith('Date: ')) date = line.substring(6).trim();
-                            else if (line.startsWith('Author: ')) authorName = line.substring(8).trim();
-                            else if (line.startsWith('Author Bio: ')) authorBio = line.substring(12).trim();
-                            else if (line.startsWith('Author Photo: ')) authorPhoto = line.substring(14).trim();
-                            else if (line.startsWith('# ')) bodyLines.push(line);
-                            else bodyLines.push(line);
-                        });
+                        // Remove metadata from body
+                        let body = markdownText
+                            .replace(titleRegex, '')
+                            .replace(dateRegex, '')
+                            .replace(authorRegex, '')
+                            .replace(authorBioRegex, '')
+                            .replace(authorPhotoRegex, '')
+                            .trim();
 
-                        titleTag.textContent = title;
-                        postTitle.textContent = title;
-                        postDate.textContent = date;
-                        
-                        // Populate author section if data exists
-                        if (authorName) {
-                            authorSection.classList.remove('hidden');
-                            authorNameEl.textContent = authorName;
-                            authorBioEl.textContent = authorBio;
-                            if (authorPhoto) {
-                                authorPhotoEl.src = authorPhoto;
-                            }
-                        } else {
-                            authorSection.classList.add('hidden');
-                        }
+                        // Update HTML content
+                        document.getElementById('post-title-tag').textContent = title;
+                        document.getElementById('post-title').textContent = title;
+                        document.getElementById('post-date').textContent = date;
+                        document.getElementById('author-name').textContent = author;
+                        document.getElementById('author-bio').textContent = authorBio;
+                        document.getElementById('author-photo').src = authorPhoto;
 
-                        // Simple Markdown-to-HTML conversion
-                        let htmlContent = '';
-                        const markdownToHtml = (markdown) => {
-                            let html = markdown
-                                .replace(/^## (.*$)/gim, '<h2 class="text-2xl md:text-3xl font-bold mb-4">$1</h2>')
-                                .replace(/^### (.*$)/gim, '<h3 class="text-xl md:text-2xl font-bold mb-4">$1</h3>')
-                                .replace(/_([^_]+)_/g, '<i>$1</i>')
-                                .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
-                            
-                            // Handle lists
-                            html = html.replace(/^\* (.*$)/gim, '<li>$1</li>');
-                            if (html.includes('<li>')) {
-                                html = '<ul>' + html + '</ul>';
-                            }
+                        // Convert Markdown to HTML for the body content
+                        const converter = new showdown.Converter();
+                        postContentDiv.innerHTML = converter.makeHtml(body);
 
-                            // Wrap paragraphs
-                            html = html.split('\n\n').map(p => {
-                                if (!p.startsWith('<h') && !p.startsWith('<ul>') && p.trim().length > 0) {
-                                    return '<p class="mb-4">' + p.replace(/\n/g, '<br>') + '</p>';
-                                }
-                                return p;
-                            }).join('');
-                            
-                            return html;
-                        };
-
-                        contentDiv.innerHTML = markdownToHtml(bodyLines.join('\n'));
                     })
                     .catch(error => {
                         console.error('Error fetching post:', error);
                         document.getElementById('post-title').textContent = 'Post Not Found';
                         document.getElementById('post-date').textContent = '';
-                        document.getElementById('post-content').innerHTML = '<p class="text-red-500">The requested blog post could not be found. Please check the URL.</p>';
+                        postContentDiv.innerHTML = '<p class="text-red-500">The requested blog post could not be found. Please check the URL.</p>';
+                        authorSection.style.display = 'none'; // Hide author section on error
                     });
             } else {
                 document.getElementById('post-title').textContent = 'No Post Specified';
                 document.getElementById('post-date').textContent = '';
-                document.getElementById('post-content').innerHTML = '<p class="text-gray-400">Please select a post from the blog list to view its content.</p>';
+                postContentDiv.innerHTML = '<p class="text-gray-400">Please select a post from the blog list to view its content.</p>';
+                authorSection.style.display = 'none';
             }
         });
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/showdown/dist/showdown.min.js"></script>
 </body>
 </html>
