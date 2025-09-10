@@ -61,33 +61,7 @@
     <main class="container mx-auto px-4 py-12 md:py-16">
         <h3 class="text-3xl md:text-4xl font-bold text-white mb-8">Latest Posts</h3>
         <div id="posts-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <!-- Blog post tiles will be dynamically added here -->
-            <div class="bg-gray-800 rounded-xl shadow-lg overflow-hidden transform hover:scale-105 transition-transform duration-300">
-                <img src="https://placehold.co/600x400/1e293b/a5f3fc?text=Post+Image" alt="Placeholder image for blog post" class="w-full h-48 object-cover">
-                <div class="p-6">
-                    <p class="text-sm font-medium text-neon-green mb-2">September 10, 2025</p>
-                    <h4 class="text-xl font-bold text-white mb-3">Understanding ACL Injuries in Indian Football</h4>
-                    <p class="text-gray-400 text-sm">A deep dive into the common causes and evidence-based prevention strategies for ACL injuries, a prevalent issue in Indian sports.</p>
-                </div>
-            </div>
-            
-            <div class="bg-gray-800 rounded-xl shadow-lg overflow-hidden transform hover:scale-105 transition-transform duration-300">
-                <img src="https://placehold.co/600x400/1e293b/a5f3fc?text=Post+Image" alt="Placeholder image for blog post" class="w-full h-48 object-cover">
-                <div class="p-6">
-                    <p class="text-sm font-medium text-neon-green mb-2">September 5, 2025</p>
-                    <h4 class="text-xl font-bold text-white mb-3">Nutrition for Endurance: A Practitioner's Guide</h4>
-                    <p class="text-gray-400 text-sm">Translating the latest research on sports nutrition into practical advice for long-distance runners and cyclists.</p>
-                </div>
-            </div>
-
-            <div class="bg-gray-800 rounded-xl shadow-lg overflow-hidden transform hover:scale-105 transition-transform duration-300">
-                <img src="https://placehold.co/600x400/1e293b/a5f3fc?text=Post+Image" alt="Placeholder image for blog post" class="w-full h-48 object-cover">
-                <div class="p-6">
-                    <p class="text-sm font-medium text-neon-green mb-2">August 28, 2025</p>
-                    <h4 class="text-xl font-bold text-white mb-3">The Mental Game: Sports Psychology for Young Athletes</h4>
-                    <p class="text-gray-400 text-sm">Exploring key psychological strategies to help young athletes build resilience, focus, and confidence.</p>
-                </div>
-            </div>
+            <!-- Blog posts will be dynamically generated here by the script below -->
         </div>
     </main>
 
@@ -133,5 +107,54 @@
             </div>
         </div>
     </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // This is your list of posts. Add new posts here.
+            const blogPosts = [
+                {
+                    filename: 'first-post.md',
+                    title: 'Understanding ACL Injuries in Indian Football',
+                    summary: 'A deep dive into the common causes and evidence-based prevention strategies for ACL injuries, a prevalent issue in Indian sports.',
+                    date: 'September 10, 2025',
+                    image: 'https://placehold.co/600x400/1e293b/a5f3fc?text=ACL+Research'
+                },
+                {
+                    filename: 'another-post.md',
+                    title: 'Nutrition for Endurance: A Practitioner\'s Guide',
+                    summary: 'Translating the latest research on sports nutrition into practical advice for long-distance runners and cyclists.',
+                    date: 'September 5, 2025',
+                    image: 'https://placehold.co/600x400/1e293b/a5f3fc?text=Nutrition+Guide'
+                },
+                {
+                    filename: 'third-post.md',
+                    title: 'The Mental Game: Sports Psychology for Young Athletes',
+                    summary: 'Exploring key psychological strategies to help young athletes build resilience, focus, and confidence.',
+                    date: 'August 28, 2025',
+                    image: 'https://placehold.co/600x400/1e293b/a5f3fc?text=Psychology'
+                }
+            ];
+
+            const postsContainer = document.getElementById('posts-container');
+            postsContainer.innerHTML = ''; // Clear any existing content
+
+            // Loop through each post and create the HTML tile
+            blogPosts.forEach(post => {
+                const postTileHtml = `
+                    <a href="../post/index.html?post=${post.filename}" class="block">
+                        <div class="bg-gray-800 rounded-xl shadow-lg overflow-hidden transform hover:scale-105 transition-transform duration-300">
+                            <img src="${post.image}" alt="Post image for ${post.title}" class="w-full h-48 object-cover">
+                            <div class="p-6">
+                                <p class="text-sm font-medium text-neon-green mb-2">${post.date}</p>
+                                <h4 class="text-xl font-bold text-white mb-3">${post.title}</h4>
+                                <p class="text-gray-400 text-sm">${post.summary}</p>
+                            </div>
+                        </div>
+                    </a>
+                `;
+                postsContainer.innerHTML += postTileHtml;
+            });
+        });
+    </script>
 </body>
 </html>
