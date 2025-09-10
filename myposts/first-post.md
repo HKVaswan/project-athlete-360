@@ -1,6 +1,5 @@
 Title: The Unseen Epidemic: ACL Injuries in Indian Football
 Date: September 10, 2025 Author : Dr. Anika Sharma
-image: assets/sample.png
 Author Bio: Sports Physiotherapist with over 10 years of experience in injury prevention and rehabilitation.
 Author Photo: https://www.google.com/search?q=https://placehold.co/100x100/1f2937/d1d5db%3Ftext%3DAS
 The Unseen Epidemic: ACL Injuries
