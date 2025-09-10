@@ -1,9 +1,11 @@
 Title: The Unseen Epidemic: ACL Injuries in Indian Football
 Date: September 10, 2025 Author : Dr. Anika Sharma
+image: assets/sample.png
 Author Bio: Sports Physiotherapist with over 10 years of experience in injury prevention and rehabilitation.
 Author Photo: https://www.google.com/search?q=https://placehold.co/100x100/1f2937/d1d5db%3Ftext%3DAS
 The Unseen Epidemic: ACL Injuries
 In the high-stakes world of Indian football, where every sprint and pivot counts, one injury looms large: the anterior cruciate ligament (ACL) tear. This debilitating injury can sideline athletes for a full season, and its prevalence in our athletes is a growing concern. This article dives into the science behind ACL injuries and shares actionable strategies for prevention.
+
 What is the ACL?
 The ACL is a critical ligament in the knee that provides stability. It connects the thigh bone to the shin bone, preventing the shin from sliding forward during sudden movements. Injuries often occur without contact, such as when an athlete performs a non-contact cutting motion, a sudden stop, or an awkward landing from a jump.
 Why are they so common?
