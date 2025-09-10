@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Athlete 360 | Blog</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" xintegrity="sha512-Fo3rlrNjHh8o3fV6o1L5v5/jJb6N1g+Jj7p1zO5B/rJt4T0xY7gGv7tE/gG+qf5qD8zP95wF8+c12tE4ZJg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .bg-gradient-hero {
+            background-image: linear-gradient(135deg, #0f172a 0%, #0c152a 100%);
+        }
+        .text-neon-green { color: #32CD32; }
+        .text-dark-blue { color: #0f172a; }
+        .bg-dark-blue { background-color: #0f172a; }
+        .link-animation {
+            transition: color 0.3s ease;
+        }
+        .link-animation:hover {
+            color: #32CD32;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 antialiased">
+
+    <!-- Header & Quick Options Bar -->
+    <header class="bg-dark-blue shadow-lg">
+        <div class="container mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center">
+            <div class="flex items-center space-x-4">
+                <a href="projectathlete360.com/blog" class="flex-shrink-0">
+                    <img src="https://i.ibb.co/bgZjVKDs/image.png" alt="Project Athlete 360 Logo" class="h-10 w-auto rounded-full">
+                </a>
+                <h1 class="text-2xl md:text-3xl font-bold text-white">Project Athlete 360</h1>
+            </div>
+            <nav class="mt-4 md:mt-0">
+                <ul class="flex flex-wrap justify-center md:justify-end gap-4 text-sm font-medium">
+                    <li><a href="projectathlete360.com/mission" class="text-gray-300 link-animation hover:text-white">Mission</a></li>
+                    <li><a href="https://pa360.in" class="text-gray-300 link-animation hover:text-white">Research</a></li>
+                    <li><a href="mailto:projextathlete360@gmail.com" class="text-gray-300 link-animation hover:text-white">Home</a></li>
+                    <li><a href="https://youtube.com/@projectathlete360" class="text-gray-300 link-animation hover:text-white">YouTube</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="bg-gradient-hero py-16 md:py-24 text-white">
+        <div class="container mx-auto px-4 text-center">
+            <h2 class="text-4xl md:text-6xl font-extrabold text-white mb-4 leading-tight">Uniting Sports & Science.</h2>
+            <p class="max-w-4xl mx-auto text-lg md:text-xl font-light text-gray-300">
+                An evidence-first space for study, research, and storytelling from the sports science ecosystem. We empower athletes and inform practitioners, turning rigorous knowledge into everyday improvements on the field.
+            </p>
+        </div>
+    </section>
+
+    <!-- Blog Posts Section -->
+    <main class="container mx-auto px-4 py-12 md:py-16">
+        <h3 class="text-3xl md:text-4xl font-bold text-white mb-8">Latest Posts</h3>
+        <div id="posts-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <!-- Blog post tiles will be dynamically added here -->
+            <div class="bg-gray-800 rounded-xl shadow-lg overflow-hidden transform hover:scale-105 transition-transform duration-300">
+                <img src="https://placehold.co/600x400/1e293b/a5f3fc?text=Post+Image" alt="Placeholder image for blog post" class="w-full h-48 object-cover">
+                <div class="p-6">
+                    <p class="text-sm font-medium text-neon-green mb-2">September 10, 2025</p>
+                    <h4 class="text-xl font-bold text-white mb-3">Understanding ACL Injuries in Indian Football</h4>
+                    <p class="text-gray-400 text-sm">A deep dive into the common causes and evidence-based prevention strategies for ACL injuries, a prevalent issue in Indian sports.</p>
+                </div>
+            </div>
+            
+            <div class="bg-gray-800 rounded-xl shadow-lg overflow-hidden transform hover:scale-105 transition-transform duration-300">
+                <img src="https://placehold.co/600x400/1e293b/a5f3fc?text=Post+Image" alt="Placeholder image for blog post" class="w-full h-48 object-cover">
+                <div class="p-6">
+                    <p class="text-sm font-medium text-neon-green mb-2">September 5, 2025</p>
+                    <h4 class="text-xl font-bold text-white mb-3">Nutrition for Endurance: A Practitioner's Guide</h4>
+                    <p class="text-gray-400 text-sm">Translating the latest research on sports nutrition into practical advice for long-distance runners and cyclists.</p>
+                </div>
+            </div>
+
+            <div class="bg-gray-800 rounded-xl shadow-lg overflow-hidden transform hover:scale-105 transition-transform duration-300">
+                <img src="https://placehold.co/600x400/1e293b/a5f3fc?text=Post+Image" alt="Placeholder image for blog post" class="w-full h-48 object-cover">
+                <div class="p-6">
+                    <p class="text-sm font-medium text-neon-green mb-2">August 28, 2025</p>
+                    <h4 class="text-xl font-bold text-white mb-3">The Mental Game: Sports Psychology for Young Athletes</h4>
+                    <p class="text-gray-400 text-sm">Exploring key psychological strategies to help young athletes build resilience, focus, and confidence.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-dark-blue text-gray-400 py-10 md:py-16">
+        <div class="container mx-auto px-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+                <!-- Project Athlete 360 Ecosystem -->
+                <div>
+                    <h5 class="text-lg font-bold text-white mb-4">Project Athlete 360 Ecosystem</h5>
+                    <p class="text-sm text-gray-500 mb-2">All platforms are currently in the development phase.</p>
+                    <ul class="text-sm space-y-2">
+                        <li><a href="https://projectathlete360.com" class="link-animation hover:text-white">projectathlete360.com</a></li>
+                        <li><a href="https://projectathlete360.in" class="link-animation hover:text-white">projectathlete360.in</a></li>
+                        <li><a href="https://pa360.in" class="link-animation hover:text-white">pa360.in</a></li>
+                        <li><a href="https://pa360.net" class="link-animation hover:text-white">pa360.net</a></li>
+                    </ul>
+                </div>
+                <!-- Our Social Handles -->
+                <div>
+                    <h5 class="text-lg font-bold text-white mb-4">Our Social Handles</h5>
+                    <ul class="flex flex-wrap gap-4 text-xl">
+                        <li><a href="https://www.instagram.com/projectathlete360" class="link-animation hover:text-white" aria-label="Instagram"><i class="fab fa-instagram"></i></a></li>
+                        <li><a href="https://m.facebook.com/projectathlete360" class="link-animation hover:text-white" aria-label="Facebook"><i class="fab fa-facebook"></i></a></li>
+                        <li><a href="https://x.com/theathlete360" class="link-animation hover:text-white" aria-label="X"><i class="fab fa-twitter"></i></a></li>
+                        <li><a href="https://www.linkedin.com/company/project-athlete-360" class="link-animation hover:text-white" aria-label="LinkedIn"><i class="fab fa-linkedin"></i></a></li>
+                        <li><a href="https://medium.com/@projectathlete360" class="link-animation hover:text-white" aria-label="Medium"><i class="fab fa-medium"></i></a></li>
+                        <li><a href="https://creators.spotify.com/pod/profile/project-athlete-360" class="link-animation hover:text-white" aria-label="Spotify"><i class="fab fa-spotify"></i></a></li>
+                    </ul>
+                </div>
+                <!-- Contact Us -->
+                <div>
+                    <h5 class="text-lg font-bold text-white mb-4">Contact Us</h5>
+                    <ul class="text-sm space-y-2">
+                        <li><a href="mailto:teampa360@gmail.com" class="link-animation hover:text-white">teampa360@gmail.com</a></li>
+                        <li><a href="mailto:projectathlete360@gmail.com" class="link-animation hover:text-white">projectathlete360@gmail.com</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-t border-gray-700 pt-8 text-center text-sm">
+                <p>Uniting Sports & Science. <span class="text-red-500">❤️</span></p>
+                <p class="mt-2">&copy; 2025 Project Athlete 360. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
