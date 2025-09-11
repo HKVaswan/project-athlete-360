@@ -15,9 +15,10 @@ Research indicates several factors contribute to a higher rate of ACL injuries i
 •Biomechanical issues: Poor landing mechanics or an improper cutting motion.<br>
 •Previous injury history: Athletes with a prior injury are at a higher risk.<br>
 <br>
-We need to address these issues holistically.Prevention is KeyPreventing an ACL tear is far better than treating one. <br>
+We need to address these issues holistically. Prevention is Key, Preventing an ACL tear is far better than treating one. <br>
 Here are some evidence-first prevention strategies:Strength and Conditioning: Focus on building strength in the hamstrings, glutes, and core.<br>
 Plyometric Training: Incorporate drills that teach proper landing and deceleration techniques.Proprioceptive Training: Use balance boards and single-leg exercises to improve joint awareness and stability.For more information, please consult a certified sports physiotherapist. <br>
 <br>
-The goal is to move from reactive treatment to proactive prevention.Our work here at Project Athlete 360 is to turn rigorous knowledge into everyday improvements on the field, and this is a perfect example of that mission.This is a guest post by Dr. Anika Sharma.
+The goal is to move from reactive treatment to proactive prevention.Our work here at Project Athlete 360 is to turn rigorous knowledge into everyday improvements on the field, and this is a perfect example of that mission.<br>
+This is a guest post by Dr. Anika Sharma.
 <br>
