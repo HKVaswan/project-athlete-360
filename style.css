@@ -710,7 +710,7 @@ body {
 .pa360-title{
   font-size: 15px;
   letter-spacing: 0.3px;
-  display: none; /* keep compact on mobile; show on larger screens */
+  display: inline-block; /* Changed from 'none' */
 }
 
 /* Nav */
