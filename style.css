@@ -779,5 +779,11 @@ body {
   border-radius: 10px;
   box-shadow: 0 8px 30px rgba(0,0,0,0.6);
 }
+
+/* --- Fix for Invisible Hamburger Icon --- */
+.pa360-menu-btn svg rect {
+    fill: #ffffff; /* Sets the three bars of the icon to white */
+}
+
 <!-- ===== end styles ===== -->
 
