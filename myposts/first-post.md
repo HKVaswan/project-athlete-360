@@ -8,7 +8,7 @@ In the high-stakes world of Indian football, where every sprint and pivot counts
 What is the ACL?
 The ACL is a critical ligament in the knee that provides stability. It connects the thigh bone to the shin bone, preventing the shin from sliding forward during sudden movements. Injuries often occur without contact, such as when an athlete performs a non-contact cutting motion, a sudden stop, or an awkward landing from a jump.
 Why are they so common?
-Research indicates several factors contribute to a higher rate of ACL injuries in certain sports, including:
+Research indicates several factors contribute to a higher rate of ACL injuries in certain sports, including:<br>
 •Neuromuscular imbalances: Weakness in the hamstrings compared to the quadriceps.
 •Biomechanical issues: Poor landing mechanics or an improper cutting motion.
 •Previous injury history: Athletes with a prior injury are at a higher risk.
