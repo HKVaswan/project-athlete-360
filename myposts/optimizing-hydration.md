@@ -4,7 +4,7 @@ Date: September 20, 2025
 
 Author Bio: Dr. Priya Singh - Sports Nutritionist specializing in performance optimization for elite athletes.
 
-Author Photo: https://placehold.co/100x100/1f2937/d1d5db?text=PS
+Author Photo: https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png
 
 The Forgotten Fuel: Hydration <br>
 
