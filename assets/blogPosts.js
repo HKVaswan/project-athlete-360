@@ -18,5 +18,15 @@ export const blogPosts = [
         authorName: 'H.K. Vaswan',
         authorImage: 'https://i.ibb.co/x8MnfSsr/CC-20250801-141736.png',
         authorBio: 'Sports Science Educator| BPES | MPES | Former Endurance Runner'
+    },
+    {
+    filename: 'managing-pressure-burnout.md',
+    title: 'Managing Competitive Pressure & Burnout in Indian Sports',
+    summary: 'Understand the causes, signs, and practical strategies to manage burnout and competitive pressure in Indian sports.',
+    date: 'September 12, 2025',
+    image: 'https://images.pexels.com/photos/22028306/pexels-photo-22028306.jpeg',
+    authorName: 'H.K. Vaswan',
+    authorImage: 'https://i.ibb.co/x8MnfSsr/CC-20250801-141736.png',
+    authorBio: 'Sports Science Educator| BPES | MPES | Former Endurance Runner'
     }
 ];
