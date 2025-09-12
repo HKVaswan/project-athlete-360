@@ -5,7 +5,7 @@ export const blogPosts = [
         summary: 'A deep dive into the common causes and evidence-based prevention strategies for ACL injuries, a prevalent issue in Indian sports.',
         date: 'September 10, 2025',
         image: '/assets/images/acl-research-card.jpg',
-        authorName: 'H.K. Vaswan',
+        authorName: 'H.K. Vaswan' ,
         authorImage: 'https://i.ibb.co/x8MnfSsr/CC-20250801-141736.png'
     },
     {
