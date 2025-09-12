@@ -1,6 +1,6 @@
 # ACL Injuries in Indian Football: Understanding & Preventing the Threat
 
-In the high-stakes world of Indian football, where every sprint and pivot counts, one injury looms large: the **anterior cruciate ligament (ACL) tear**.  
+In the high-stakes world of Indian football, where every sprint and pivot counts, one injury looms large: the <b>anterior cruciate ligament (ACL) tear<b>.  
 This debilitating injury can sideline athletes for a full season, and its prevalence in our athletes is a growing concern.  
 
 This article dives into the science behind ACL injuries and shares **actionable strategies for prevention**.
