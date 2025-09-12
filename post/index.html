@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" integrity="sha512-Fo3rlrNjHh8o3fV6o1L5v5/jJb6N1g+Jj7p1zO5B/rJt4T0xY7gGv7tE/gG+qf5qD8zP95wF8+c12tE4ZJg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" xintegrity="sha512-Fo3rlrNjHh8o3fV6o1L5v5/jJb6N1g+Jj7p1zO5B/rJt4T0xY7gGv7tE/gG+qf5qD8zP95wF8+c12tE4ZJg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
         body { font-family: 'Inter', sans-serif; }
         .bg-dark-blue { background-color: #0f172a; }
@@ -31,6 +31,10 @@
             color: #d1d5db;
             padding: 0.2rem 0.4rem;
             border-radius: 0.25rem;
+        }
+        /* TailwindCSS aspect ratio plugin not included by default, so we'll add a common one for demonstration */
+        .aspect-video {
+            aspect-ratio: 16 / 9;
         }
     </style>
 </head>
@@ -70,8 +74,8 @@
                 <hr class="border-gray-700">
             </header>
             
-            <div class="my-6 rounded-lg overflow-hidden">
-                <img id="post-image" src="" alt="Post Main Image" class="w-full h-48 md:h-64 object-cover">
+            <div class="my-6 rounded-lg overflow-hidden aspect-video">
+                <img id="post-image" src="" alt="Post Main Image" class="w-full h-full object-cover">
             </div>
 
             <div id="post-content" class="prose max-w-none text-gray-300 mt-6">
@@ -193,7 +197,7 @@
             postImage.alt = `Main image for ${postData.title}`;
             authorName.textContent = `Written by ${postData.authorName}`;
             authorPhoto.src = postData.authorImage;
-            authorBio.textContent = postData.authorBio; // Added this line to display the author bio
+            authorBio.textContent = postData.authorBio;
 
             // Fetch the Markdown content from the myposts folder
             const markdownUrl = `../myposts/${postFilename}`;
