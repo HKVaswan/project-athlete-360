@@ -14,7 +14,7 @@ export const blogPosts = [
         title: 'Optimizing Hydration for Peak Athletic Performance',
         summary: 'Explore the critical role of hydration in athletic success and learn practical strategies to maintain optimal fluid balance.',
         date: 'September 11, 2025',
-        image: '/https://images.pexels.com/photos/416528/pexels-photo-416528.jpeg',
+        image: 'https://images.pexels.com/photos/416528/pexels-photo-416528.jpeg',
         authorName: 'H.K. Vaswan',
         authorImage: 'https://i.ibb.co/x8MnfSsr/CC-20250801-141736.png',
         authorBio: 'Sports Science Educator| BPES | MPES | Former Endurance Runner'
