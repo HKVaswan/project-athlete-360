@@ -73,6 +73,11 @@
                 <hr class="border-gray-700">
             </header>
             
+            <!-- Post Image -->
+            <div class="my-6 rounded-lg overflow-hidden">
+                <img id="post-image" src="" alt="Post Main Image" class="w-full h-48 md:h-64 object-cover">
+            </div>
+
             <div id="post-content" class="prose max-w-none text-gray-300 mt-6">
                 <!-- A simple loading state while fetching content -->
                 <div class="animate-pulse flex flex-col space-y-4">
@@ -86,7 +91,7 @@
             
             <!-- Author Section -->
             <div id="author-section" class="mt-12 pt-8 border-t border-gray-700 flex items-center space-x-4">
-                <img id="author-photo" class="w-16 h-16 rounded-full" src="https://placehold.co/100x100/1f2937/d1d5db?text=Author" alt="Author's Photo">
+                <img id="author-photo" class="w-16 h-16 rounded-full object-cover" src="https://placehold.co/100x100/1f2937/d1d5db?text=Author" alt="Author's Photo">
                 <div>
                     <p id="author-name" class="font-bold text-white text-lg">Author Name</p>
                     <p id="author-bio" class="text-sm text-gray-400">Author bio goes here. This section can be used to introduce the writer and their expertise.</p>
@@ -160,74 +165,68 @@
         </div>
     </footer>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
+    <script type="module">
+        import { blogPosts } from '../assets/blogPosts.js';
+
+        document.addEventListener('DOMContentLoaded', async () => {
             const params = new URLSearchParams(window.location.search);
-            const postName = params.get('post');
+            const postFilename = params.get('post');
             const postContentDiv = document.getElementById('post-content');
             const authorSection = document.getElementById('author-section');
+            const postTitleTag = document.getElementById('post-title-tag');
+            const postTitle = document.getElementById('post-title');
+            const postDate = document.getElementById('post-date');
+            const postImage = document.getElementById('post-image');
+            const authorName = document.getElementById('author-name');
+            const authorPhoto = document.getElementById('author-photo');
 
-            if (postName) {
-                // Fetch the Markdown content using a more robust absolute path
-                fetch(`/myposts/${postName}`)
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('Post not found');
-                        }
-                        return response.text();
-                    })
-                    .then(markdownText => {
-                        // Regular expressions for parsing metadata
-                        const titleRegex = /Title:\s*(.*)/;
-                        const dateRegex = /Date:\s*(.*)/;
-                        const authorRegex = /Author:\s*(.*)/;
-                        const authorBioRegex = /Author Bio:\s*(.*)/;
-                        const authorPhotoRegex = /Author Photo:\s*(.*)/;
-
-                        // Extract metadata
-                        const title = markdownText.match(titleRegex)?.[1] || 'Untitled Post';
-                        const date = markdownText.match(dateRegex)?.[1] || 'N/A';
-                        const author = markdownText.match(authorRegex)?.[1] || 'Author Name';
-                        const authorBio = markdownText.match(authorBioRegex)?.[1] || 'Author bio not available.';
-                        const authorPhoto = markdownText.match(authorPhotoRegex)?.[1] || 'https://placehold.co/100x100/1f2937/d1d5db?text=Author';
-
-                        // Remove metadata from body
-                        let body = markdownText
-                            .replace(titleRegex, '')
-                            .replace(dateRegex, '')
-                            .replace(authorRegex, '')
-                            .replace(authorBioRegex, '')
-                            .replace(authorPhotoRegex, '')
-                            .trim();
-
-                        // Update HTML content
-                        document.getElementById('post-title-tag').textContent = title;
-                        document.getElementById('post-title').textContent = title;
-                        document.getElementById('post-date').textContent = date;
-                        document.getElementById('author-name').textContent = author;
-                        document.getElementById('author-bio').textContent = authorBio;
-                        document.getElementById('author-photo').src = authorPhoto;
-
-                        // Convert Markdown to HTML for the body content
-                        const converter = new showdown.Converter();
-                        postContentDiv.innerHTML = converter.makeHtml(body);
-
-                    })
-                    .catch(error => {
-                        console.error('Error fetching post:', error);
-                        document.getElementById('post-title').textContent = 'Post Not Found';
-                        document.getElementById('post-date').textContent = '';
-                        postContentDiv.innerHTML = '<p class="text-red-500">The requested blog post could not be found. Please check the URL.</p>';
-                        authorSection.style.display = 'none'; // Hide author section on error
-                    });
-            } else {
-                document.getElementById('post-title').textContent = 'No Post Specified';
-                document.getElementById('post-date').textContent = '';
-                postContentDiv.innerHTML = '<p class="text-gray-400">Please select a post from the blog list to view its content.</p>';
+            if (!postFilename) {
+                postContentDiv.innerHTML = '<p class="text-center text-red-500">Post not found. Please return to the blog page.</p>';
                 authorSection.style.display = 'none';
+                return;
+            }
+
+            // Find the post data from the centralized JavaScript file
+            const postData = blogPosts.find(post => post.filename === postFilename);
+
+            if (!postData) {
+                postContentDiv.innerHTML = '<p class="text-center text-red-500">Post not found.</p>';
+                authorSection.style.display = 'none';
+                return;
+            }
+
+            // Populate metadata from the blogPosts.js file
+            postTitleTag.textContent = postData.title;
+            postTitle.textContent = postData.title;
+            postDate.textContent = postData.date;
+            postImage.src = postData.image;
+            postImage.alt = `Main image for ${postData.title}`;
+            authorName.textContent = `Written by ${postData.authorName}`;
+            authorPhoto.src = postData.authorImage;
+
+            // Fetch the Markdown content from the myposts folder
+            const markdownUrl = `../myposts/${postFilename}`;
+            try {
+                const response = await fetch(markdownUrl);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch markdown: ${response.statusText}`);
+                }
+                const markdown = await response.text();
+                
+                // Simple Markdown-to-HTML conversion logic
+                // For a production site, a dedicated library like Showdown.js is recommended
+                const htmlContent = markdown.replace(/^# (.*$)/gim, '<h1>$1</h1>')
+                                            .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+                                            .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+                                            .replace(/^\* (.*$)/gim, '<ul><li>$1</li></ul>');
+                
+                postContentDiv.innerHTML = htmlContent;
+
+            } catch (error) {
+                console.error('Error loading post:', error);
+                postContentDiv.innerHTML = `<p class="text-center text-red-500">Error loading post content.</p>`;
             }
         });
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/showdown/dist/showdown.min.js"></script>
 </body>
 </html>
