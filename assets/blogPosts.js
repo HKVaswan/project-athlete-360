@@ -6,6 +6,7 @@ export const blogPosts = [
         date: 'September 10, 2025',
         image: '/assets/images/acl-research-card.jpg',
         authorName: 'H.K. Vaswan',
+        author-bio: 'BPES | MPES | Former Endurance Runner',
         authorImage: 'https://i.ibb.co/x8MnfSsr/CC-20250801-141736.png'
     },
     {
@@ -15,6 +16,7 @@ export const blogPosts = [
         date: 'September 20, 2025',
         image: '/assets/images/hydration-guide.png',
         authorName: 'H.K. Vaswan',
+        author-bio: 'BPES | MPES | Former Endurance Runner',
         authorImage: 'https://i.ibb.co/x8MnfSsr/CC-20250801-141736.png'
     }
 ];
