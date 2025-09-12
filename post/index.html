@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" xintegrity="sha512-Fo3rlrNjHh8o3fV6o1L5v5/jJb6N1g+Jj7p1zO5B/rJt4T0xY7gGv7tE/gG+qf5qD8zP95wF8+c12tE4ZJg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" integrity="sha512-Fo3rlrNjHh8o3fV6o1L5v5/jJb6N1g+Jj7p1zO5B/rJt4T0xY7gGv7tE/gG+qf5qD8zP95wF8+c12tE4ZJg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
         body { font-family: 'Inter', sans-serif; }
         .bg-dark-blue { background-color: #0f172a; }
@@ -36,7 +36,6 @@
 </head>
 <body class="bg-gray-900 text-gray-200 antialiased">
 
-    <!-- Header & Quick Options Bar -->
     <header class="bg-dark-blue shadow-lg">
         <div class="container mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center">
             <div class="flex items-center space-x-4">
@@ -56,9 +55,7 @@
         </div>
     </header>
 
-    <!-- Post Content Section -->
     <main class="container mx-auto px-4 py-12 md:py-16">
-        <!-- Back Button -->
         <a href="../blog/index.html" class="mb-6 inline-flex items-center text-sm font-medium text-neon-green hover:text-white transition-colors duration-300">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -73,13 +70,11 @@
                 <hr class="border-gray-700">
             </header>
             
-            <!-- Post Image -->
             <div class="my-6 rounded-lg overflow-hidden">
                 <img id="post-image" src="" alt="Post Main Image" class="w-full h-48 md:h-64 object-cover">
             </div>
 
             <div id="post-content" class="prose max-w-none text-gray-300 mt-6">
-                <!-- A simple loading state while fetching content -->
                 <div class="animate-pulse flex flex-col space-y-4">
                     <div class="h-4 bg-gray-700 rounded w-3/4"></div>
                     <div class="h-4 bg-gray-700 rounded"></div>
@@ -89,7 +84,6 @@
                 </div>
             </div>
             
-            <!-- Author Section -->
             <div id="author-section" class="mt-12 pt-8 border-t border-gray-700 flex items-center space-x-4">
                 <img id="author-photo" class="w-16 h-16 rounded-full object-cover" src="https://placehold.co/100x100/1f2937/d1d5db?text=Author" alt="Author's Photo">
                 <div>
@@ -98,7 +92,6 @@
                 </div>
             </div>
 
-            <!-- Comments Section - Giscus -->
             <div id="giscus-comments-section" class="mt-12 pt-8 border-t border-gray-700">
                 <h4 class="text-2xl font-bold text-white mb-6">Comments</h4>
                 <section id="comments" aria-label="Comments">
@@ -122,11 +115,9 @@
         </article>
     </main>
 
-    <!-- Footer -->
     <footer class="bg-dark-blue text-gray-400 py-10 md:py-16">
         <div class="container mx-auto px-4">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-                <!-- Project Athlete 360 Ecosystem -->
                 <div>
                     <h5 class="text-lg font-bold text-white mb-4">Project Athlete 360 Ecosystem</h5>
                     <p class="text-sm text-gray-500 mb-2">All platforms are currently in the development phase.</p>
@@ -137,7 +128,6 @@
                         <li><a href="https://pa360.net" class="hover:text-white transition-colors duration-300">pa360.net</a></li>
                     </ul>
                 </div>
-                <!-- Our Social Handles -->
                 <div>
                     <h5 class="text-lg font-bold text-white mb-4">Our Social Handles</h5>
                     <ul class="flex flex-wrap gap-4 text-xl">
@@ -149,7 +139,6 @@
                         <li><a href="https://creators.spotify.com/pod/profile/project-athlete-360" class="hover:text-white transition-colors duration-300" aria-label="Spotify"><i class="fab fa-spotify"></i></a></li>
                     </ul>
                 </div>
-                <!-- Contact Us -->
                 <div>
                     <h5 class="text-lg font-bold text-white mb-4">Contact Us</h5>
                     <ul class="text-sm space-y-2">
@@ -160,7 +149,7 @@
             </div>
             <div class="border-t border-gray-700 pt-8 text-center text-sm">
                 <p>Uniting Sports & Science. <span class="text-red-500">❤️</span></p>
-                <p class="mt-2">&copy; 2025 Project Athlete 360. All rights reserved.</p>
+                <p class="mt-2">© 2025 Project Athlete 360. All rights reserved.</p>
             </div>
         </div>
     </footer>
@@ -179,6 +168,7 @@
             const postImage = document.getElementById('post-image');
             const authorName = document.getElementById('author-name');
             const authorPhoto = document.getElementById('author-photo');
+            const authorBio = document.getElementById('author-bio');
 
             if (!postFilename) {
                 postContentDiv.innerHTML = '<p class="text-center text-red-500">Post not found. Please return to the blog page.</p>';
@@ -203,6 +193,7 @@
             postImage.alt = `Main image for ${postData.title}`;
             authorName.textContent = `Written by ${postData.authorName}`;
             authorPhoto.src = postData.authorImage;
+            authorBio.textContent = postData.authorBio; // Added this line to display the author bio
 
             // Fetch the Markdown content from the myposts folder
             const markdownUrl = `../myposts/${postFilename}`;
