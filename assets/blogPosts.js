@@ -13,7 +13,7 @@ export const blogPosts = [
         filename: 'optimizing-hydration.md',
         title: 'Optimizing Hydration for Peak Athletic Performance',
         summary: 'Explore the critical role of hydration in athletic success and learn practical strategies to maintain optimal fluid balance.',
-        date: 'September 20, 2025',
+        date: 'September 11, 2025',
         image: '/assets/images/hydration-guide.png',
         authorName: 'H.K. Vaswan',
         authorImage: 'https://i.ibb.co/x8MnfSsr/CC-20250801-141736.png',
