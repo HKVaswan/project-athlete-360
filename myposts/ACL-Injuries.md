@@ -22,7 +22,7 @@ Injuries often occur without contact — for example:  <br>
 <br>
 
 ## Why Are ACL Injuries So Common?<br>
-
+<br>
 Research indicates several factors contribute to a higher rate of ACL injuries in certain sports, including:<br>
 <br>
 - <b>Neuromuscular imbalances</b>: Weakness in the hamstrings compared to the quadriceps  <br>
@@ -32,10 +32,10 @@ Research indicates several factors contribute to a higher rate of ACL injuries i
 <br>
 
 ## Prevention Is Key<br>
-
+<br>
 Preventing an ACL tear is far better than treating one.  <br>
 Here are some <b>evidence-first prevention strategies</b>:<br>
-
+<br>
 1. <b>Strength and Conditioning</b>  <br>
    Focus on building strength in the hamstrings, glutes, and core.  <br>
 
