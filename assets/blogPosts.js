@@ -4,7 +4,7 @@ export const blogPosts = [
         title: 'Understanding ACL Injuries in Indian Football',
         summary: 'A deep dive into the common causes and evidence-based prevention strategies for ACL injuries, a prevalent issue in Indian sports.',
         date: 'September 10, 2025',
-        image: 'https://images.pexels.com/photos/9519544/pexels-photo-9519544.jpeg',
+        image: 'https://images.pexels.com/photos/9519544/pexels-photo-9519544.jpeg',  
         authorName: 'H.K. Vaswan',
         authorImage: 'https://i.ibb.co/x8MnfSsr/CC-20250801-141736.png',
         authorBio: 'Sports Science Educator| BPES | MPES | Former Endurance Runner'
