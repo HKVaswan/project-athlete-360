@@ -10,6 +10,7 @@ import AttendancePage from "./pages/AttendancePage";
 import AssessmentsPage from "./pages/AssessmentsPage";
 import InjuriesPage from "./pages/InjuriesPage";
 import LoginPage from "./pages/LoginPage";
+import PerformancePage from "./pages/PerformancePage";
 import Pa360ElevateLandingPage from "./pages/Pa360ElevateLandingPage";
 
 const App = () => {
