@@ -61,4 +61,4 @@ const SessionList: React.FC<SessionListProps> = ({ sessions, onEdit, onDelete })
   );
 };
 
-export default SessionList;
+export default SessionList; 
