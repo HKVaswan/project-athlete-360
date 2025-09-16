@@ -1,3 +1,1 @@
-const athletesService = {};
-
-export default athletesService;
+export const athletesService = {};
