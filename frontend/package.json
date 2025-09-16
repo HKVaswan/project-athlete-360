@@ -18,7 +18,8 @@
     "chart.js": "^4.4.2",
     "lucide-react": "^0.309.0",
     "framer-motion": "^11.0.3",
-    "recharts": "^2.10.3"
+    "recharts": "^2.10.3",
+    "axios": "^1.7.2"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",
@@ -35,3 +36,4 @@
     "vite": "^5.0.8"
   }
 }
+
