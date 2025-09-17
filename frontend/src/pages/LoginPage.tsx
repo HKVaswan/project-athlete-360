@@ -1,80 +1,70 @@
-import { useState } from 'react';
-import AuthService from '../services/authService';
+import { useState, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { authService } from '../services/authService';
+import { AuthContext } from '../AuthContext';
 
 const LoginPage = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [isLogin, setIsLogin] = useState(true);
-  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+  const authContext = useContext(AuthContext);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      if (isLogin) {
-        await AuthService.login({ username, password });
-        setMessage('Login successful!');
-        // In a real app, you would redirect the user to the dashboard
-      } else {
-        await AuthService.register({ username, password });
-        setMessage('Registration successful! You can now log in.');
-        setIsLogin(true); // Switch to login form
+      await authService.login(username, password);
+      localStorage.setItem('token', 'some-token'); // Store a token on successful login
+      if (authContext) {
+        authContext.setIsAuthenticated(true);
       }
-    } catch (error: any) {
-      setMessage(error.error || 'An error occurred.');
+      navigate('/dashboard');
+    } catch (err) {
+      setError('Invalid username or password.');
+      console.error(err);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-md overflow-hidden p-6">
-        <h2 className="text-2xl font-bold text-center text-gray-800">
-          {isLogin ? 'Login' : 'Register'}
-        </h2>
-        <form className="mt-4" onSubmit={handleSubmit}>
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-100">
+      <div className="w-full max-w-md bg-white p-8 rounded-lg shadow-md">
+        <h1 className="text-4xl font-bold mb-6 text-center text-blue-800">Login</h1>
+        <form onSubmit={handleSubmit}>
           <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="username">
+            <label className="block text-gray-700 font-bold mb-2" htmlFor="username">
               Username
             </label>
             <input
-              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-              id="username"
               type="text"
-              placeholder="Username"
+              id="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
               required
             />
           </div>
           <div className="mb-6">
-            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="password">
+            <label className="block text-gray-700 font-bold mb-2" htmlFor="password">
               Password
             </label>
             <input
-              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline"
-              id="password"
               type="password"
-              placeholder="******************"
+              id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline"
               required
             />
           </div>
           <div className="flex items-center justify-between">
             <button
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
               type="submit"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
             >
-              {isLogin ? 'Sign In' : 'Register'}
-            </button>
-            <button
-              type="button"
-              className="inline-block align-baseline font-bold text-sm text-blue-500 hover:text-blue-800"
-              onClick={() => setIsLogin(!isLogin)}
-            >
-              {isLogin ? 'Need an account? Register' : 'Already have an account? Login'}
+              Sign In
             </button>
           </div>
-          {message && <p className="text-center text-gray-600 mt-4">{message}</p>}
+          {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
         </form>
       </div>
     </div>
