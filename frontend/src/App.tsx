@@ -12,7 +12,8 @@ import InjuriesPage from "./pages/InjuriesPage";
 import LoginPage from "./pages/LoginPage";
 import PerformancePage from "./pages/PerformancePage";
 import Pa360ElevateLandingPage from "./pages/Pa360ElevateLandingPage";
-import DashboardPage from "./pages/DashboardPage"; // Add this line
+import DashboardPage from "./pages/DashboardPage";
+import FeaturesPage from "./pages/FeaturesPage"; // Add this line
 
 const App = () => {
   return (
@@ -25,7 +26,8 @@ const App = () => {
           <Route path="/elevate" element={<Pa360ElevateLandingPage />} />
           
           <Route element={<ProtectedRoute />}>
-            <Route path="/dashboard" element={<DashboardPage />} /> // Add this line
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/features" element={<FeaturesPage />} /> // Add this line
             <Route path="/athletes" element={<AthletesPage />} />
             <Route path="/sessions" element={<SessionsPage />} />
             <Route path="/attendance/:sessionId" element={<AttendancePage />} />
