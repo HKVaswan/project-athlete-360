@@ -1,17 +1,33 @@
 const express = require('express');
 const cors = require('cors');
+const { Pool } = require('pg');
+
 const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(cors());
 
-// A placeholder API endpoint that returns a list of athletes
-app.get('/api/athletes', (req, res) => {
-  res.json([
-    { id: 1, name: 'Sample Athlete 1' },
-    { id: 2, name: 'Sample Athlete 2' },
-    { id: 3, name: 'Sample Athlete 3' }
-  ]);
+// Create a new Pool instance to connect to the database
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
+});
+
+app.get('/api/athletes', async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT id, name FROM athletes;');
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "An error occurred fetching athletes." });
+  }
+});
+
+// A placeholder API endpoint for the root URL
+app.get('/', (req, res) => {
+  res.send('Backend is running!');
 });
 
 app.listen(port, () => {
