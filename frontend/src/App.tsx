@@ -13,7 +13,7 @@ import LoginPage from "./pages/LoginPage";
 import PerformancePage from "./pages/PerformancePage";
 import Pa360ElevateLandingPage from "./pages/Pa360ElevateLandingPage";
 import DashboardPage from "./pages/DashboardPage";
-import FeaturesPage from "./pages/FeaturesPage"; // This line was missing
+import FeaturesPage from "./pages/FeaturesPage"; // Added this import
 
 const App = () => {
   return (
@@ -44,5 +44,3 @@ const App = () => {
 };
 
 export default App;
-
-
