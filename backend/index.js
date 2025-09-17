@@ -157,7 +157,7 @@ app.put('/api/athletes/:id', async (req, res) => {
   }
 });
 
-// Corrected endpoint to create a new training session
+// Endpoint to create a new training session
 app.post('/api/training-sessions', async (req, res) => {
   try {
     const { athlete_id, notes } = req.body;
@@ -174,6 +174,22 @@ app.post('/api/training-sessions', async (req, res) => {
     res.status(500).json({ error: "An error occurred creating the training session." });
   }
 });
+
+// New endpoint to get all training sessions for a specific athlete
+app.get('/api/training-sessions/:athleteId', async (req, res) => {
+  try {
+    const { athleteId } = req.params;
+    const { rows } = await pool.query(
+      'SELECT session_date, notes FROM training_sessions WHERE athlete_id = $1 ORDER BY session_date DESC',
+      [athleteId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "An error occurred fetching training sessions." });
+  }
+});
+
 
 app.get('/', (req, res) => {
   res.send('Backend is running!');
