@@ -26,42 +26,26 @@ const initializeDatabase = async () => {
       );
     `);
     console.log('Users table ensured to exist.');
-
-    // Check if athletes table exists, if not, create it
-    const athletesTableCheck = await pool.query(`
-      SELECT EXISTS (
-        SELECT FROM pg_tables
-        WHERE  schemaname = 'public'
-        AND    tablename  = 'athletes'
+    
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS athletes (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        athlete_id VARCHAR(255) UNIQUE
       );
     `);
+    console.log('Athletes table ensured to exist.');
 
-    if (!athletesTableCheck.rows[0].exists) {
-      await pool.query(`
-        CREATE TABLE athletes (
-          id SERIAL PRIMARY KEY,
-          name VARCHAR(255) NOT NULL,
-          athlete_id VARCHAR(255) UNIQUE
-        );
-      `);
-      console.log('Athletes table created with athlete_id column.');
-    } else {
-      // Check if athlete_id column exists, and add it if not
-      const athleteIdColumnCheck = await pool.query(`
-        SELECT EXISTS (
-          SELECT 1
-          FROM information_schema.columns
-          WHERE table_name = 'athletes' AND column_name = 'athlete_id'
-        );
-      `);
-      if (!athleteIdColumnCheck.rows[0].exists) {
-        await pool.query(`
-          ALTER TABLE athletes ADD COLUMN athlete_id VARCHAR(255) UNIQUE;
-        `);
-        console.log('Added athlete_id column to athletes table.');
-      }
-    }
-    
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS training_sessions (
+        id SERIAL PRIMARY KEY,
+        athlete_id VARCHAR(255) REFERENCES athletes(athlete_id) ON DELETE CASCADE,
+        session_date TIMESTAMP NOT NULL DEFAULT NOW(),
+        notes TEXT
+      );
+    `);
+    console.log('Training_sessions table ensured to exist.');
+
   } catch (err) {
     console.error('Error initializing database:', err);
   }
@@ -108,7 +92,6 @@ app.post('/api/register', async (req, res) => {
     res.status(500).json({ error: "An error occurred during registration." });
   }
 });
-
 
 // All previous API endpoints for athletes
 app.get('/api/athletes', async (req, res) => {
@@ -173,6 +156,24 @@ app.put('/api/athletes/:id', async (req, res) => {
   }
 });
 
+// New endpoint to create a new training session
+app.post('/api/training-sessions', async (req, res) => {
+  try {
+    const { athlete_id, session_date, notes } = req.body;
+    if (!athlete_id) {
+      return res.status(400).json({ error: 'Athlete ID is required.' });
+    }
+    const result = await pool.query(
+      'INSERT INTO training_sessions (athlete_id, session_date, notes) VALUES ($1, $2, $3) RETURNING *',
+      [athlete_id, session_date, notes]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "An error occurred creating the training session." });
+  }
+});
+
 app.get('/', (req, res) => {
   res.send('Backend is running!');
 });
@@ -180,4 +181,3 @@ app.get('/', (req, res) => {
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
-
