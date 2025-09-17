@@ -6,7 +6,6 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(cors());
-// This line is essential for parsing JSON data sent from the frontend.
 app.use(express.json());
 
 const pool = new Pool({
@@ -36,6 +35,7 @@ initializeDatabase();
 app.get('/api/athletes', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT id, name FROM athletes;');
+    // If the table is empty, we will insert some sample data for demonstration
     if (rows.length === 0) {
       await pool.query("INSERT INTO athletes (name) VALUES ('Sample Athlete 1'), ('Sample Athlete 2'), ('Sample Athlete 3');");
       const { rows: updatedRows } = await pool.query('SELECT id, name FROM athletes;');
@@ -49,20 +49,17 @@ app.get('/api/athletes', async (req, res) => {
   }
 });
 
-// New POST endpoint to create a new athlete
+// Existing POST endpoint to create a new athlete
 app.post('/api/athletes', async (req, res) => {
   try {
-    // The name of the athlete is sent in the request body
     const { name } = req.body;
     if (!name) {
       return res.status(400).json({ error: 'Athlete name is required.' });
     }
-    // SQL query to insert a new athlete into the table
     const result = await pool.query(
       'INSERT INTO athletes (name) VALUES ($1) RETURNING *',
       [name]
     );
-    // Send back the newly created athlete data
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -70,7 +67,21 @@ app.post('/api/athletes', async (req, res) => {
   }
 });
 
-// A placeholder API endpoint for the root URL
+// New DELETE endpoint to delete an athlete by ID
+app.delete('/api/athletes/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('DELETE FROM athletes WHERE id = $1 RETURNING *', [id]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Athlete not found." });
+    }
+    res.status(200).json({ message: "Athlete deleted successfully." });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "An error occurred deleting the athlete." });
+  }
+});
+
 app.get('/', (req, res) => {
   res.send('Backend is running!');
 });
