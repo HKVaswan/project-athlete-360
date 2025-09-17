@@ -31,11 +31,10 @@ const initializeDatabase = async () => {
 
 initializeDatabase();
 
-// Existing GET endpoint to fetch all athletes
+// GET endpoint to fetch all athletes
 app.get('/api/athletes', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT id, name FROM athletes;');
-    // If the table is empty, we will insert some sample data for demonstration
     if (rows.length === 0) {
       await pool.query("INSERT INTO athletes (name) VALUES ('Sample Athlete 1'), ('Sample Athlete 2'), ('Sample Athlete 3');");
       const { rows: updatedRows } = await pool.query('SELECT id, name FROM athletes;');
@@ -49,7 +48,7 @@ app.get('/api/athletes', async (req, res) => {
   }
 });
 
-// Existing POST endpoint to create a new athlete
+// POST endpoint to create a new athlete
 app.post('/api/athletes', async (req, res) => {
   try {
     const { name } = req.body;
@@ -67,7 +66,7 @@ app.post('/api/athletes', async (req, res) => {
   }
 });
 
-// New DELETE endpoint to delete an athlete by ID
+// DELETE endpoint to delete an athlete by ID
 app.delete('/api/athletes/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -79,6 +78,28 @@ app.delete('/api/athletes/:id', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "An error occurred deleting the athlete." });
+  }
+});
+
+// New PUT endpoint to update an athlete by ID
+app.put('/api/athletes/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name } = req.body;
+    if (!name) {
+      return res.status(400).json({ error: 'New athlete name is required.' });
+    }
+    const result = await pool.query(
+      'UPDATE athletes SET name = $1 WHERE id = $2 RETURNING *',
+      [name, id]
+    );
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Athlete not found." });
+    }
+    res.status(200).json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "An error occurred updating the athlete." });
   }
 });
 
