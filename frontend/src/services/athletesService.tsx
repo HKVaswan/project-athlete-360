@@ -3,6 +3,7 @@ import api from "./api";
 interface Athlete {
   id: number;
   name: string;
+  athlete_id: string;
 }
 
 export const athletesService = {
@@ -11,8 +12,8 @@ export const athletesService = {
     return response.data;
   },
 
-  createAthlete: async (name: string): Promise<Athlete> => {
-    const response = await api.post('/api/athletes', { name });
+  createAthlete: async (name: string, athlete_id: string): Promise<Athlete> => {
+    const response = await api.post('/api/athletes', { name, athlete_id });
     return response.data;
   },
 
@@ -20,9 +21,9 @@ export const athletesService = {
     await api.delete(`/api/athletes/${id}`);
   },
 
-  // New function to update an athlete by ID
-  updateAthlete: async (id: number, name: string): Promise<Athlete> => {
-    const response = await api.put(`/api/athletes/${id}`, { name });
+  updateAthlete: async (id: number, name: string, athlete_id: string): Promise<Athlete> => {
+    const response = await api.put(`/api/athletes/${id}`, { name, athlete_id });
     return response.data;
   }
 };
+
