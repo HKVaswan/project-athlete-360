@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
+const bcrypt = require('bcrypt');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -18,6 +19,15 @@ const pool = new Pool({
 const initializeDatabase = async () => {
   try {
     await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL
+      );
+    `);
+    console.log('Users table ensured to exist.');
+    
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS athletes (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL
@@ -31,7 +41,48 @@ const initializeDatabase = async () => {
 
 initializeDatabase();
 
-// GET endpoint to fetch all athletes
+// Login endpoint
+app.post('/api/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const user = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+
+    if (user.rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+
+    const validPassword = await bcrypt.compare(password, user.rows[0].password);
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+
+    res.status(200).json({ message: 'Login successful' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "An error occurred during login." });
+  }
+});
+
+// Register endpoint
+app.post('/api/register', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    const newUser = await pool.query(
+      'INSERT INTO users (username, password) VALUES ($1, $2) RETURNING *',
+      [username, hashedPassword]
+    );
+
+    res.status(201).json({ message: 'User created successfully', user: newUser.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "An error occurred during registration." });
+  }
+});
+
+
+// All previous API endpoints for athletes
 app.get('/api/athletes', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT id, name FROM athletes;');
@@ -48,7 +99,6 @@ app.get('/api/athletes', async (req, res) => {
   }
 });
 
-// POST endpoint to create a new athlete
 app.post('/api/athletes', async (req, res) => {
   try {
     const { name } = req.body;
@@ -66,7 +116,6 @@ app.post('/api/athletes', async (req, res) => {
   }
 });
 
-// DELETE endpoint to delete an athlete by ID
 app.delete('/api/athletes/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -81,7 +130,6 @@ app.delete('/api/athletes/:id', async (req, res) => {
   }
 });
 
-// New PUT endpoint to update an athlete by ID
 app.put('/api/athletes/:id', async (req, res) => {
   try {
     const { id } = req.params;
