@@ -4,7 +4,7 @@ const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.env || 3000;
 
 app.use(cors());
 app.use(express.json());
@@ -26,14 +26,42 @@ const initializeDatabase = async () => {
       );
     `);
     console.log('Users table ensured to exist.');
-    
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS athletes (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL
+
+    // Check if athletes table exists, if not, create it
+    const athletesTableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM pg_tables
+        WHERE  schemaname = 'public'
+        AND    tablename  = 'athletes'
       );
     `);
-    console.log('Athletes table ensured to exist.');
+
+    if (!athletesTableCheck.rows[0].exists) {
+      await pool.query(`
+        CREATE TABLE athletes (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          athlete_id VARCHAR(255) UNIQUE
+        );
+      `);
+      console.log('Athletes table created with athlete_id column.');
+    } else {
+      // Check if athlete_id column exists, and add it if not
+      const athleteIdColumnCheck = await pool.query(`
+        SELECT EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_name = 'athletes' AND column_name = 'athlete_id'
+        );
+      `);
+      if (!athleteIdColumnCheck.rows[0].exists) {
+        await pool.query(`
+          ALTER TABLE athletes ADD COLUMN athlete_id VARCHAR(255) UNIQUE;
+        `);
+        console.log('Added athlete_id column to athletes table.');
+      }
+    }
+    
   } catch (err) {
     console.error('Error initializing database:', err);
   }
@@ -85,14 +113,8 @@ app.post('/api/register', async (req, res) => {
 // All previous API endpoints for athletes
 app.get('/api/athletes', async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT id, name FROM athletes;');
-    if (rows.length === 0) {
-      await pool.query("INSERT INTO athletes (name) VALUES ('Sample Athlete 1'), ('Sample Athlete 2'), ('Sample Athlete 3');");
-      const { rows: updatedRows } = await pool.query('SELECT id, name FROM athletes;');
-      res.json(updatedRows);
-    } else {
-      res.json(rows);
-    }
+    const { rows } = await pool.query('SELECT id, name, athlete_id FROM athletes;');
+    res.json(rows);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "An error occurred fetching athletes." });
@@ -101,13 +123,13 @@ app.get('/api/athletes', async (req, res) => {
 
 app.post('/api/athletes', async (req, res) => {
   try {
-    const { name } = req.body;
-    if (!name) {
-      return res.status(400).json({ error: 'Athlete name is required.' });
+    const { name, athlete_id } = req.body;
+    if (!name || !athlete_id) {
+      return res.status(400).json({ error: 'Athlete name and ID are required.' });
     }
     const result = await pool.query(
-      'INSERT INTO athletes (name) VALUES ($1) RETURNING *',
-      [name]
+      'INSERT INTO athletes (name, athlete_id) VALUES ($1, $2) RETURNING *',
+      [name, athlete_id]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -133,13 +155,13 @@ app.delete('/api/athletes/:id', async (req, res) => {
 app.put('/api/athletes/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name } = req.body;
-    if (!name) {
-      return res.status(400).json({ error: 'New athlete name is required.' });
+    const { name, athlete_id } = req.body;
+    if (!name || !athlete_id) {
+      return res.status(400).json({ error: 'New athlete name and ID are required.' });
     }
     const result = await pool.query(
-      'UPDATE athletes SET name = $1 WHERE id = $2 RETURNING *',
-      [name, id]
+      'UPDATE athletes SET name = $1, athlete_id = $2 WHERE id = $3 RETURNING *',
+      [name, athlete_id, id]
     );
     if (result.rowCount === 0) {
       return res.status(404).json({ error: "Athlete not found." });
@@ -158,3 +180,4 @@ app.get('/', (req, res) => {
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
+
