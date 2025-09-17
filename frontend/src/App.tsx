@@ -13,7 +13,7 @@ import LoginPage from "./pages/LoginPage";
 import PerformancePage from "./pages/PerformancePage";
 import Pa360ElevateLandingPage from "./pages/Pa360ElevateLandingPage";
 import DashboardPage from "./pages/DashboardPage";
-import FeaturesPage from "./pages/FeaturesPage"; // Add this line
+import FeaturesPage from "./pages/FeaturesPage"; // This line was missing
 
 const App = () => {
   return (
@@ -27,7 +27,7 @@ const App = () => {
           
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/features" element={<FeaturesPage />} /> // Add this line
+            <Route path="/features" element={<FeaturesPage />} />
             <Route path="/athletes" element={<AthletesPage />} />
             <Route path="/sessions" element={<SessionsPage />} />
             <Route path="/attendance/:sessionId" element={<AttendancePage />} />
@@ -44,4 +44,3 @@ const App = () => {
 };
 
 export default App;
-
