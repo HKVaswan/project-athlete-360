@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { athletesService } from '../services/athletesService';
+import { trainingSessionsService } from '../services/trainingSessionsService';
 
 interface Athlete {
   id: number;
@@ -14,6 +15,8 @@ const AthletesPage = () => {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
   const [editingAthleteId, setEditingAthleteId] = useState('');
+  const [sessionNotes, setSessionNotes] = useState('');
+  const [loggingSessionId, setLoggingSessionId] = useState<number | null>(null);
 
   const fetchAthletes = async () => {
     try {
@@ -34,7 +37,6 @@ const AthletesPage = () => {
   const handleDelete = async (id: number) => {
     try {
       await athletesService.deleteAthlete(id);
-      // After successful deletion, refresh the list of athletes
       fetchAthletes();
     } catch (err) {
       setError('Failed to delete athlete.');
@@ -48,7 +50,7 @@ const AthletesPage = () => {
       setEditingId(null);
       setEditingName('');
       setEditingAthleteId('');
-      fetchAthletes(); // Refresh the list
+      fetchAthletes();
     } catch (err) {
       setError('Failed to update athlete.');
       console.error(err);
@@ -59,6 +61,18 @@ const AthletesPage = () => {
     setEditingId(athlete.id);
     setEditingName(athlete.name);
     setEditingAthleteId(athlete.athlete_id);
+  };
+
+  const handleLogSession = async (athleteId: string) => {
+    try {
+      await trainingSessionsService.createTrainingSession(athleteId, sessionNotes);
+      setLoggingSessionId(null);
+      setSessionNotes('');
+      alert('Session logged successfully!');
+    } catch (err) {
+      alert('Failed to log session.');
+      console.error(err);
+    }
   };
 
   if (loading) return <div className="text-center mt-8">Loading...</div>;
@@ -74,7 +88,6 @@ const AthletesPage = () => {
             athletes.map((athlete: any) => (
               <li key={athlete.id} className="flex justify-between items-center py-2 border-b last:border-b-0">
                 {editingId === athlete.id ? (
-                  // Edit mode
                   <div className="flex-grow flex flex-col sm:flex-row sm:items-center">
                     <input
                       type="text"
@@ -104,10 +117,11 @@ const AthletesPage = () => {
                     </div>
                   </div>
                 ) : (
-                  // View mode
                   <>
-                    <span className="text-lg font-bold mr-2">{athlete.athlete_id}</span>
-                    <span className="text-lg">{athlete.name}</span>
+                    <div className="flex flex-col sm:flex-row sm:items-center">
+                      <span className="text-lg font-bold mr-2">{athlete.athlete_id}</span>
+                      <span className="text-lg">{athlete.name}</span>
+                    </div>
                     <div className="flex space-x-2 ml-auto">
                       <button
                         onClick={() => handleEditClick(athlete)}
@@ -121,6 +135,12 @@ const AthletesPage = () => {
                       >
                         Delete
                       </button>
+                      <button
+                        onClick={() => setLoggingSessionId(athlete.id)}
+                        className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline"
+                      >
+                        Log Session
+                      </button>
                     </div>
                   </>
                 )}
@@ -130,6 +150,33 @@ const AthletesPage = () => {
             <p>No athletes found. Please create one.</p>
           )}
         </ul>
+
+        {loggingSessionId && (
+          <div className="mt-8 p-6 bg-white rounded-lg shadow-md">
+            <h3 className="text-xl font-semibold mb-4">Log a Session for Athlete ID: {athletes.find(a => a.id === loggingSessionId)?.athlete_id}</h3>
+            <textarea
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              rows={4}
+              placeholder="Enter session notes here..."
+              value={sessionNotes}
+              onChange={(e) => setSessionNotes(e.target.value)}
+            ></textarea>
+            <div className="flex justify-end space-x-2 mt-4">
+              <button
+                onClick={() => handleLogSession(athletes.find(a => a.id === loggingSessionId)?.athlete_id || '')}
+                className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+              >
+                Submit
+              </button>
+              <button
+                onClick={() => setLoggingSessionId(null)}
+                className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
