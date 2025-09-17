@@ -93,6 +93,7 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
+
 // All previous API endpoints for athletes
 app.get('/api/athletes', async (req, res) => {
   try {
@@ -156,16 +157,16 @@ app.put('/api/athletes/:id', async (req, res) => {
   }
 });
 
-// New endpoint to create a new training session
+// Corrected endpoint to create a new training session
 app.post('/api/training-sessions', async (req, res) => {
   try {
-    const { athlete_id, session_date, notes } = req.body;
+    const { athlete_id, notes } = req.body;
     if (!athlete_id) {
       return res.status(400).json({ error: 'Athlete ID is required.' });
     }
     const result = await pool.query(
-      'INSERT INTO training_sessions (athlete_id, session_date, notes) VALUES ($1, $2, $3) RETURNING *',
-      [athlete_id, session_date, notes]
+      'INSERT INTO training_sessions (athlete_id, notes) VALUES ($1, $2) RETURNING *',
+      [athlete_id, notes]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
