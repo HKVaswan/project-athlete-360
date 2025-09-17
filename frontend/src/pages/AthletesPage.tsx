@@ -92,9 +92,9 @@ const AthletesPage = () => {
         <ul className="bg-white shadow-md rounded-lg p-6">
           {athletes.length > 0 ? (
             athletes.map((athlete: any) => (
-              <li key={athlete.id} className="flex justify-between items-center py-2 border-b last:border-b-0">
+              <li key={athlete.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center py-4 border-b last:border-b-0">
                 {editingId === athlete.id ? (
-                  <div className="flex-grow flex flex-col sm:flex-row sm:items-center">
+                  <div className="flex-grow flex flex-col sm:flex-row sm:items-center w-full">
                     <input
                       type="text"
                       value={editingAthleteId}
@@ -107,7 +107,7 @@ const AthletesPage = () => {
                       onChange={(e) => setEditingName(e.target.value)}
                       className="shadow appearance-none border rounded w-full py-1 px-2 mb-2 sm:mb-0 sm:mr-2 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                     />
-                    <div className="flex space-x-2">
+                    <div className="flex space-x-2 mt-2 sm:mt-0">
                       <button
                         onClick={() => handleUpdate(athlete.id)}
                         className="bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline"
@@ -124,32 +124,32 @@ const AthletesPage = () => {
                   </div>
                 ) : (
                   <>
-                    <div className="flex flex-col sm:flex-row sm:items-center">
+                    <div className="flex flex-col sm:flex-row sm:items-center mb-2 sm:mb-0 flex-grow">
                       <span className="text-lg font-bold mr-2">{athlete.athlete_id}</span>
                       <span className="text-lg">{athlete.name}</span>
                     </div>
-                    <div className="flex space-x-2 ml-auto">
+                    <div className="flex flex-wrap justify-end gap-2 mt-2 sm:mt-0">
                       <button
                         onClick={() => handleEditClick(athlete)}
-                        className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline"
+                        className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline text-sm"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => handleDelete(athlete.id)}
-                        className="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline"
+                        className="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline text-sm"
                       >
                         Delete
                       </button>
                       <button
                         onClick={() => setLoggingSessionId(athlete.id)}
-                        className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline"
+                        className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline text-sm"
                       >
                         Log Session
                       </button>
                       <button
                         onClick={() => handleViewSessions(athlete.athlete_id)}
-                        className="bg-purple-500 hover:bg-purple-600 text-white font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline"
+                        className="bg-purple-500 hover:bg-purple-600 text-white font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline text-sm"
                       >
                         View Sessions
                       </button>
@@ -159,7 +159,7 @@ const AthletesPage = () => {
               </li>
             ))
           ) : (
-            <p>No athletes found. Please create one.</p>
+            <p className="text-center text-gray-600">No athletes found. Please create one.</p>
           )}
         </ul>
 
