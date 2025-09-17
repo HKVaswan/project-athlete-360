@@ -6,3 +6,4 @@ export const trainingSessionsService = {
     return response.data;
   }
 };
+
