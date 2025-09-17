@@ -18,6 +18,9 @@ export default function Navbar() {
         <Link to="/athletes" className="hover:text-blue-500">
           Athletes
         </Link>
+        <Link to="/create-athlete" className="hover:text-blue-500">
+          Create Athlete
+        </Link>
         <Link to="/login" className="hover:text-blue-500">
           Login
         </Link>
