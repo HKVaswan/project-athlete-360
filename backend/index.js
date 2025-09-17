@@ -6,8 +6,9 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(cors());
+// This line is essential for parsing JSON data sent from the frontend.
+app.use(express.json());
 
-// Create a new Pool instance to connect to the database
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
@@ -15,7 +16,6 @@ const pool = new Pool({
   }
 });
 
-// A function to connect to the database and ensure the table exists
 const initializeDatabase = async () => {
   try {
     await pool.query(`
@@ -30,13 +30,12 @@ const initializeDatabase = async () => {
   }
 };
 
-// Call the initialization function when the app starts
 initializeDatabase();
 
+// Existing GET endpoint to fetch all athletes
 app.get('/api/athletes', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT id, name FROM athletes;');
-    // If the table is empty, we will insert some sample data for demonstration
     if (rows.length === 0) {
       await pool.query("INSERT INTO athletes (name) VALUES ('Sample Athlete 1'), ('Sample Athlete 2'), ('Sample Athlete 3');");
       const { rows: updatedRows } = await pool.query('SELECT id, name FROM athletes;');
@@ -47,6 +46,27 @@ app.get('/api/athletes', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "An error occurred fetching athletes." });
+  }
+});
+
+// New POST endpoint to create a new athlete
+app.post('/api/athletes', async (req, res) => {
+  try {
+    // The name of the athlete is sent in the request body
+    const { name } = req.body;
+    if (!name) {
+      return res.status(400).json({ error: 'Athlete name is required.' });
+    }
+    // SQL query to insert a new athlete into the table
+    const result = await pool.query(
+      'INSERT INTO athletes (name) VALUES ($1) RETURNING *',
+      [name]
+    );
+    // Send back the newly created athlete data
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "An error occurred creating the athlete." });
   }
 });
 
