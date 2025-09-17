@@ -4,6 +4,7 @@ import { athletesService } from '../services/athletesService';
 interface Athlete {
   id: number;
   name: string;
+  athlete_id: string;
 }
 
 const AthletesPage = () => {
@@ -12,6 +13,7 @@ const AthletesPage = () => {
   const [error, setError] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
+  const [editingAthleteId, setEditingAthleteId] = useState('');
 
   const fetchAthletes = async () => {
     try {
@@ -42,9 +44,10 @@ const AthletesPage = () => {
 
   const handleUpdate = async (id: number) => {
     try {
-      await athletesService.updateAthlete(id, editingName);
+      await athletesService.updateAthlete(id, editingName, editingAthleteId);
       setEditingId(null);
       setEditingName('');
+      setEditingAthleteId('');
       fetchAthletes(); // Refresh the list
     } catch (err) {
       setError('Failed to update athlete.');
@@ -55,6 +58,7 @@ const AthletesPage = () => {
   const handleEditClick = (athlete: Athlete) => {
     setEditingId(athlete.id);
     setEditingName(athlete.name);
+    setEditingAthleteId(athlete.athlete_id);
   };
 
   if (loading) return <div className="text-center mt-8">Loading...</div>;
@@ -71,31 +75,40 @@ const AthletesPage = () => {
               <li key={athlete.id} className="flex justify-between items-center py-2 border-b last:border-b-0">
                 {editingId === athlete.id ? (
                   // Edit mode
-                  <div className="flex-grow flex items-center">
+                  <div className="flex-grow flex flex-col sm:flex-row sm:items-center">
+                    <input
+                      type="text"
+                      value={editingAthleteId}
+                      onChange={(e) => setEditingAthleteId(e.target.value)}
+                      className="shadow appearance-none border rounded w-full py-1 px-2 mb-2 sm:mb-0 sm:mr-2 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                    />
                     <input
                       type="text"
                       value={editingName}
                       onChange={(e) => setEditingName(e.target.value)}
-                      className="shadow appearance-none border rounded w-full py-1 px-2 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                      className="shadow appearance-none border rounded w-full py-1 px-2 mb-2 sm:mb-0 sm:mr-2 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                     />
-                    <button
-                      onClick={() => handleUpdate(athlete.id)}
-                      className="bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-3 rounded ml-2 focus:outline-none focus:shadow-outline"
-                    >
-                      Save
-                    </button>
-                    <button
-                      onClick={() => setEditingId(null)}
-                      className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-1 px-3 rounded ml-2 focus:outline-none focus:shadow-outline"
-                    >
-                      Cancel
-                    </button>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => handleUpdate(athlete.id)}
+                        className="bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => setEditingId(null)}
+                        className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   // View mode
                   <>
+                    <span className="text-lg font-bold mr-2">{athlete.athlete_id}</span>
                     <span className="text-lg">{athlete.name}</span>
-                    <div className="flex space-x-2">
+                    <div className="flex space-x-2 ml-auto">
                       <button
                         onClick={() => handleEditClick(athlete)}
                         className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline"
@@ -123,4 +136,3 @@ const AthletesPage = () => {
 };
 
 export default AthletesPage;
-
