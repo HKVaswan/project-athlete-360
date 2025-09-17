@@ -11,14 +11,18 @@ export const athletesService = {
     return response.data;
   },
 
-  // Existing function to create a new athlete
   createAthlete: async (name: string): Promise<Athlete> => {
     const response = await api.post('/api/athletes', { name });
     return response.data;
   },
 
-  // New function to delete an athlete by ID
   deleteAthlete: async (id: number): Promise<void> => {
     await api.delete(`/api/athletes/${id}`);
+  },
+
+  // New function to update an athlete by ID
+  updateAthlete: async (id: number, name: string): Promise<Athlete> => {
+    const response = await api.put(`/api/athletes/${id}`, { name });
+    return response.data;
   }
 };
