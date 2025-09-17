@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { athletesService } from '../services/athletesService';
 import { trainingSessionsService } from '../services/trainingSessionsService';
 
@@ -17,6 +18,7 @@ const AthletesPage = () => {
   const [editingAthleteId, setEditingAthleteId] = useState('');
   const [sessionNotes, setSessionNotes] = useState('');
   const [loggingSessionId, setLoggingSessionId] = useState<number | null>(null);
+  const navigate = useNavigate();
 
   const fetchAthletes = async () => {
     try {
@@ -73,6 +75,10 @@ const AthletesPage = () => {
       alert('Failed to log session.');
       console.error(err);
     }
+  };
+
+  const handleViewSessions = (athleteId: string) => {
+    navigate(`/athletes/sessions/${athleteId}`);
   };
 
   if (loading) return <div className="text-center mt-8">Loading...</div>;
@@ -140,6 +146,12 @@ const AthletesPage = () => {
                         className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline"
                       >
                         Log Session
+                      </button>
+                      <button
+                        onClick={() => handleViewSessions(athlete.athlete_id)}
+                        className="bg-purple-500 hover:bg-purple-600 text-white font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline"
+                      >
+                        View Sessions
                       </button>
                     </div>
                   </>
