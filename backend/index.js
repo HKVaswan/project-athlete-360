@@ -130,7 +130,10 @@ app.post('/api/login', async (req, res) => {
     }
 
     const token = jwt.sign({ userId: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
-    res.status(200).json({ message: 'Login successful', token, role: user.role });
+    const decodedToken = jwt.decode(token);
+    const exp = decodedToken.exp * 1000;
+    
+    res.status(200).json({ message: 'Login successful', token, role: user.role, userId: user.id, exp });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "An error occurred during login." });
@@ -404,6 +407,11 @@ app.delete('/api/performance-metrics/:id', authenticateToken, authorizeRoles('co
   }
 });
 
+
+app.get('/api/me', authenticateToken, (req, res) => {
+  // This endpoint is used by the frontend to verify the token is valid
+  res.status(200).json({ message: 'Token is valid', user: req.user });
+});
 
 app.get('/', (req, res) => {
   res.send('Backend is running!');
