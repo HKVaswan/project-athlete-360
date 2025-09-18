@@ -1,101 +1,118 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Link } from 'react-router-dom';
+import { FaSignInAlt, FaSpinner } from 'react-icons/fa';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
 const Login: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const { login, authError } = useAuth();
+  const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    // Client-side validation
-    if (!username || !password) {
-      setError('Username and password are required.');
-      setLoading(false);
-      return;
-    }
-
     try {
       const response = await fetch(`${API_URL}/api/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username: username.trim(), password }),
       });
 
       const data = await response.json();
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('Invalid username or password.');
-        } else {
-          throw new Error(data.error || 'Login failed. Please try again.');
-        }
+      if (response.ok && data.success) {
+        login(data.data);
+      } else {
+        throw new Error('Invalid username or password. Please check your credentials.');
       }
-
-      // Call the login function from AuthContext with all necessary data
-      login(data.token, data.role, data.username, data.userId, data.exp);
     } catch (err: any) {
-      console.error(err);
-      setError(err.message || 'An unexpected error occurred. Please try again.');
+      // Catch network errors or other unexpected issues
+      setError('An error occurred during login. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
-      <form onSubmit={handleSubmit} className="p-8 bg-white rounded-lg shadow-md w-full max-w-sm">
-        <h2 className="text-2xl font-bold mb-6 text-center">Login</h2>
-        {authError && <p className="text-red-500 text-sm mb-4">{authError}</p>}
-        {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
-        <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2">
-            Username
-          </label>
-          <input
-            type="text"
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            disabled={loading}
-            required
-          />
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 px-4 py-8">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-8 sm:p-10 w-full max-w-md transition-all duration-300 transform scale-95 md:scale-100">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">
+            Welcome Back
+          </h1>
+          <p className="text-gray-500 dark:text-gray-400">
+            Sign in to your account
+          </p>
         </div>
-        <div className="mb-6">
-          <label className="block text-gray-700 text-sm font-bold mb-2">
-            Password
-          </label>
-          <input
-            type="password"
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="off"
-            disabled={loading}
-            required
-          />
-        </div>
-        <div className="flex items-center justify-between">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Username
+            </label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+              placeholder="Enter your username"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+              placeholder="Enter your password"
+              required
+            />
+          </div>
+          {error && (
+            <div className="text-center text-sm text-red-500 bg-red-100 dark:bg-red-900 p-3 rounded-md">
+              {error}
+            </div>
+          )}
           <button
             type="submit"
-            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline disabled:opacity-50"
+            className="w-full flex items-center justify-center space-x-2 bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 transition-colors duration-200 disabled:bg-blue-400 disabled:cursor-not-allowed"
             disabled={loading}
           >
-            {loading ? 'Logging In...' : 'Log In'}
+            {loading ? (
+              <>
+                <FaSpinner className="animate-spin" />
+                <span>Signing In...</span>
+              </>
+            ) : (
+              <>
+                <FaSignInAlt />
+                <span>Sign In</span>
+              </>
+            )}
           </button>
-          <Link to="#" className="inline-block align-baseline font-bold text-sm text-blue-500 hover:text-blue-800">
-            Forgot Password?
-          </Link>
-        </div>
-      </form>
+        </form>
+        <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+          Don't have an account?{' '}
+          <button
+            onClick={() => navigate('/register')}
+            className="font-medium text-blue-600 hover:text-blue-500 hover:underline transition-colors"
+          >
+            Create one
+          </button>
+        </p>
+      </div>
     </div>
   );
 };
