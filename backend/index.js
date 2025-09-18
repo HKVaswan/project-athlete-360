@@ -383,10 +383,10 @@ app.delete('/api/athletes/:id', authenticateToken, authorizeRoles('coach', 'admi
 // --- Protected Endpoints for Training Sessions ---
 app.post('/api/training-sessions', authenticateToken, authorizeRoles('coach', 'admin'), async (req, res) => {
   try {
-    const { athlete_id, notes } = req.body;
+    const { athlete_id, session_date, notes } = req.body;
     const result = await pool.query(
-      'INSERT INTO training_sessions (athlete_id, notes) VALUES ($1, $2) RETURNING *',
-      [athlete_id, notes]
+      'INSERT INTO training_sessions (athlete_id, session_date, notes) VALUES ($1, $2, $3) RETURNING *',
+      [athlete_id, session_date, notes]
     );
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (err) {
@@ -460,10 +460,10 @@ app.delete('/api/training-sessions/:id', authenticateToken, authorizeRoles('coac
 // --- Protected Endpoints for Performance Metrics ---
 app.post('/api/performance-metrics', authenticateToken, authorizeRoles('coach', 'admin'), async (req, res) => {
   try {
-    const { athlete_id, metric_name, metric_value } = req.body;
+    const { athlete_id, metric_name, metric_value, notes } = req.body;
     const result = await pool.query(
-      'INSERT INTO performance_metrics (athlete_id, metric_name, metric_value) VALUES ($1, $2, $3) RETURNING *',
-      [athlete_id, metric_name, metric_value]
+      'INSERT INTO performance_metrics (athlete_id, metric_name, metric_value, notes) VALUES ($1, $2, $3, $4) RETURNING *',
+      [athlete_id, metric_name, metric_value, notes]
     );
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (err) {
