@@ -1,94 +1,63 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import ProtectedRoute from './components/ProtectedRoute';
+
+// Components
 import Navbar from './components/Navbar';
 
-// Page Imports
+// Pages
 import Login from './pages/Login';
 import Register from './pages/Register';
-import Unauthorized from './pages/Unauthorized';
 import AthleteDashboard from './pages/AthleteDashboard';
 import CoachDashboard from './pages/CoachDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import AthletesPage from './pages/AthletesPage';
 import AthleteProfile from './pages/AthleteProfile';
 import AddAthletePage from './pages/AddAthletePage';
-import EditAthletePage from './pages/EditAthletePage'; // New Import
+import EditAthletePage from './pages/EditAthletePage';
 
-// Component for shared layout
-const ProtectedRouteLayout: React.FC = () => {
+// Main App Component with AuthProvider
+const App: React.FC = () => {
   return (
-    <>
-      <Navbar />
-      <div className="container mx-auto p-4">
-        <Outlet />
-      </div>
-    </>
+    <Router>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </Router>
   );
 };
 
-// Component to wrap routes inside AuthProvider
-const AppWrapper: React.FC = () => {
-    const { isAuthenticated, user } = useAuth();
-
-    return (
+// Routes Component to use auth context
+const AppRoutes: React.FC = () => {
+  const { user } = useAuth();
+  
+  return (
+    <div className="min-h-screen bg-gray-100">
+      <Navbar />
+      <main className="container mx-auto p-4">
         <Routes>
-            {/* Public Routes */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/unauthorized" element={<Unauthorized />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          
+          {/* Protected Routes based on role */}
+          <Route path="/" element={user ? <Navigate to={`/${user.role}-dashboard`} replace /> : <Navigate to="/login" replace />} />
+          
+          {/* Athlete Routes */}
+          <Route path="/athlete-dashboard" element={user && user.role === 'athlete' ? <AthleteDashboard /> : <Navigate to="/login" replace />} />
+          
+          {/* Coach Routes */}
+          <Route path="/coach-dashboard" element={user && user.role === 'coach' ? <CoachDashboard /> : <Navigate to="/login" replace />} />
+          <Route path="/athletes" element={user && (user.role === 'coach' || user.role === 'admin') ? <AthletesPage /> : <Navigate to="/login" replace />} />
+          <Route path="/athletes/:id" element={user ? <AthleteProfile /> : <Navigate to="/login" replace />} />
+          <Route path="/athletes/add" element={user && (user.role === 'coach' || user.role === 'admin') ? <AddAthletePage /> : <Navigate to="/login" replace />} />
+          <Route path="/athletes/edit/:id" element={user && (user.role === 'coach' || user.role === 'admin') ? <EditAthletePage /> : <Navigate to="/login" replace />} />
 
-            {/* Role-Based Redirect on Root Path */}
-            <Route 
-                path="/" 
-                element={
-                    isAuthenticated && user ? (
-                        user.role === 'athlete' ? <Navigate to="/athlete-dashboard" replace /> :
-                        user.role === 'coach' ? <Navigate to="/coach-dashboard" replace /> :
-                        user.role === 'admin' ? <Navigate to="/admin" replace /> :
-                        <Navigate to="/unauthorized" replace />
-                    ) : (
-                        <Navigate to="/login" replace />
-                    )
-                } 
-            />
-
-            {/* Protected Routes with Navbar Layout */}
-            <Route element={<ProtectedRouteLayout />}>
-              <Route element={<ProtectedRoute allowedRoles={['athlete']} />}>
-                  <Route path="/athlete-dashboard" element={<AthleteDashboard />} />
-              </Route>
-              
-              <Route element={<ProtectedRoute allowedRoles={['coach']} />}>
-                  <Route path="/coach-dashboard" element={<CoachDashboard />} />
-                  <Route path="/add-athlete" element={<AddAthletePage />} />
-                  <Route path="/athletes/edit/:id" element={<EditAthletePage />} /> {/* New Route */}
-              </Route>
-
-              <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-                  <Route path="/admin" element={<AdminDashboard />} />
-              </Route>
-
-              <Route element={<ProtectedRoute allowedRoles={['admin', 'coach']} />}>
-                  <Route path="/athletes" element={<AthletesPage />} />
-                  <Route path="/athletes/:id" element={<AthleteProfile />} />
-              </Route>
-            </Route>
-
-            <Route path="*" element={<h1>404 Not Found</h1>} />
+          {/* Admin Routes */}
+          <Route path="/admin-dashboard" element={user && user.role === 'admin' ? <AdminDashboard /> : <Navigate to="/login" replace />} />
         </Routes>
-    );
-};
-
-const App: React.FC = () => {
-    return (
-        <Router>
-            <AuthProvider>
-                <AppWrapper />
-            </AuthProvider>
-        </Router>
-    );
+      </main>
+    </div>
+  );
 };
 
 export default App;
