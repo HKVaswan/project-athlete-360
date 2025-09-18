@@ -1,11 +1,20 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Navigate, Outlet } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
-const ProtectedRoute = () => {
-  // In a real application, you would add authentication logic here.
-  // For now, we will just render the child routes.
-  return <Outlet />;
+const ProtectedRoute = ({ allowedRoles }: { allowedRoles?: string[] }) => {
+    const { isAuthenticated, user } = useAuth();
+
+    if (!isAuthenticated) {
+        return <Navigate to="/login" replace />;
+    }
+
+    if (allowedRoles && user?.role && !allowedRoles.includes(user.role)) {
+        console.warn(`Unauthorized access attempt for role: ${user.role}`);
+        return <Navigate to="/unauthorized" replace />;
+    }
+
+    return <Outlet />;
 };
 
 export default ProtectedRoute;
-
