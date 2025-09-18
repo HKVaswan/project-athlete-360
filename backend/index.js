@@ -149,16 +149,32 @@ app.post('/api/login', async (req, res) => {
 app.post('/api/register', async (req, res) => {
   const client = await pool.connect();
   try {
-    const { username, password, name, dob, sport, gender, contact_info } = req.body;
-    if (!username || !password || !name || !dob || !sport || !gender || !contact_info) {
-      return res.status(400).json({ success: false, message: 'All fields are required.' });
+    const { username, password, name, dob, sport, gender, contact_info, role } = req.body;
+    
+    if (!username || !password) {
+      return res.status(400).json({ success: false, message: 'Username and password are required.' });
     }
     
+    const token = req.headers['authorization']?.split(' ')[1];
+    let userRole = 'athlete'; // Default role is athlete
+
+    // Check if an admin is creating the user
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        if (decoded.role === 'admin' && ['athlete', 'coach', 'admin'].includes(role)) {
+          userRole = role; // Assign the specified role
+        }
+      } catch (err) {
+        // Invalid token, continue with default 'athlete' role.
+        console.error('Invalid token for role assignment, defaulting to athlete role.');
+      }
+    }
+
     // Begin transaction
     await client.query('BEGIN');
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const userRole = 'athlete';
     
     const userInsertResult = await client.query(
       'INSERT INTO users (username, password, role) VALUES ($1, $2, $3) RETURNING id, username, role',
@@ -166,20 +182,24 @@ app.post('/api/register', async (req, res) => {
     );
 
     const newUserId = userInsertResult.rows[0].id;
-    
-    const athleteInsertResult = await client.query(
-      'INSERT INTO athletes (user_id, name, dob, sport, gender, contact_info) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [newUserId, name, dob, sport, gender, contact_info]
-    );
+
+    if (userRole === 'athlete') {
+      if (!name || !dob || !sport || !gender || !contact_info) {
+        throw new Error('All athlete profile fields are required for this role.');
+      }
+      const athleteInsertResult = await client.query(
+        'INSERT INTO athletes (user_id, name, dob, sport, gender, contact_info) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+        [newUserId, name, dob, sport, gender, contact_info]
+      );
+    }
 
     await client.query('COMMIT');
 
     res.status(201).json({ 
       success: true,
-      message: 'User and athlete profile created successfully', 
+      message: 'User created successfully', 
       data: {
-        user: userInsertResult.rows[0],
-        athlete: athleteInsertResult.rows[0]
+        user: userInsertResult.rows[0]
       }
     });
   } catch (err) {
@@ -190,6 +210,7 @@ app.post('/api/register', async (req, res) => {
     client.release();
   }
 });
+
 
 // --- Protected Endpoints for Athlete Management ---
 app.post('/api/athletes', authenticateToken, authorizeRoles('coach', 'admin'), async (req, res) => {
@@ -211,15 +232,16 @@ app.get('/api/athletes', authenticateToken, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 20;
     const offset = parseInt(req.query.offset) || 0;
+    const userId = req.query.userId;
     
     if (req.user.role === 'coach' || req.user.role === 'admin') {
-        const { rows } = await pool.query('SELECT * FROM athletes LIMIT $1 OFFSET $2', [limit, offset]);
-        res.status(200).json({ success: true, data: rows });
-    } else if (req.user.role === 'athlete') {
-        const { rows } = await pool.query('SELECT * FROM athletes WHERE user_id = $1 LIMIT $2 OFFSET $3', [req.user.userId, limit, offset]);
-        res.status(200).json({ success: true, data: rows });
+      const { rows } = await pool.query('SELECT * FROM athletes LIMIT $1 OFFSET $2', [limit, offset]);
+      res.status(200).json({ success: true, data: rows });
+    } else if (req.user.role === 'athlete' && userId) {
+      const { rows } = await pool.query('SELECT * FROM athletes WHERE user_id = $1 LIMIT $2 OFFSET $3', [userId, limit, offset]);
+      res.status(200).json({ success: true, data: rows });
     } else {
-        res.status(403).json({ success: false, message: 'Permission denied.' });
+      res.status(403).json({ success: false, message: 'Permission denied.' });
     }
   } catch (err) {
     console.error(err);
@@ -481,4 +503,3 @@ app.get('/', (req, res) => {
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
-      
