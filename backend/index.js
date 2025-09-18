@@ -137,17 +137,17 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// Register endpoint (now includes a role for future RBAC)
+// Register endpoint (now forces role to 'athlete')
 app.post('/api/register', async (req, res) => {
   try {
-    const { username, password, role } = req.body;
+    const { username, password } = req.body;
     if (!username || !password) {
       return res.status(400).json({ error: 'Username and password are required.' });
     }
     const hashedPassword = await bcrypt.hash(password, 10);
     
-    // Default role to 'athlete' if not provided
-    const userRole = role || 'athlete';
+    // Force role to 'athlete' regardless of what's passed in the request body
+    const userRole = 'athlete';
     
     const newUserResult = await pool.query(
       'INSERT INTO users (username, password, role) VALUES ($1, $2, $3) RETURNING id, username, role',
@@ -178,12 +178,14 @@ app.post('/api/athletes', authenticateToken, authorizeRoles('coach', 'admin'), a
 
 app.get('/api/athletes', authenticateToken, async (req, res) => {
   try {
-    // Only fetch athletes associated with the logged-in user or all for a coach/admin
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = parseInt(req.query.offset) || 0;
+    
     if (req.user.role === 'coach' || req.user.role === 'admin') {
-        const { rows } = await pool.query('SELECT * FROM athletes;');
+        const { rows } = await pool.query('SELECT * FROM athletes LIMIT $1 OFFSET $2', [limit, offset]);
         res.json(rows);
     } else if (req.user.role === 'athlete') {
-        const { rows } = await pool.query('SELECT * FROM athletes WHERE user_id = $1', [req.user.userId]);
+        const { rows } = await pool.query('SELECT * FROM athletes WHERE user_id = $1 LIMIT $2 OFFSET $3', [req.user.userId, limit, offset]);
         res.json(rows);
     } else {
         res.status(403).json({ error: 'Permission denied.' });
@@ -194,18 +196,40 @@ app.get('/api/athletes', authenticateToken, async (req, res) => {
   }
 });
 
-app.put('/api/athletes/:id', authenticateToken, authorizeRoles('coach', 'admin'), async (req, res) => {
+app.put('/api/athletes/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, athlete_id, dob, sport, gender, contact_info } = req.body;
-    const updateResult = await pool.query(
-      'UPDATE athletes SET name = $1, athlete_id = $2, dob = $3, sport = $4, gender = $5, contact_info = $6 WHERE id = $7 RETURNING *',
-      [name, athlete_id, dob, sport, gender, contact_info, id]
-    );
-    if (updateResult.rowCount === 0) {
-      return res.status(404).json({ error: "Athlete not found." });
+    
+    if (req.user.role === 'coach' || req.user.role === 'admin') {
+      const { name, athlete_id, dob, sport, gender, contact_info } = req.body;
+      const updateResult = await pool.query(
+        'UPDATE athletes SET name = $1, athlete_id = $2, dob = $3, sport = $4, gender = $5, contact_info = $6 WHERE id = $7 RETURNING *',
+        [name, athlete_id, dob, sport, gender, contact_info, id]
+      );
+      if (updateResult.rowCount === 0) {
+        return res.status(404).json({ error: "Athlete not found." });
+      }
+      res.status(200).json(updateResult.rows[0]);
+    } else if (req.user.role === 'athlete') {
+      const { name, contact_info } = req.body;
+
+      // Verify athlete is updating their own profile
+      const athleteResult = await pool.query('SELECT user_id FROM athletes WHERE id = $1', [id]);
+      if (athleteResult.rows.length === 0 || athleteResult.rows[0].user_id !== req.user.userId) {
+        return res.status(403).json({ error: 'Permission denied.' });
+      }
+
+      const updateResult = await pool.query(
+        'UPDATE athletes SET name = $1, contact_info = $2 WHERE id = $3 RETURNING *',
+        [name, contact_info, id]
+      );
+      if (updateResult.rowCount === 0) {
+        return res.status(404).json({ error: "Athlete not found." });
+      }
+      res.status(200).json(updateResult.rows[0]);
+    } else {
+      res.status(403).json({ error: 'Permission denied.' });
     }
-    res.status(200).json(updateResult.rows[0]);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "An error occurred updating the athlete." });
@@ -244,17 +268,19 @@ app.post('/api/training-sessions', authenticateToken, authorizeRoles('coach', 'a
 app.get('/api/training-sessions/:athleteId', authenticateToken, async (req, res) => {
   try {
     const { athleteId } = req.params;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = parseInt(req.query.offset) || 0;
+    
     const athleteResult = await pool.query('SELECT user_id FROM athletes WHERE id = $1', [athleteId]);
     if (athleteResult.rows.length === 0) {
       return res.status(404).json({ error: "Athlete not found." });
     }
     const athleteUserId = athleteResult.rows[0].user_id;
 
-    // Check if the user is a coach/admin or if they are the athlete themselves
     if (req.user.role === 'coach' || req.user.role === 'admin' || req.user.userId === athleteUserId) {
       const { rows } = await pool.query(
-        'SELECT session_date, notes FROM training_sessions WHERE athlete_id = $1 ORDER BY session_date DESC',
-        [athleteId]
+        'SELECT session_date, notes FROM training_sessions WHERE athlete_id = $1 ORDER BY session_date DESC LIMIT $2 OFFSET $3',
+        [athleteId, limit, offset]
       );
       res.json(rows);
     } else {
@@ -319,17 +345,19 @@ app.post('/api/performance-metrics', authenticateToken, authorizeRoles('coach', 
 app.get('/api/performance-metrics/:athleteId', authenticateToken, async (req, res) => {
   try {
     const { athleteId } = req.params;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = parseInt(req.query.offset) || 0;
+    
     const athleteResult = await pool.query('SELECT user_id FROM athletes WHERE id = $1', [athleteId]);
     if (athleteResult.rows.length === 0) {
       return res.status(404).json({ error: "Athlete not found." });
     }
     const athleteUserId = athleteResult.rows[0].user_id;
 
-    // Check if the user is a coach/admin or if they are the athlete themselves
     if (req.user.role === 'coach' || req.user.role === 'admin' || req.user.userId === athleteUserId) {
       const { rows } = await pool.query(
-        'SELECT entry_date, metric_name, metric_value FROM performance_metrics WHERE athlete_id = $1 ORDER BY entry_date DESC',
-        [athleteId]
+        'SELECT entry_date, metric_name, metric_value FROM performance_metrics WHERE athlete_id = $1 ORDER BY entry_date DESC LIMIT $2 OFFSET $3',
+        [athleteId, limit, offset]
       );
       res.json(rows);
     } else {
