@@ -1,47 +1,117 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import Register from './Register';
-import UserList from '../components/UserList';
+import { useNavigate, Link } from 'react-router-dom';
+import { FaUsers, FaUserCog, FaUserPlus, FaChartPie, FaSpinner } from 'react-icons/fa';
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 const AdminDashboard: React.FC = () => {
-  const { user } = useAuth();
-  const [showAddUser, setShowAddUser] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const { user, token, logout } = useAuth();
+  const [userCount, setUserCount] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
 
-  const handleRegistrationSuccess = () => {
-    setShowAddUser(false);
-    setRefreshKey(prevKey => prevKey + 1);
-  };
-  
+  const fetchUserCount = useCallback(async () => {
+    if (!user || user.role !== 'admin') {
+      navigate('/login');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`${API_URL}/api/users/count`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.status === 401) {
+        logout();
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch user count.');
+      }
+
+      const { data } = await response.json();
+      setUserCount(data.count);
+    } catch (err: any) {
+      setError('Failed to load user data. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, [user, token, navigate, logout]);
+
+  useEffect(() => {
+    fetchUserCount();
+  }, [fetchUserCount]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full text-xl text-blue-500">
+        <FaSpinner className="animate-spin mr-2" />
+        Loading admin dashboard...
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div className="text-red-500 text-center">{error}</div>;
+  }
+
   return (
     <div className="p-4">
-      <h1 className="text-3xl font-bold mb-4">Admin Dashboard</h1>
-      <p className="text-lg mb-6">Welcome, {user?.username}! Manage users and system settings.</p>
-      
-      <div className="mb-8">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-semibold">User Management</h2>
-          <button
-            onClick={() => setShowAddUser(!showAddUser)}
-            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-          >
-            {showAddUser ? 'View All Users' : 'Add New User'}
-          </button>
-        </div>
-        
-        {showAddUser ? (
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <Register isAdminPage={true} onSuccess={handleRegistrationSuccess} />
-          </div>
-        ) : (
-          <UserList key={refreshKey} />
-        )}
-      </div>
+      <h1 className="text-3xl font-bold text-gray-800 dark:text-white mb-6">
+        Admin Dashboard
+      </h1>
 
-      {/* Additional admin sections can be added here */}
-      <div className="mt-8 p-6 bg-white rounded-lg shadow-md">
-        <h2 className="text-2xl font-semibold">System Metrics (Future Feature)</h2>
-        <p className="text-gray-500 mt-2">Coming soon: System-wide metrics, activity logs, and more advanced tools.</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        {/* Total Users Card */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 flex flex-col items-center justify-center">
+          <FaChartPie className="text-blue-500 text-5xl mb-4" />
+          <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">
+            Total Users
+          </h2>
+          <p className="text-gray-500 dark:text-gray-400 text-6xl font-extrabold mt-2">
+            {userCount ?? 'N/A'}
+          </p>
+        </div>
+
+        {/* Manage Athletes Card */}
+        <Link to="/athletes" className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 flex flex-col items-center justify-center transition-transform transform hover:scale-105">
+          <FaUsers className="text-green-500 text-5xl mb-4" />
+          <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">
+            Manage Athletes
+          </h2>
+          <p className="text-gray-500 dark:text-gray-400 mt-2 text-center">
+            View, edit, or delete athlete profiles.
+          </p>
+        </Link>
+        
+        {/* Manage Coaches Card */}
+        <Link to="/manage-coaches" className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 flex flex-col items-center justify-center transition-transform transform hover:scale-105">
+          <FaUserCog className="text-orange-500 text-5xl mb-4" />
+          <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">
+            Manage Coaches
+          </h2>
+          <p className="text-gray-500 dark:text-gray-400 mt-2 text-center">
+            Review and manage coach accounts.
+          </p>
+        </Link>
+        
+        {/* Add User Card */}
+        <Link to="/users/add" className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 flex flex-col items-center justify-center transition-transform transform hover:scale-105">
+          <FaUserPlus className="text-purple-500 text-5xl mb-4" />
+          <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">
+            Add New User
+          </h2>
+          <p className="text-gray-500 dark:text-gray-400 mt-2 text-center">
+            Create a new account for any role.
+          </p>
+        </Link>
       </div>
     </div>
   );
