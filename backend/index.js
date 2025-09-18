@@ -140,27 +140,46 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// Register endpoint (now forces role to 'athlete')
+// Register endpoint (now handles both user and athlete creation)
 app.post('/api/register', async (req, res) => {
+  const client = await pool.connect();
   try {
-    const { username, password } = req.body;
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password are required.' });
+    const { username, password, dob, sport, gender, contact_info } = req.body;
+    if (!username || !password || !dob || !sport || !gender || !contact_info) {
+      return res.status(400).json({ error: 'All fields are required.' });
     }
-    const hashedPassword = await bcrypt.hash(password, 10);
     
-    // Force role to 'athlete' regardless of what's passed in the request body
+    // Begin transaction
+    await client.query('BEGIN');
+
+    const hashedPassword = await bcrypt.hash(password, 10);
     const userRole = 'athlete';
     
-    const newUserResult = await pool.query(
+    const userInsertResult = await client.query(
       'INSERT INTO users (username, password, role) VALUES ($1, $2, $3) RETURNING id, username, role',
       [username, hashedPassword, userRole]
     );
 
-    res.status(201).json({ message: 'User created successfully', user: newUserResult.rows[0] });
+    const newUserId = userInsertResult.rows[0].id;
+    
+    const athleteInsertResult = await client.query(
+      'INSERT INTO athletes (user_id, name, dob, sport, gender, contact_info) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [newUserId, username, dob, sport, gender, contact_info]
+    );
+
+    await client.query('COMMIT');
+
+    res.status(201).json({ 
+      message: 'User and athlete profile created successfully', 
+      user: userInsertResult.rows[0],
+      athlete: athleteInsertResult.rows[0]
+    });
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error(err);
     res.status(500).json({ error: "An error occurred during registration." });
+  } finally {
+    client.release();
   }
 });
 
@@ -409,7 +428,6 @@ app.delete('/api/performance-metrics/:id', authenticateToken, authorizeRoles('co
 
 
 app.get('/api/me', authenticateToken, (req, res) => {
-  // This endpoint is used by the frontend to verify the token is valid
   res.status(200).json({ message: 'Token is valid', user: req.user });
 });
 
