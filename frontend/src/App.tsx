@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 
 // Components
 import Navbar from './components/Navbar';
+import Layout from './components/Layout';
 
 // Pages
 import Login from './pages/Login';
@@ -33,13 +34,12 @@ const AppRoutes: React.FC = () => {
   
   return (
     <div className="min-h-screen bg-gray-100">
-      <Navbar />
-      <main className="container mx-auto p-4">
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          
-          {/* Protected Routes based on role */}
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        
+        {/* Protected Routes using the new Layout */}
+        <Route element={<Layout />}>
           <Route path="/" element={user ? <Navigate to={`/${user.role}-dashboard`} replace /> : <Navigate to="/login" replace />} />
           
           {/* Athlete Routes */}
@@ -54,8 +54,8 @@ const AppRoutes: React.FC = () => {
 
           {/* Admin Routes */}
           <Route path="/admin-dashboard" element={user && user.role === 'admin' ? <AdminDashboard /> : <Navigate to="/login" replace />} />
-        </Routes>
-      </main>
+        </Route>
+      </Routes>
     </div>
   );
 };
