@@ -1,65 +1,81 @@
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import { useState, useEffect } from 'react';
-import LoginPage from './pages/LoginPage';
-import DashboardPage from './pages/DashboardPage';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import Unauthorized from './pages/Unauthorized';
+
+// New Dashboard Pages
+import AthleteDashboard from './pages/AthleteDashboard';
+import CoachDashboard from './pages/CoachDashboard';
+import AdminDashboard from './pages/AdminDashboard';
 import AthletesPage from './pages/AthletesPage';
-import CreateAthletePage from './pages/CreateAthletePage';
-import TrainingSessionsPage from './pages/TrainingSessionsPage';
-import { AuthContext } from './AuthContext';
 
-const App = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+// A custom component for protecting routes with multiple roles
+const ProtectedRoute = ({ allowedRoles, children }: { allowedRoles: string[]; children?: React.ReactNode }) => {
+    const { isAuthenticated, user } = useAuth();
 
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      setIsAuthenticated(true);
+    if (!isAuthenticated) {
+        return <Navigate to="/login" replace />;
     }
-  }, []);
 
-  return (
-    <AuthContext.Provider value={{ isAuthenticated, setIsAuthenticated }}>
-      <Router>
-        <nav className="bg-blue-800 p-4 shadow-md">
-          <ul className="flex justify-start space-x-4 text-white">
-            <li>
-              <Link to="/dashboard" className="hover:text-blue-200">Dashboard</Link>
-            </li>
-            <li>
-              <Link to="/athletes" className="hover:text-blue-200">Athletes</Link>
-            </li>
-            <li>
-              <Link to="/create-athlete" className="hover:text-blue-200">Create Athlete</Link>
-            </li>
-            <li className="ml-auto">
-              {!isAuthenticated ? (
-                <Link to="/" className="hover:text-blue-200">Login</Link>
-              ) : (
-                <button
-                  onClick={() => {
-                    localStorage.removeItem('token');
-                    setIsAuthenticated(false);
-                    // navigate('/'); // You can add navigation logic here
-                  }}
-                  className="hover:text-blue-200"
-                >
-                  Logout
-                </button>
-              )}
-            </li>
-          </ul>
-        </nav>
-        <Routes>
-          <Route path="/" element={<LoginPage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/athletes" element={<AthletesPage />} />
-          <Route path="/create-athlete" element={<CreateAthletePage />} />
-          <Route path="/athletes/sessions/:athleteId" element={<TrainingSessionsPage />} />
-        </Routes>
-      </Router>
-    </AuthContext.Provider>
-  );
+    if (allowedRoles && !allowedRoles.includes(user?.role)) {
+        return <Navigate to="/unauthorized" replace />;
+    }
+
+    return children ? children : <Outlet />;
 };
 
-export default App; 
+const App: React.FC = () => {
+    const { isAuthenticated, user } = useAuth();
 
+    return (
+        <Router>
+            <AuthProvider>
+                <Routes>
+                    {/* Public Routes */}
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/register" element={<Register />} />
+                    <Route path="/unauthorized" element={<Unauthorized />} />
+                    
+                    {/* Role-Based Redirect on Root Path */}
+                    <Route 
+                        path="/" 
+                        element={
+                            isAuthenticated && user ? (
+                                user.role === 'athlete' ? <Navigate to="/athlete-dashboard" replace /> :
+                                user.role === 'coach' ? <Navigate to="/coach-dashboard" replace /> :
+                                user.role === 'admin' ? <Navigate to="/admin" replace /> :
+                                <Navigate to="/unauthorized" replace />
+                            ) : (
+                                <Navigate to="/login" replace />
+                            )
+                        } 
+                    />
+
+                    {/* Protected Routes */}
+                    <Route element={<ProtectedRoute allowedRoles={['athlete']} />}>
+                        <Route path="/athlete-dashboard" element={<AthleteDashboard />} />
+                    </Route>
+                    
+                    <Route element={<ProtectedRoute allowedRoles={['coach']} />}>
+                        <Route path="/coach-dashboard" element={<CoachDashboard />} />
+                    </Route>
+
+                    <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+                        <Route path="/admin" element={<AdminDashboard />} />
+                    </Route>
+
+                    {/* Example of a page for multiple roles */}
+                    <Route element={<ProtectedRoute allowedRoles={['admin', 'coach']} />}>
+                        <Route path="/athletes" element={<AthletesPage />} />
+                    </Route>
+
+                    <Route path="*" element={<h1>404 Not Found</h1>} />
+                </Routes>
+            </AuthProvider>
+        </Router>
+    );
+};
+
+export default App;
