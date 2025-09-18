@@ -7,7 +7,7 @@ import Navbar from './components/Navbar';
 import Layout from './components/Layout';
 
 // Pages
-import Login from './pages/LoginPage';
+import Login from './pages/Login';
 import Register from './pages/Register';
 import AthleteDashboard from './pages/AthleteDashboard';
 import CoachDashboard from './pages/CoachDashboard';
