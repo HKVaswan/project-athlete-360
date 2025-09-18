@@ -1,15 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { FaUserPlus, FaSpinner } from 'react-icons/fa';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
-interface RegisterProps {
-  onSuccess?: () => void;
-  isAdminPage?: boolean;
-}
-
-const Register: React.FC<RegisterProps> = ({ onSuccess, isAdminPage = false }) => {
+const Register: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -17,19 +12,24 @@ const Register: React.FC<RegisterProps> = ({ onSuccess, isAdminPage = false }) =
   const [sport, setSport] = useState('');
   const [gender, setGender] = useState('');
   const [contactInfo, setContactInfo] = useState('');
-  const [role, setRole] = useState('athlete');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
-  const { token } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
+    // Frontend validation
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters long.");
+      setLoading(false);
+      return;
+    }
+
     const registrationData = {
-      username,
+      username: username.trim(),
       password,
       name,
       dob,
@@ -37,144 +37,174 @@ const Register: React.FC<RegisterProps> = ({ onSuccess, isAdminPage = false }) =
       gender,
       contact_info: contactInfo,
     };
-    
-    // Only add role if it's an admin creating a user
-    const finalData = isAdminPage ? { ...registrationData, role } : registrationData;
 
     try {
       const response = await fetch(`${API_URL}/api/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(isAdminPage && token && { 'Authorization': `Bearer ${token}` }),
         },
-        body: JSON.stringify(finalData),
+        body: JSON.stringify(registrationData),
       });
 
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.message || 'Failed to register user.');
-      }
+      const data = await response.json();
 
-      // Handle success based on where the component is used
-      if (onSuccess) {
-        onSuccess();
-      } else {
+      if (response.ok && data.success) {
         navigate('/login');
+      } else {
+        // Standardize error message for security
+        throw new Error('Registration failed. Please check your details and try again.');
       }
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
+      setError(err.message || 'An unexpected error occurred. Please try again later.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className={`p-4 ${!isAdminPage ? 'max-w-lg mx-auto' : ''}`}>
-      <h1 className="text-2xl font-bold text-center mb-4">{isAdminPage ? 'Add New User' : 'Register a New Account'}</h1>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-        {isAdminPage && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Role</label>
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-              disabled={loading}
-            >
-              <option value="athlete">Athlete</option>
-              <option value="coach">Coach</option>
-              <option value="admin">Admin</option>
-            </select>
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 px-4 py-8">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-8 sm:p-10 w-full max-w-lg transition-all duration-300 transform scale-95 md:scale-100">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">
+            Create Your Account
+          </h1>
+          <p className="text-gray-500 dark:text-gray-400">
+            Join Project Athlete 360
+          </p>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Username
+              </label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                placeholder="Choose a username"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Password
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                placeholder="Minimum 6 characters"
+                required
+              />
+            </div>
           </div>
-        )}
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Username</label>
-          <input
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+          <hr className="border-gray-200 dark:border-gray-700" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Full Name
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                placeholder="e.g., John Doe"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Date of Birth
+              </label>
+              <input
+                type="date"
+                value={dob}
+                onChange={(e) => setDob(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Sport
+              </label>
+              <input
+                type="text"
+                value={sport}
+                onChange={(e) => setSport(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                placeholder="e.g., Football, Swimming"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Gender
+              </label>
+              <select
+                value={gender}
+                onChange={(e) => setGender(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                required
+              >
+                <option value="">Select...</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Contact Info
+              </label>
+              <input
+                type="text"
+                value={contactInfo}
+                onChange={(e) => setContactInfo(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                placeholder="Email or phone number"
+                required
+              />
+            </div>
+          </div>
+          {error && (
+            <div className="text-center text-sm text-red-500 bg-red-100 dark:bg-red-900 p-3 rounded-md">
+              {error}
+            </div>
+          )}
+          <button
+            type="submit"
+            className="w-full flex items-center justify-center space-x-2 bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 transition-colors duration-200 disabled:bg-blue-400 disabled:cursor-not-allowed"
             disabled={loading}
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-            disabled={loading}
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Full Name</label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-            disabled={loading}
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
-          <input
-            type="date"
-            value={dob}
-            onChange={(e) => setDob(e.target.value)}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-            disabled={loading}
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Sport</label>
-          <input
-            type="text"
-            value={sport}
-            onChange={(e) => setSport(e.target.value)}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-            disabled={loading}
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Gender</label>
-          <input
-            type="text"
-            value={gender}
-            onChange={(e) => setGender(e.target.value)}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-            disabled={loading}
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Contact Info</label>
-          <input
-            type="text"
-            value={contactInfo}
-            onChange={(e) => setContactInfo(e.target.value)}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-            disabled={loading}
-            required
-          />
-        </div>
-        <button
-          type="submit"
-          className="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50"
-          disabled={loading}
-        >
-          {loading ? 'Submitting...' : 'Register'}
-        </button>
-      </form>
+          >
+            {loading ? (
+              <>
+                <FaSpinner className="animate-spin" />
+                <span>Registering...</span>
+              </>
+            ) : (
+              <>
+                <FaUserPlus />
+                <span>Register</span>
+              </>
+            )}
+          </button>
+        </form>
+        <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+          Already have an account?{' '}
+          <button
+            onClick={() => navigate('/login')}
+            className="font-medium text-blue-600 hover:text-blue-500 hover:underline transition-colors"
+          >
+            Sign in
+          </button>
+        </p>
+      </div>
     </div>
   );
 };
