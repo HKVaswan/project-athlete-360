@@ -78,6 +78,11 @@ const initializeDatabase = async () => {
     `);
     console.log('Performance_metrics table ensured to exist.');
 
+    // Add indexes for performance
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_training_sessions_athlete_id ON training_sessions(athlete_id);');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_performance_metrics_athlete_id ON performance_metrics(athlete_id);');
+    console.log('Database indexes ensured to exist.');
+
   } catch (err) {
     console.error('Error initializing database:', err);
   }
@@ -90,12 +95,12 @@ const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
   if (token == null) {
-    return res.status(401).json({ error: 'Authentication token required.' });
+    return res.status(401).json({ success: false, message: 'Authentication token required.' });
   }
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
-      return res.status(403).json({ error: 'Invalid or expired token.' });
+      return res.status(403).json({ success: false, message: 'Invalid or expired token.' });
     }
     req.user = user;
     next();
@@ -105,7 +110,7 @@ const authenticateToken = (req, res, next) => {
 const authorizeRoles = (...roles) => {
   return (req, res, next) => {
     if (!req.user || !req.user.role || !roles.includes(req.user.role)) {
-      return res.status(403).json({ error: 'Permission denied.' });
+      return res.status(403).json({ success: false, message: 'Permission denied.' });
     }
     next();
   };
@@ -120,23 +125,23 @@ app.post('/api/login', async (req, res) => {
     const userResult = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
 
     if (userResult.rows.length === 0) {
-      return res.status(401).json({ error: 'Invalid username or password.' });
+      return res.status(401).json({ success: false, message: 'Invalid username or password.' });
     }
     const user = userResult.rows[0];
     const validPassword = await bcrypt.compare(password, user.password);
 
     if (!validPassword) {
-      return res.status(401).json({ error: 'Invalid username or password.' });
+      return res.status(401).json({ success: false, message: 'Invalid username or password.' });
     }
 
     const token = jwt.sign({ userId: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
     const decodedToken = jwt.decode(token);
     const exp = decodedToken.exp * 1000;
     
-    res.status(200).json({ message: 'Login successful', token, role: user.role, userId: user.id, exp });
+    res.status(200).json({ success: true, message: 'Login successful', data: { token, role: user.role, userId: user.id, exp } });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "An error occurred during login." });
+    res.status(500).json({ success: false, message: "An error occurred during login." });
   }
 });
 
@@ -144,9 +149,9 @@ app.post('/api/login', async (req, res) => {
 app.post('/api/register', async (req, res) => {
   const client = await pool.connect();
   try {
-    const { username, password, dob, sport, gender, contact_info } = req.body;
-    if (!username || !password || !dob || !sport || !gender || !contact_info) {
-      return res.status(400).json({ error: 'All fields are required.' });
+    const { username, password, name, dob, sport, gender, contact_info } = req.body;
+    if (!username || !password || !name || !dob || !sport || !gender || !contact_info) {
+      return res.status(400).json({ success: false, message: 'All fields are required.' });
     }
     
     // Begin transaction
@@ -164,20 +169,23 @@ app.post('/api/register', async (req, res) => {
     
     const athleteInsertResult = await client.query(
       'INSERT INTO athletes (user_id, name, dob, sport, gender, contact_info) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [newUserId, username, dob, sport, gender, contact_info]
+      [newUserId, name, dob, sport, gender, contact_info]
     );
 
     await client.query('COMMIT');
 
     res.status(201).json({ 
+      success: true,
       message: 'User and athlete profile created successfully', 
-      user: userInsertResult.rows[0],
-      athlete: athleteInsertResult.rows[0]
+      data: {
+        user: userInsertResult.rows[0],
+        athlete: athleteInsertResult.rows[0]
+      }
     });
   } catch (err) {
     await client.query('ROLLBACK');
     console.error(err);
-    res.status(500).json({ error: "An error occurred during registration." });
+    res.status(500).json({ success: false, message: "An error occurred during registration." });
   } finally {
     client.release();
   }
@@ -187,14 +195,15 @@ app.post('/api/register', async (req, res) => {
 app.post('/api/athletes', authenticateToken, authorizeRoles('coach', 'admin'), async (req, res) => {
   try {
     const { user_id, name, athlete_id, dob, sport, gender, contact_info } = req.body;
+    // Security Fix: Do not allow user_id to be passed in body. It should be assigned by the system.
     const newAthleteResult = await pool.query(
-      'INSERT INTO athletes (user_id, name, athlete_id, dob, sport, gender, contact_info) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-      [user_id, name, athlete_id, dob, sport, gender, contact_info]
+      'INSERT INTO athletes (name, athlete_id, dob, sport, gender, contact_info) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [name, athlete_id, dob, sport, gender, contact_info]
     );
-    res.status(201).json(newAthleteResult.rows[0]);
+    res.status(201).json({ success: true, data: newAthleteResult.rows[0] });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "An error occurred creating the athlete." });
+    res.status(500).json({ success: false, message: "An error occurred creating the athlete." });
   }
 });
 
@@ -205,16 +214,50 @@ app.get('/api/athletes', authenticateToken, async (req, res) => {
     
     if (req.user.role === 'coach' || req.user.role === 'admin') {
         const { rows } = await pool.query('SELECT * FROM athletes LIMIT $1 OFFSET $2', [limit, offset]);
-        res.json(rows);
+        res.status(200).json({ success: true, data: rows });
     } else if (req.user.role === 'athlete') {
         const { rows } = await pool.query('SELECT * FROM athletes WHERE user_id = $1 LIMIT $2 OFFSET $3', [req.user.userId, limit, offset]);
-        res.json(rows);
+        res.status(200).json({ success: true, data: rows });
     } else {
-        res.status(403).json({ error: 'Permission denied.' });
+        res.status(403).json({ success: false, message: 'Permission denied.' });
     }
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "An error occurred fetching athletes." });
+    res.status(500).json({ success: false, message: "An error occurred fetching athletes." });
+  }
+});
+
+app.get('/api/athletes/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const athleteResult = await pool.query('SELECT * FROM athletes WHERE id = $1', [id]);
+    const athlete = athleteResult.rows[0];
+
+    if (!athlete) {
+      return res.status(404).json({ success: false, message: "Athlete not found." });
+    }
+
+    const isAuthorized = req.user.role === 'coach' || req.user.role === 'admin' || req.user.userId === athlete.user_id;
+    if (!isAuthorized) {
+      return res.status(403).json({ success: false, message: 'Permission denied.' });
+    }
+
+    const trainingSessionsResult = await pool.query('SELECT * FROM training_sessions WHERE athlete_id = $1 ORDER BY session_date DESC', [id]);
+    const performanceMetricsResult = await pool.query('SELECT * FROM performance_metrics WHERE athlete_id = $1 ORDER BY entry_date DESC', [id]);
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        ...athlete,
+        training_sessions: trainingSessionsResult.rows,
+        performance_metrics: performanceMetricsResult.rows
+      }
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "An error occurred fetching the athlete profile." });
   }
 });
 
@@ -229,16 +272,16 @@ app.put('/api/athletes/:id', authenticateToken, async (req, res) => {
         [name, athlete_id, dob, sport, gender, contact_info, id]
       );
       if (updateResult.rowCount === 0) {
-        return res.status(404).json({ error: "Athlete not found." });
+        return res.status(404).json({ success: false, message: "Athlete not found." });
       }
-      res.status(200).json(updateResult.rows[0]);
+      res.status(200).json({ success: true, message: "Athlete updated successfully", data: updateResult.rows[0] });
     } else if (req.user.role === 'athlete') {
       const { name, contact_info } = req.body;
 
       // Verify athlete is updating their own profile
       const athleteResult = await pool.query('SELECT user_id FROM athletes WHERE id = $1', [id]);
       if (athleteResult.rows.length === 0 || athleteResult.rows[0].user_id !== req.user.userId) {
-        return res.status(403).json({ error: 'Permission denied.' });
+        return res.status(403).json({ success: false, message: 'Permission denied.' });
       }
 
       const updateResult = await pool.query(
@@ -246,15 +289,15 @@ app.put('/api/athletes/:id', authenticateToken, async (req, res) => {
         [name, contact_info, id]
       );
       if (updateResult.rowCount === 0) {
-        return res.status(404).json({ error: "Athlete not found." });
+        return res.status(404).json({ success: false, message: "Athlete not found." });
       }
-      res.status(200).json(updateResult.rows[0]);
+      res.status(200).json({ success: true, message: "Athlete updated successfully", data: updateResult.rows[0] });
     } else {
-      res.status(403).json({ error: 'Permission denied.' });
+      res.status(403).json({ success: false, message: 'Permission denied.' });
     }
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "An error occurred updating the athlete." });
+    res.status(500).json({ success: false, message: "An error occurred updating the athlete." });
   }
 });
 
@@ -263,12 +306,12 @@ app.delete('/api/athletes/:id', authenticateToken, authorizeRoles('coach', 'admi
     const { id } = req.params;
     const result = await pool.query('DELETE FROM athletes WHERE id = $1 RETURNING *', [id]);
     if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Athlete not found." });
+      return res.status(404).json({ success: false, message: "Athlete not found." });
     }
-    res.status(200).json({ message: "Athlete deleted successfully." });
+    res.status(200).json({ success: true, message: "Athlete deleted successfully." });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "An error occurred deleting the athlete." });
+    res.status(500).json({ success: false, message: "An error occurred deleting the athlete." });
   }
 });
 
@@ -280,10 +323,10 @@ app.post('/api/training-sessions', authenticateToken, authorizeRoles('coach', 'a
       'INSERT INTO training_sessions (athlete_id, notes) VALUES ($1, $2) RETURNING *',
       [athlete_id, notes]
     );
-    res.status(201).json(result.rows[0]);
+    res.status(201).json({ success: true, data: result.rows[0] });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "An error occurred creating the training session." });
+    res.status(500).json({ success: false, message: "An error occurred creating the training session." });
   }
 });
 
@@ -295,7 +338,7 @@ app.get('/api/training-sessions/:athleteId', authenticateToken, async (req, res)
     
     const athleteResult = await pool.query('SELECT user_id FROM athletes WHERE id = $1', [athleteId]);
     if (athleteResult.rows.length === 0) {
-      return res.status(404).json({ error: "Athlete not found." });
+      return res.status(404).json({ success: false, message: "Athlete not found." });
     }
     const athleteUserId = athleteResult.rows[0].user_id;
 
@@ -304,13 +347,13 @@ app.get('/api/training-sessions/:athleteId', authenticateToken, async (req, res)
         'SELECT session_date, notes FROM training_sessions WHERE athlete_id = $1 ORDER BY session_date DESC LIMIT $2 OFFSET $3',
         [athleteId, limit, offset]
       );
-      res.json(rows);
+      res.status(200).json({ success: true, data: rows });
     } else {
-      res.status(403).json({ error: 'Permission denied.' });
+      res.status(403).json({ success: false, message: 'Permission denied.' });
     }
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "An error occurred fetching training sessions." });
+    res.status(500).json({ success: false, message: "An error occurred fetching training sessions." });
   }
 });
 
@@ -323,12 +366,12 @@ app.put('/api/training-sessions/:id', authenticateToken, authorizeRoles('coach',
       [notes, id]
     );
     if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Training session not found." });
+      return res.status(404).json({ success: false, message: "Training session not found." });
     }
-    res.status(200).json(result.rows[0]);
+    res.status(200).json({ success: true, message: "Training session updated successfully", data: result.rows[0] });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "An error occurred updating the training session." });
+    res.status(500).json({ success: false, message: "An error occurred updating the training session." });
   }
 });
 
@@ -340,12 +383,12 @@ app.delete('/api/training-sessions/:id', authenticateToken, authorizeRoles('coac
       [id]
     );
     if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Training session not found." });
+      return res.status(404).json({ success: false, message: "Training session not found." });
     }
-    res.status(200).json({ message: "Training session deleted successfully." });
+    res.status(200).json({ success: true, message: "Training session deleted successfully." });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "An error occurred deleting the training session." });
+    res.status(500).json({ success: false, message: "An error occurred deleting the training session." });
   }
 });
 
@@ -357,10 +400,10 @@ app.post('/api/performance-metrics', authenticateToken, authorizeRoles('coach', 
       'INSERT INTO performance_metrics (athlete_id, metric_name, metric_value) VALUES ($1, $2, $3) RETURNING *',
       [athlete_id, metric_name, metric_value]
     );
-    res.status(201).json(result.rows[0]);
+    res.status(201).json({ success: true, data: result.rows[0] });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "An error occurred creating the performance metric." });
+    res.status(500).json({ success: false, message: "An error occurred creating the performance metric." });
   }
 });
 
@@ -372,7 +415,7 @@ app.get('/api/performance-metrics/:athleteId', authenticateToken, async (req, re
     
     const athleteResult = await pool.query('SELECT user_id FROM athletes WHERE id = $1', [athleteId]);
     if (athleteResult.rows.length === 0) {
-      return res.status(404).json({ error: "Athlete not found." });
+      return res.status(404).json({ success: false, message: "Athlete not found." });
     }
     const athleteUserId = athleteResult.rows[0].user_id;
 
@@ -381,13 +424,13 @@ app.get('/api/performance-metrics/:athleteId', authenticateToken, async (req, re
         'SELECT entry_date, metric_name, metric_value FROM performance_metrics WHERE athlete_id = $1 ORDER BY entry_date DESC LIMIT $2 OFFSET $3',
         [athleteId, limit, offset]
       );
-      res.json(rows);
+      res.status(200).json({ success: true, data: rows });
     } else {
-      res.status(403).json({ error: 'Permission denied.' });
+      res.status(403).json({ success: false, message: 'Permission denied.' });
     }
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "An error occurred fetching performance metrics." });
+    res.status(500).json({ success: false, message: "An error occurred fetching performance metrics." });
   }
 });
 
@@ -400,12 +443,12 @@ app.put('/api/performance-metrics/:id', authenticateToken, authorizeRoles('coach
       [metric_name, metric_value, id]
     );
     if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Performance metric not found." });
+      return res.status(404).json({ success: false, message: "Performance metric not found." });
     }
-    res.status(200).json(result.rows[0]);
+    res.status(200).json({ success: true, message: "Performance metric updated successfully", data: result.rows[0] });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "An error occurred updating the performance metric." });
+    res.status(500).json({ success: false, message: "An error occurred updating the performance metric." });
   }
 });
 
@@ -417,18 +460,18 @@ app.delete('/api/performance-metrics/:id', authenticateToken, authorizeRoles('co
       [id]
     );
     if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Performance metric not found." });
+      return res.status(404).json({ success: false, message: "Performance metric not found." });
     }
-    res.status(200).json({ message: "Performance metric deleted successfully." });
+    res.status(200).json({ success: true, message: "Performance metric deleted successfully." });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "An error occurred deleting the performance metric." });
+    res.status(500).json({ success: false, message: "An error occurred deleting the performance metric." });
   }
 });
 
 
 app.get('/api/me', authenticateToken, (req, res) => {
-  res.status(200).json({ message: 'Token is valid', user: req.user });
+  res.status(200).json({ success: true, message: 'Token is valid', data: req.user });
 });
 
 app.get('/', (req, res) => {
@@ -438,3 +481,4 @@ app.get('/', (req, res) => {
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
+                                                                       
