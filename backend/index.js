@@ -211,6 +211,49 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
+// --- User Management Endpoints (Admin Only) ---
+app.get('/api/users', authenticateToken, authorizeRoles('admin'), async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, username, role FROM users ORDER BY id ASC');
+    res.status(200).json({ success: true, data: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "An error occurred fetching users." });
+  }
+});
+
+app.delete('/api/users/:id', authenticateToken, authorizeRoles('admin'), async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { id } = req.params;
+
+    // Prevent deleting the logged-in admin user
+    if (req.user.userId === parseInt(id, 10)) {
+      return res.status(400).json({ success: false, message: "Cannot delete your own account." });
+    }
+
+    await client.query('BEGIN');
+    
+    // Deleting the user will automatically delete the linked athlete row due to ON DELETE CASCADE
+    const result = await client.query('DELETE FROM users WHERE id = $1 RETURNING *', [id]);
+    
+    if (result.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
+
+    await client.query('COMMIT');
+    res.status(200).json({ success: true, message: "User deleted successfully." });
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err);
+    res.status(500).json({ success: false, message: "An error occurred deleting the user." });
+  } finally {
+    client.release();
+  }
+});
+
 
 // --- Protected Endpoints for Athlete Management ---
 app.post('/api/athletes', authenticateToken, authorizeRoles('coach', 'admin'), async (req, res) => {
