@@ -13,7 +13,8 @@ import CoachDashboard from './pages/CoachDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import AthletesPage from './pages/AthletesPage';
 import AthleteProfile from './pages/AthleteProfile';
-import AddAthletePage from './pages/AddAthletePage'; // New Import
+import AddAthletePage from './pages/AddAthletePage';
+import EditAthletePage from './pages/EditAthletePage'; // New Import
 
 // Component for shared layout
 const ProtectedRouteLayout: React.FC = () => {
@@ -61,7 +62,8 @@ const AppWrapper: React.FC = () => {
               
               <Route element={<ProtectedRoute allowedRoles={['coach']} />}>
                   <Route path="/coach-dashboard" element={<CoachDashboard />} />
-                  <Route path="/add-athlete" element={<AddAthletePage />} /> {/* New Route */}
+                  <Route path="/add-athlete" element={<AddAthletePage />} />
+                  <Route path="/athletes/edit/:id" element={<EditAthletePage />} /> {/* New Route */}
               </Route>
 
               <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
