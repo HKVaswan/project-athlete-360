@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { FaSignInAlt, FaSpinner } from 'react-icons/fa';
 
@@ -105,12 +105,12 @@ const Login: React.FC = () => {
         </form>
         <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
           Don't have an account?{' '}
-          <button
-            onClick={() => navigate('/register')}
+          <Link
+            to="/register"
             className="font-medium text-blue-600 hover:text-blue-500 hover:underline transition-colors"
           >
             Create one
-          </button>
+          </Link>
         </p>
       </div>
     </div>
