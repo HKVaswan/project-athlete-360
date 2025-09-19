@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { FaUserPlus, FaSpinner } from 'react-icons/fa';
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -197,12 +197,12 @@ const Register: React.FC = () => {
         </form>
         <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
           Already have an account?{' '}
-          <button 
-            onClick={() => navigate('/login')}
+          <Link
+            to="/login"
             className="font-medium text-blue-600 hover:text-blue-500 hover:underline transition-colors"
           >
             Sign in
-          </button>
+          </Link>
         </p>
       </div>
     </div>
