@@ -39,7 +39,8 @@ const Register: React.FC = () => {
     };
 
     try {
-      const response = await fetch(`${API_URL}/api/register`, {
+      // Fix: Removed the leading slash to prevent a double slash in the URL
+      const response = await fetch(`${API_URL}api/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
