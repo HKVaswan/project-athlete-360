@@ -35,26 +35,21 @@ const AppRoutes: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-100">
       <Routes>
-        {/* Public Routes */}
+        {/* Public Routes - Accessible to all */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-
-        {/* Home page route to redirect to login if not authenticated */}
+        
+        {/* Redirect from home to a relevant page based on auth status */}
         <Route path="/" element={user ? <Navigate to={`/${user.role}-dashboard`} replace /> : <Navigate to="/login" replace />} />
         
-        {/* Protected Routes using the new Layout */}
+        {/* Protected Routes - Only accessible if a user is authenticated */}
         <Route element={<Layout />}>
-          {/* Athlete Routes */}
           <Route path="/athlete-dashboard" element={user && user.role === 'athlete' ? <AthleteDashboard /> : <Navigate to="/login" replace />} />
-          
-          {/* Coach Routes */}
           <Route path="/coach-dashboard" element={user && user.role === 'coach' ? <CoachDashboard /> : <Navigate to="/login" replace />} />
           <Route path="/athletes" element={user && (user.role === 'coach' || user.role === 'admin') ? <AthletesPage /> : <Navigate to="/login" replace />} />
           <Route path="/athletes/:id" element={user ? <AthleteProfile /> : <Navigate to="/login" replace />} />
           <Route path="/athletes/add" element={user && (user.role === 'coach' || user.role === 'admin') ? <AddAthletePage /> : <Navigate to="/login" replace />} />
           <Route path="/athletes/edit/:id" element={user && (user.role === 'coach' || user.role === 'admin') ? <EditAthletePage /> : <Navigate to="/login" replace />} />
-
-          {/* Admin Routes */}
           <Route path="/admin-dashboard" element={user && user.role === 'admin' ? <AdminDashboard /> : <Navigate to="/login" replace />} />
         </Route>
       </Routes>
