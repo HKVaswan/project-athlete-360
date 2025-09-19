@@ -1,96 +1,181 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useState, useEffect } from 'react';
+import { athletesService } from '../services/athletesService';
+import { trainingSessionsService } from '../services/trainingSessionsService';
 
-const API_URL = import.meta.env.VITE_API_URL;
+interface Athlete {
+  id: number;
+  name: string;
+  athlete_id: string;
+}
 
-const AthletesPage: React.FC = () => {
-  const { token, user, logout } = useAuth();
-  const navigate = useNavigate();
-  const [athletes, setAthletes] = useState<any[]>([]);
+const AthletesPage = () => {
+  const [athletes, setAthletes] = useState<Athlete[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingName, setEditingName] = useState('');
+  const [editingAthleteId, setEditingAthleteId] = useState('');
+  const [sessionNotes, setSessionNotes] = useState('');
+  const [loggingSessionId, setLoggingSessionId] = useState<number | null>(null);
 
-  const fetchAthletes = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const fetchAthletes = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/athletes`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (response.status === 401) {
-        logout();
-        return;
-      }
-
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.message || 'Failed to fetch athletes.');
-      }
-
-      const { data } = await response.json();
-      setAthletes(data);
-    } catch (err: any) {
-      setError(err.message || 'An error occurred.');
+      const fetchedAthletes = await athletesService.getAthletes();
+      setAthletes(fetchedAthletes);
+    } catch (err) {
+      setError('Failed to fetch athletes.');
+      console.error(err);
     } finally {
       setLoading(false);
     }
-  }, [token, logout]);
+  };
 
   useEffect(() => {
     fetchAthletes();
-  }, [fetchAthletes]);
+  }, []);
 
-  const isCoachOrAdmin = user?.role === 'coach' || user?.role === 'admin';
+  const handleDelete = async (id: number) => {
+    try {
+      await athletesService.deleteAthlete(id);
+      fetchAthletes();
+    } catch (err) {
+      setError('Failed to delete athlete.');
+      console.error(err);
+    }
+  };
 
-  if (loading) return <div className="p-4 text-center">Loading...</div>;
-  if (error) return <div className="p-4 text-red-500 text-center">{error} <button onClick={fetchAthletes} className="ml-2 underline">Retry</button></div>;
+  const handleUpdate = async (id: number) => {
+    try {
+      await athletesService.updateAthlete(id, editingName, editingAthleteId);
+      setEditingId(null);
+      setEditingName('');
+      setEditingAthleteId('');
+      fetchAthletes();
+    } catch (err) {
+      setError('Failed to update athlete.');
+      console.error(err);
+    }
+  };
+
+  const handleEditClick = (athlete: Athlete) => {
+    setEditingId(athlete.id);
+    setEditingName(athlete.name);
+    setEditingAthleteId(athlete.athlete_id);
+  };
+
+  const handleLogSession = async (athleteId: string) => {
+    try {
+      await trainingSessionsService.createTrainingSession(athleteId, sessionNotes);
+      setLoggingSessionId(null);
+      setSessionNotes('');
+      alert('Session logged successfully!');
+    } catch (err) {
+      alert('Failed to log session.');
+      console.error(err);
+    }
+  };
+
+  if (loading) return <div className="text-center mt-8">Loading...</div>;
+  if (error) return <div className="text-center mt-8 text-red-500">Error: {error}</div>;
 
   return (
-    <div className="p-4">
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">My Athletes</h1>
-        {isCoachOrAdmin && (
-          <Link
-            to="/add-athlete"
-            className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
-          >
-            Add New Athlete
-          </Link>
-        )}
-      </div>
-
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        {athletes.length === 0 ? (
-          <p className="text-gray-500 text-center">No athletes found.</p>
-        ) : (
-          <ul className="divide-y divide-gray-200">
-            {athletes.map((athlete) => (
-              <li key={athlete.id} className="py-4 flex items-center justify-between">
-                <div className="flex-1">
-                  <h2 className="text-xl font-semibold text-gray-800">{athlete.name}</h2>
-                  <p className="text-gray-500">{athlete.sport}</p>
-                </div>
-                <div className="flex space-x-2">
-                  <Link
-                    to={`/athletes/${athlete.id}`}
-                    className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-                  >
-                    View
-                  </Link>
-                  <Link
-                    to={`/athletes/edit/${athlete.id}`}
-                    className="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded"
-                  >
-                    Edit
-                  </Link>
-                </div>
+    <div className="container mx-auto p-4">
+      <h1 className="text-4xl font-bold text-center mb-6 text-blue-800">Athlete Management</h1>
+      <div className="max-w-xl mx-auto">
+        <h2 className="text-2xl font-semibold mb-4">List of Athletes</h2>
+        <ul className="bg-white shadow-md rounded-lg p-6">
+          {athletes.length > 0 ? (
+            athletes.map((athlete: any) => (
+              <li key={athlete.id} className="flex justify-between items-center py-2 border-b last:border-b-0">
+                {editingId === athlete.id ? (
+                  <div className="flex-grow flex flex-col sm:flex-row sm:items-center">
+                    <input
+                      type="text"
+                      value={editingAthleteId}
+                      onChange={(e) => setEditingAthleteId(e.target.value)}
+                      className="shadow appearance-none border rounded w-full py-1 px-2 mb-2 sm:mb-0 sm:mr-2 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                    />
+                    <input
+                      type="text"
+                      value={editingName}
+                      onChange={(e) => setEditingName(e.target.value)}
+                      className="shadow appearance-none border rounded w-full py-1 px-2 mb-2 sm:mb-0 sm:mr-2 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                    />
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => handleUpdate(athlete.id)}
+                        className="bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => setEditingId(null)}
+                        className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex flex-col sm:flex-row sm:items-center">
+                      <span className="text-lg font-bold mr-2">{athlete.athlete_id}</span>
+                      <span className="text-lg">{athlete.name}</span>
+                    </div>
+                    <div className="flex space-x-2 ml-auto">
+                      <button
+                        onClick={() => handleEditClick(athlete)}
+                        className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(athlete.id)}
+                        className="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline"
+                      >
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => setLoggingSessionId(athlete.id)}
+                        className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline"
+                      >
+                        Log Session
+                      </button>
+                    </div>
+                  </>
+                )}
               </li>
-            ))}
-          </ul>
+            ))
+          ) : (
+            <p>No athletes found. Please create one.</p>
+          )}
+        </ul>
+
+        {loggingSessionId && (
+          <div className="mt-8 p-6 bg-white rounded-lg shadow-md">
+            <h3 className="text-xl font-semibold mb-4">Log a Session for Athlete ID: {athletes.find(a => a.id === loggingSessionId)?.athlete_id}</h3>
+            <textarea
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              rows={4}
+              placeholder="Enter session notes here..."
+              value={sessionNotes}
+              onChange={(e) => setSessionNotes(e.target.value)}
+            ></textarea>
+            <div className="flex justify-end space-x-2 mt-4">
+              <button
+                onClick={() => handleLogSession(athletes.find(a => a.id === loggingSessionId)?.athlete_id || '')}
+                className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+              >
+                Submit
+              </button>
+              <button
+                onClick={() => setLoggingSessionId(null)}
+                className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>
