@@ -63,7 +63,7 @@ const AthletesPage = () => {
     setEditingAthleteId(athlete.athlete_id);
   };
 
-  const handleLogSession = async (athleteId: string) => {
+  const handleLogSession = async (athleteId: number) => {
     try {
       await trainingSessionsService.createTrainingSession(athleteId, sessionNotes);
       setLoggingSessionId(null);
@@ -163,7 +163,7 @@ const AthletesPage = () => {
             ></textarea>
             <div className="flex justify-end space-x-2 mt-4">
               <button
-                onClick={() => handleLogSession(athletes.find(a => a.id === loggingSessionId)?.athlete_id || '')}
+                onClick={() => handleLogSession(loggingSessionId)}
                 className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
               >
                 Submit
