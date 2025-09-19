@@ -35,13 +35,15 @@ const AppRoutes: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-100">
       <Routes>
+        {/* Public Routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+
+        {/* Home page route to redirect to login if not authenticated */}
+        <Route path="/" element={user ? <Navigate to={`/${user.role}-dashboard`} replace /> : <Navigate to="/login" replace />} />
         
         {/* Protected Routes using the new Layout */}
         <Route element={<Layout />}>
-          <Route path="/" element={user ? <Navigate to={`/${user.role}-dashboard`} replace /> : <Navigate to="/login" replace />} />
-          
           {/* Athlete Routes */}
           <Route path="/athlete-dashboard" element={user && user.role === 'athlete' ? <AthleteDashboard /> : <Navigate to="/login" replace />} />
           
