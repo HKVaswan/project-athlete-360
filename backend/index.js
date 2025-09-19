@@ -29,29 +29,30 @@ const pool = new Pool({
 // --- Database Schema Overhaul ---
 const initializeDatabase = async () => {
   try {
-    // Users table with a 'role' column
+    // Corrected Users table with a UUID primary key and required fields
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  username VARCHAR(255) NOT NULL UNIQUE,
-  password_hash VARCHAR(255) NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        username VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        role VARCHAR(50) NOT NULL DEFAULT 'athlete'
+      );
     `);
     console.log('Users table ensured to exist.');
 
     // Athletes table with a link to the users table
+    // The user_id is now a UUID to match the users table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS athletes (
-  id SERIAL PRIMARY KEY,
-  user_id UUID UNIQUE REFERENCES users(id) ON DELETE CASCADE,
-  name VARCHAR(255) NOT NULL,
-  athlete_id VARCHAR(255) UNIQUE,
-  dob DATE,
-  sport VARCHAR(100),
-  gender VARCHAR(20),
-  contact_info VARCHAR(255)
-     );
+        id SERIAL PRIMARY KEY,
+        user_id UUID UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        athlete_id VARCHAR(255) UNIQUE,
+        dob DATE,
+        sport VARCHAR(100),
+        gender VARCHAR(20),
+        contact_info VARCHAR(255)
+      );
     `);
     console.log('Athletes table ensured to exist.');
 
@@ -379,6 +380,7 @@ app.delete('/api/athletes/:id', authenticateToken, authorizeRoles('coach', 'admi
     res.status(500).json({ success: false, message: "An error occurred deleting the athlete." });
   }
 });
+
 
 // --- Protected Endpoints for Training Sessions ---
 app.post('/api/training-sessions', authenticateToken, authorizeRoles('coach', 'admin'), async (req, res) => {
