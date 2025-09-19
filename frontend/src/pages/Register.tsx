@@ -197,7 +197,7 @@ const Register: React.FC = () => {
         </form>
         <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
           Already have an account?{' '}
-          <button
+          <button 
             onClick={() => navigate('/login')}
             className="font-medium text-blue-600 hover:text-blue-500 hover:underline transition-colors"
           >
