@@ -14,7 +14,7 @@ interface AuthContextType {
   token: string | null;
   user: UserInfo | null;
   authError: string | null;
-  login: (token: string, role: string, username: string, userId: number, exp: number) => void;
+  login: (newToken: string) => void;
   logout: () => void;
   isAuthenticated: boolean;
   checkAuth: () => Promise<void>;
@@ -67,12 +67,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     try {
       const parsedUser = JSON.parse(storedUser);
-      // Validate the stored expiration time before calling the backend
       if (!checkTokenExpiry(parsedUser.exp)) {
         return;
       }
 
-      // Verify the token with the backend, and get the authoritative `exp` value
       const response = await fetch(`${API_URL}/api/me`, {
         headers: { 'Authorization': `Bearer ${storedToken}` }
       });
@@ -83,7 +81,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error(data.error || 'Backend rejected token');
       }
 
-      // Authoritative check on the token's expiration from the backend
       const backendExp = data.user.exp;
       if (!checkTokenExpiry(backendExp)) {
         return;
@@ -101,7 +98,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [logout, checkTokenExpiry, getStorage]);
 
   useEffect(() => {
-    checkAuth();
+    const isLoginPage = window.location.pathname === '/login';
+    const isRegisterPage = window.location.pathname === '/register';
+    
+    if (!isLoginPage && !isRegisterPage) {
+        checkAuth();
+    }
   }, [checkAuth]);
 
   const login = (newToken: string, role: string, username: string, userId: number, exp: number) => {
@@ -132,7 +134,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isAuthenticated = !!token;
 
   return (
-    <AuthContext.Provider value={{ token, user, authError, login, logout, isAuthenticated, checkAuth }}>
+    <AuthContext.Provider value={{ token, user, authError, login: login as (token: string, role: string, username: string, userId: number, exp: number) => void, logout, isAuthenticated, checkAuth }}>
       {children}
     </AuthContext.Provider>
   );
