@@ -43,15 +43,15 @@ const initializeDatabase = async () => {
     // Athletes table with a link to the users table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS athletes (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER UNIQUE REFERENCES users(id) ON DELETE CASCADE,
-        name VARCHAR(255) NOT NULL,
-        athlete_id VARCHAR(255) UNIQUE,
-        dob DATE,
-        sport VARCHAR(100),
-        gender VARCHAR(20),
-        contact_info VARCHAR(255)
-      );
+  id SERIAL PRIMARY KEY,
+  user_id UUID UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  name VARCHAR(255) NOT NULL,
+  athlete_id VARCHAR(255) UNIQUE,
+  dob DATE,
+  sport VARCHAR(100),
+  gender VARCHAR(20),
+  contact_info VARCHAR(255)
+     );
     `);
     console.log('Athletes table ensured to exist.');
 
