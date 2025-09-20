@@ -12,3 +12,4 @@ export interface AttendancePayload {
   athleteId: string;
   present: boolean;
 }
+ 
