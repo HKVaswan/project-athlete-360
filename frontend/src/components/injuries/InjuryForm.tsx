@@ -73,3 +73,4 @@ const InjuryForm: React.FC<Props> = ({ athleteId, onSubmit, initialData }) => {
 };
 
 export default InjuryForm;
+ 
