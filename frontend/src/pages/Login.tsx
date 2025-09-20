@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { FaSignInAlt, FaSpinner } from 'react-icons/fa';
 
 // Fix: Change the environment variable to use REACT_APP_API_URL and add a correct fallback.
-const API_URL = process.env.REACT_APP_API_URL || "https://project-athlete-360.onrender.com/";
+const API_URL = process.env.REACT_APP_API_URL || "https://project-athlete-360.onrender.com";
 
 const Login: React.FC = () => {
   const [username, setUsername] = useState('');
