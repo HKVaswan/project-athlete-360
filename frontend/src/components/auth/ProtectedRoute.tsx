@@ -18,3 +18,4 @@ const ProtectedRoute = ({ allowedRoles }: { allowedRoles?: string[] }) => {
 };
 
 export default ProtectedRoute;
+ 
