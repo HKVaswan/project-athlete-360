@@ -22,3 +22,4 @@ export const sessionsService = {
     await api.delete(`/sessions/${id}`);
   },
 };
+ 
