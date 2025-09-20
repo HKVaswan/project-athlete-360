@@ -60,3 +60,4 @@ def list_attendance(current_user = Depends(auth.get_current_user),
         models.Athlete.institution_id == current_user.institution_id
     ).all()
     return attendance_records
+ 
