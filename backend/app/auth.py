@@ -72,3 +72,4 @@ def require_role(allowed_roles: list):
             raise HTTPException(status_code=403, detail="Forbidden: Insufficient role")
         return current_user
     return wrapper
+ 
