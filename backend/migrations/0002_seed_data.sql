@@ -72,3 +72,4 @@ INSERT INTO injury (id, athlete_id, reported_by, description, diagnosis, date_re
   (gen_random_uuid(), '30000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000003', 'Mild hamstring strain', 'Hamstring strain (grade 1)', '2025-06-01', 'open', TRUE);
 
 COMMIT;
+ 
