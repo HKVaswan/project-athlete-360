@@ -42,3 +42,4 @@ app.include_router(injuries.router)
 @app.get("/", tags=["Root"])
 def root():
     return {"message": "Welcome to Athlete Management API"}
+ 
