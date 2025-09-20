@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { FaUserPlus, FaSpinner } from 'react-icons/fa';
 
-const API_URL = import.meta.env.VITE_API_URL;
+// Fix: Changed the environment variable to use REACT_APP_API_URL and added a correct fallback
+const API_URL = process.env.REACT_APP_API_URL || "https://project-athlete-360.onrender.com/";
 
 const Register: React.FC = () => {
   const [username, setUsername] = useState('');
