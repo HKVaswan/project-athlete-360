@@ -13,3 +13,4 @@ export interface PerformanceSummary {
   bestScore: number;
   trend: "improving" | "declining" | "stable";
 }
+ 
