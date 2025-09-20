@@ -8,7 +8,11 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
+const cors = require('cors');
+
+// Use the environment variable, or a fallback for local testing
+const frontendUrl = process.env.FRONTEND_URL || 'https://your-frontend-url.vercel.app';
+app.use(cors({ origin: frontendUrl }));
 app.use(express.json());
 
 // JWT Secret Key (MUST BE SET IN ENVIRONMENT)
