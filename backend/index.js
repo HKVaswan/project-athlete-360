@@ -139,7 +139,7 @@ app.post('/api/login', async (req, res) => {
     const token = jwt.sign({ userId: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
     const decodedToken = jwt.decode(token);
     const exp = decodedToken.exp * 1000;
-    
+
     res.status(200).json({ success: true, message: 'Login successful', data: { token, role: user.role, userId: user.id, exp } });
   } catch (err) {
     console.error(err);
@@ -152,11 +152,11 @@ app.post('/api/register', async (req, res) => {
   const client = await pool.connect();
   try {
     const { username, password, name, dob, sport, gender, contact_info, role } = req.body;
-    
+
     if (!username || !password) {
       return res.status(400).json({ success: false, message: 'Username and password are required.' });
     }
-    
+
     const token = req.headers['authorization']?.split(' ')[1];
     let userRole = 'athlete'; // Default role is athlete
 
@@ -177,7 +177,7 @@ app.post('/api/register', async (req, res) => {
     await client.query('BEGIN');
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    
+
     const userInsertResult = await client.query(
       'INSERT INTO users (username, password, role) VALUES ($1, $2, $3) RETURNING id, username, role',
       [username, hashedPassword, userRole]
@@ -235,10 +235,10 @@ app.delete('/api/users/:id', authenticateToken, authorizeRoles('admin'), async (
     }
 
     await client.query('BEGIN');
-    
+
     // Deleting the user will automatically delete the linked athlete row due to ON DELETE CASCADE
     const result = await client.query('DELETE FROM users WHERE id = $1 RETURNING *', [id]);
-    
+
     if (result.rowCount === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json({ success: false, message: "User not found." });
@@ -255,7 +255,6 @@ app.delete('/api/users/:id', authenticateToken, authorizeRoles('admin'), async (
     client.release();
   }
 });
-
 
 // --- Protected Endpoints for Athlete Management ---
 app.post('/api/athletes', authenticateToken, authorizeRoles('coach', 'admin'), async (req, res) => {
@@ -381,7 +380,6 @@ app.delete('/api/athletes/:id', authenticateToken, authorizeRoles('coach', 'admi
     res.status(500).json({ success: false, message: "An error occurred deleting the athlete." });
   }
 });
-
 
 // --- Protected Endpoints for Training Sessions ---
 app.post('/api/training-sessions', authenticateToken, authorizeRoles('coach', 'admin'), async (req, res) => {
@@ -536,7 +534,6 @@ app.delete('/api/performance-metrics/:id', authenticateToken, authorizeRoles('co
     res.status(500).json({ success: false, message: "An error occurred deleting the performance metric." });
   }
 });
-
 
 app.get('/api/me', authenticateToken, (req, res) => {
   res.status(200).json({ success: true, message: 'Token is valid', data: req.user });
