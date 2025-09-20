@@ -1,8 +1,10 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
 
 // Components
 import Navbar from './components/Navbar';
+import Layout from './components/Layout';
 
 // Pages
 import Login from './pages/Login';
@@ -15,27 +17,43 @@ import AthleteProfile from './pages/AthleteProfile';
 import AddAthletePage from './pages/AddAthletePage';
 import EditAthletePage from './pages/EditAthletePage';
 
-// Main App Component
+// Main App Component with AuthProvider
 const App: React.FC = () => {
   return (
     <Router>
-      <div className="min-h-screen bg-gray-100">
-        <Navbar />
-        <Routes>
-          {/* All routes are now public and accessible */}
-          <Route path="/" element={<Login />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/athlete-dashboard" element={<AthleteDashboard />} />
-          <Route path="/coach-dashboard" element={<CoachDashboard />} />
-          <Route path="/athletes" element={<AthletesPage />} />
-          <Route path="/athletes/:id" element={<AthleteProfile />} />
-          <Route path="/athletes/add" element={<AddAthletePage />} />
-          <Route path="/athletes/edit/:id" element={<EditAthletePage />} />
-          <Route path="/admin-dashboard" element={<AdminDashboard />} />
-        </Routes>
-      </div>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
     </Router>
+  );
+};
+
+// Routes Component to use auth context
+const AppRoutes: React.FC = () => {
+  const { user } = useAuth();
+  
+  return (
+    <div className="min-h-screen bg-gray-100">
+      <Routes>
+        {/* Public Routes - Accessible to all */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        
+        {/* Redirect from home to a relevant page based on auth status */}
+        <Route path="/" element={user ? <Navigate to={`/${user.role}-dashboard`} replace /> : <Navigate to="/login" replace />} />
+        
+        {/* Protected Routes - Only accessible if a user is authenticated */}
+        <Route element={<Layout />}>
+          <Route path="/athlete-dashboard" element={user && user.role === 'athlete' ? <AthleteDashboard /> : <Navigate to="/login" replace />} />
+          <Route path="/coach-dashboard" element={user && user.role === 'coach' ? <CoachDashboard /> : <Navigate to="/login" replace />} />
+          <Route path="/athletes" element={user && (user.role === 'coach' || user.role === 'admin') ? <AthletesPage /> : <Navigate to="/login" replace />} />
+          <Route path="/athletes/:id" element={user ? <AthleteProfile /> : <Navigate to="/login" replace />} />
+          <Route path="/athletes/add" element={user && (user.role === 'coach' || user.role === 'admin') ? <AddAthletePage /> : <Navigate to="/login" replace />} />
+          <Route path="/athletes/edit/:id" element={user && (user.role === 'coach' || user.role === 'admin') ? <EditAthletePage /> : <Navigate to="/login" replace />} />
+          <Route path="/admin-dashboard" element={user && user.role === 'admin' ? <AdminDashboard /> : <Navigate to="/login" replace />} />
+        </Route>
+      </Routes>
+    </div>
   );
 };
 
