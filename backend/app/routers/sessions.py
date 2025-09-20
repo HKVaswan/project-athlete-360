@@ -66,3 +66,4 @@ def list_sessions(current_user = Depends(auth.get_current_user),
         models.Team.institution_id == current_user.institution_id
     ).all()
     return sessions
+ 
