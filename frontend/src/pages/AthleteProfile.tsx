@@ -154,4 +154,4 @@ const AthleteProfile: React.FC = () => {
 };
 
 export default AthleteProfile;
-                
+              
