@@ -1,7 +1,6 @@
 import React from "react";
-import { Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
-import { useAuth } from "./context/AuthContext";
-import { FaSpinner } from "react-icons/fa";
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 
 // Components
 import Navbar from "./components/Navbar";
@@ -19,33 +18,146 @@ import AddAthletePage from "./pages/AddAthletePage";
 import EditAthletePage from "./pages/EditAthletePage";
 
 // --- Robust Route Guards ---
+
+// Authenticated Route: waits for user, shows spinner if loading, redirects if not authenticated
 const RequireAuth: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isAuthenticated } = useAuth();
   const location = useLocation();
+
+  if (user === undefined) {
+    // Context not resolved yet (rare); show loading spinner
+    return <div className="flex items-center justify-center min-h-screen"><span>Loading...</span></div>;
+  }
+
   if (!isAuthenticated()) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
+
   return <>{children}</>;
 };
 
+// Role-Based Route
 const RequireRole: React.FC<{ role: string; children: React.ReactNode }> = ({ role, children }) => {
   const { user } = useAuth();
+
   if (!user || user.role !== role) {
     return <Navigate to="/login" replace />;
   }
   return <>{children}</>;
 };
 
+// Multi-Role Route
 const RequireRoles: React.FC<{ roles: string[]; children: React.ReactNode }> = ({ roles, children }) => {
   const { user } = useAuth();
+
   if (!user || !roles.includes(user.role)) {
     return <Navigate to="/login" replace />;
   }
   return <>{children}</>;
 };
 
+// --- Main App ---
+const App: React.FC = () => {
+  return (
+    <Router>
+      <AuthProvider>
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+
+          {/* Home Route: Redirect based on role */}
+          <Route
+            path="/"
+            element={
+              <HomeRedirect />
+            }
+          />
+
+          {/* Protected Routes */}
+          <Route element={<Layout />}>
+            <Route
+              path="/athlete-dashboard"
+              element={
+                <RequireAuth>
+                  <RequireRole role="athlete">
+                    <AthleteDashboard />
+                  </RequireRole>
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/coach-dashboard"
+              element={
+                <RequireAuth>
+                  <RequireRole role="coach">
+                    <CoachDashboard />
+                  </RequireRole>
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/admin-dashboard"
+              element={
+                <RequireAuth>
+                  <RequireRole role="admin">
+                    <AdminDashboard />
+                  </RequireRole>
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/athletes"
+              element={
+                <RequireAuth>
+                  <RequireRoles roles={["coach", "admin"]}>
+                    <AthletesPage />
+                  </RequireRoles>
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/athletes/:id"
+              element={
+                <RequireAuth>
+                  <AthleteProfile />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/athletes/add"
+              element={
+                <RequireAuth>
+                  <RequireRoles roles={["coach", "admin"]}>
+                    <AddAthletePage />
+                  </RequireRoles>
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/athletes/edit/:id"
+              element={
+                <RequireAuth>
+                  <RequireRoles roles={["coach", "admin"]}>
+                    <EditAthletePage />
+                  </RequireRoles>
+                </RequireAuth>
+              }
+            />
+          </Route>
+
+          {/* Fallback Route */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AuthProvider>
+    </Router>
+  );
+};
+
+// HomeRedirect: redirect user based on their role after login
 const HomeRedirect: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
+
   if (!isAuthenticated() || !user) {
     return <Navigate to="/login" replace />;
   }
@@ -61,99 +173,4 @@ const HomeRedirect: React.FC = () => {
   }
 };
 
-// --- Main App ---
-const App: React.FC = () => {
-  const { loading } = useAuth();
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <FaSpinner className="animate-spin text-4xl text-blue-600" />
-      </div>
-    );
-  }
-
-  return (
-    <Routes>
-      {/* Public Routes */}
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/" element={<HomeRedirect />} />
-      {/* Protected Routes */}
-      <Route element={<Layout />}>
-        <Route
-          path="/athlete-dashboard"
-          element={
-            <RequireAuth>
-              <RequireRole role="athlete">
-                <AthleteDashboard />
-              </RequireRole>
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/coach-dashboard"
-          element={
-            <RequireAuth>
-              <RequireRole role="coach">
-                <CoachDashboard />
-              </RequireRole>
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/admin-dashboard"
-          element={
-            <RequireAuth>
-              <RequireRole role="admin">
-                <AdminDashboard />
-              </RequireRole>
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/athletes"
-          element={
-            <RequireAuth>
-              <RequireRoles roles={["coach", "admin"]}>
-                <AthletesPage />
-              </RequireRoles>
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/athletes/:id"
-          element={
-            <RequireAuth>
-              <AthleteProfile />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/athletes/add"
-          element={
-            <RequireAuth>
-              <RequireRoles roles={["coach", "admin"]}>
-                <AddAthletePage />
-              </RequireRoles>
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/athletes/edit/:id"
-          element={
-            <RequireAuth>
-              <RequireRoles roles={["coach", "admin"]}>
-                <EditAthletePage />
-              </RequireRoles>
-            </RequireAuth>
-          }
-        />
-      </Route>
-      {/* Fallback Route */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  );
-};
-
 export default App;
- 
