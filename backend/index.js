@@ -137,10 +137,9 @@ app.post('/api/login', async (req, res) => {
     }
 
     const token = jwt.sign({ userId: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
-    const decodedToken = jwt.decode(token);
-    const exp = decodedToken.exp * 1000;
-
-    res.status(200).json({ success: true, message: 'Login successful', data: { token, role: user.role, userId: user.id, exp } });
+    
+    // Corrected Response
+    res.status(200).json({ success: true, message: 'Login successful', data: { token, user: { role: user.role, userId: user.id } } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "An error occurred during login." });
@@ -277,7 +276,7 @@ app.get('/api/athletes', authenticateToken, async (req, res) => {
     const limit = parseInt(req.query.limit) || 20;
     const offset = parseInt(req.query.offset) || 0;
     const userId = req.query.userId;
-    
+
     if (req.user.role === 'coach' || req.user.role === 'admin') {
       const { rows } = await pool.query('SELECT * FROM athletes LIMIT $1 OFFSET $2', [limit, offset]);
       res.status(200).json({ success: true, data: rows });
@@ -296,7 +295,7 @@ app.get('/api/athletes', authenticateToken, async (req, res) => {
 app.get('/api/athletes/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const athleteResult = await pool.query('SELECT * FROM athletes WHERE id = $1', [id]);
     const athlete = athleteResult.rows[0];
 
@@ -311,7 +310,7 @@ app.get('/api/athletes/:id', authenticateToken, async (req, res) => {
 
     const trainingSessionsResult = await pool.query('SELECT * FROM training_sessions WHERE athlete_id = $1 ORDER BY session_date DESC', [id]);
     const performanceMetricsResult = await pool.query('SELECT * FROM performance_metrics WHERE athlete_id = $1 ORDER BY entry_date DESC', [id]);
-    
+
     res.status(200).json({
       success: true,
       data: {
@@ -330,7 +329,7 @@ app.get('/api/athletes/:id', authenticateToken, async (req, res) => {
 app.put('/api/athletes/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     if (req.user.role === 'coach' || req.user.role === 'admin') {
       const { name, athlete_id, dob, sport, gender, contact_info } = req.body;
       const updateResult = await pool.query(
@@ -401,7 +400,7 @@ app.get('/api/training-sessions/:athleteId', authenticateToken, async (req, res)
     const { athleteId } = req.params;
     const limit = parseInt(req.query.limit) || 20;
     const offset = parseInt(req.query.offset) || 0;
-    
+
     const athleteResult = await pool.query('SELECT user_id FROM athletes WHERE id = $1', [athleteId]);
     if (athleteResult.rows.length === 0) {
       return res.status(404).json({ success: false, message: "Athlete not found." });
@@ -478,7 +477,7 @@ app.get('/api/performance-metrics/:athleteId', authenticateToken, async (req, re
     const { athleteId } = req.params;
     const limit = parseInt(req.query.limit) || 20;
     const offset = parseInt(req.query.offset) || 0;
-    
+
     const athleteResult = await pool.query('SELECT user_id FROM athletes WHERE id = $1', [athleteId]);
     if (athleteResult.rows.length === 0) {
       return res.status(404).json({ success: false, message: "Athlete not found." });
