@@ -152,8 +152,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // The critical fix: The 'loading' check was causing a circular dependency.
   const isAuthenticated = (): boolean => {
-    if (loading) return false;
     if (!token) return false;
     const decoded = safeDecode(token);
     return isTokenValid(decoded);
