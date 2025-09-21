@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { FaSignInAlt, FaSpinner, FaCheckCircle, FaEye, FaEyeSlash } from 'react-icons/fa';
 
+// Use your environment variable or default API URL
 const API_URL = (process.env.REACT_APP_API_URL || "https://project-athlete-360.onrender.com").replace(/\/+$/, "");
 
 const MIN_USERNAME_LENGTH = 3;
@@ -15,8 +16,29 @@ const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
   const navigate = useNavigate();
-  const { login } = useAuth();
+  let authContext;
+  try {
+    authContext = useAuth();
+  } catch (err) {
+    // If useAuth throws, show a visible error for debugging
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-red-100">
+        <div className="bg-white rounded-lg shadow p-8 max-w-lg">
+          <h2 className="text-xl font-bold text-red-700 mb-4">Critical Error</h2>
+          <p className="text-red-600">Authentication context is not available. Make sure your App is wrapped in <code>AuthProvider</code> and <code>Router</code>.</p>
+          <pre className="mt-4 text-xs text-red-500">{String(err)}</pre>
+        </div>
+      </div>
+    );
+  }
+
+  // Defensive fallback if context is undefined
+  const login = authContext?.login;
+  const contextLoading = authContext?.loading ?? false;
+  const contextError = authContext?.error ?? null;
+
   const usernameRef = useRef<HTMLInputElement>(null);
   const errorRef = useRef<HTMLDivElement>(null);
 
@@ -45,46 +67,86 @@ const Login: React.FC = () => {
       return;
     }
 
+    let response;
     try {
-      const response = await fetch(`${API_URL}/api/login`, {
+      response = await fetch(`${API_URL}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: username.trim(), password }),
       });
+    } catch (networkErr) {
+      setError("Network error. Could not reach login server.");
+      setLoading(false);
+      return;
+    }
 
-      if (!response) {
-        setError("Cannot reach login server. Try again later.");
-        setLoading(false);
-        return;
-      }
+    // Defensive: Handle no response
+    if (!response) {
+      setError("No response from login server.");
+      setLoading(false);
+      return;
+    }
 
-      let data = {};
+    let data: any = {};
+    try {
+      data = await response.json();
+    } catch (jsonErr) {
+      setError("Server returned an invalid response. Please contact support.");
+      setLoading(false);
+      return;
+    }
+
+    // Defensive: Check structure
+    if (!('success' in data) || (!data.success && !data.message)) {
+      setError("Unexpected server response. Please contact support.");
+      setLoading(false);
+      return;
+    }
+
+    if (response.ok && data.success && data.data && data.data.token && data.data.role) {
+      setSuccess(true);
       try {
-        data = await response.json();
-      } catch (e) {
-        setError("Server returned an invalid response. Please contact support.");
-        setLoading(false);
-        return;
+        login(data.data.token); // Defensive: context login
+        setTimeout(() => navigate(`/${data.data.role}-dashboard`), 1200);
+      } catch (err) {
+        setError("Critical auth error. Please reload the page.");
+        setSuccess(false);
       }
-
-      if (response.ok && (data as any).success) {
-        setSuccess(true);
-        login((data as any).data.token);
-        setTimeout(() => navigate(`/${(data as any).data.role}-dashboard`), 1200);
-      } else {
-        if ((data as any).message?.toLowerCase().includes('credentials')) {
+    } else {
+      // Defensive: Message handling
+      if (data.message) {
+        if (typeof data.message === 'string' && data.message.toLowerCase().includes('credentials')) {
           setError('Incorrect username or password.');
         } else {
-          setError((data as any).message || 'Login failed. Please try again.');
+          setError(data.message || 'Login failed. Please try again.');
         }
-        usernameRef.current?.focus();
+      } else {
+        setError('Login failed. Please try again.');
       }
-    } catch (err: any) {
-      setError('Could not connect to login server. Please check your internet or try again later.');
-    } finally {
-      setLoading(false);
+      usernameRef.current?.focus();
     }
+    setLoading(false);
   };
+
+  // Context loading/error UI
+  if (contextLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-100">
+        <FaSpinner className="animate-spin text-4xl text-blue-600" />
+        <span className="ml-4 text-lg text-gray-700">Loading authentication…</span>
+      </div>
+    );
+  }
+  if (contextError) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-red-100">
+        <div className="bg-white rounded-lg shadow p-8 max-w-lg">
+          <h2 className="text-xl font-bold text-red-700 mb-4">Authentication Error</h2>
+          <p className="text-red-600">{contextError}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 px-4 py-8">
@@ -158,7 +220,7 @@ const Login: React.FC = () => {
           )}
           <button
             type="submit"
-            className="w-full flex items-center justify-center space-x-2 bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 transition-colors duration-200 disabled:bg-blue-400"
+            className="w-full flex items-center justify-center space-x-2 bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 transition-colors duration-200 disabled:bg-blue-400 disabled:cursor-not-allowed"
             disabled={loading}
             aria-label="Sign In"
           >
