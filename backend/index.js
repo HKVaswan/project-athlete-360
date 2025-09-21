@@ -1,5 +1,4 @@
 const express = require('express');
-const bodyParser = require('body-parser');
 const cors = require('cors');
 const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
@@ -8,13 +7,9 @@ const jwt = require('jsonwebtoken');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// --- Middleware ---
-const frontendUrl = 'https://project-athlete-360.vercel.app';
-app.use(cors({
-  origin: frontendUrl,
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+// Middleware
+const frontendUrl = process.env.FRONTEND_URL || 'https://your-frontend-url.vercel.app';
+app.use(cors({ origin: frontendUrl }));
 app.use(express.json());
 
 // JWT Secret Key (MUST BE SET IN ENVIRONMENT)
@@ -202,9 +197,9 @@ app.post('/api/register', async (req, res) => {
 
     await client.query('COMMIT');
 
-    res.status(201).json({
+    res.status(201).json({ 
       success: true,
-      message: 'User created successfully',
+      message: 'User created successfully', 
       data: {
         user: userInsertResult.rows[0]
       }
