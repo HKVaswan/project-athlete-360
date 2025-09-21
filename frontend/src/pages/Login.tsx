@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { FaSignInAlt, FaSpinner } from 'react-icons/fa';
+import { FaSignInAlt, FaSpinner, FaCheckCircle } from 'react-icons/fa';
 
-const API_URL = import.meta.env.VITE_API_URL || "https://project-athlete-360.onrender.com/";
+const API_URL = (process.env.REACT_APP_API_URL || "https://project-athlete-360.onrender.com").replace(/\/+$/, "");
 
 const Login: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -18,7 +18,6 @@ const Login: React.FC = () => {
     setLoading(true);
     setError(null);
 
-    // Frontend validation
     if (!username || !password) {
       setError("Please enter a username and password.");
       setLoading(false);
@@ -26,7 +25,7 @@ const Login: React.FC = () => {
     }
 
     try {
-      const response = await fetch(`${API_URL}api/login`, {
+      const response = await fetch(`${API_URL}/api/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -34,19 +33,31 @@ const Login: React.FC = () => {
         body: JSON.stringify({ username: username.trim(), password }),
       });
 
-      const data = await response.json();
+      // Handle non-fetch errors, like server not reachable
+      if (!response) {
+        setError("Cannot reach login server. Try again later.");
+        setLoading(false);
+        return;
+      }
 
-      if (response.ok && data.success) {
+      let data = {};
+      try {
+        data = await response.json();
+      } catch (e) {
+        setError("Server returned an invalid response. Please contact support.");
+        setLoading(false);
+        return;
+      }
+
+      if (response.ok && (data as any).success) {
         // Use the login function from AuthContext to set the user and token
-        login(data.data.token);
-        navigate(`/${data.data.role}-dashboard`);
+        login((data as any).data.token);
+        navigate(`/${(data as any).data.role}-dashboard`);
       } else {
-        // This is the key change. We now get the specific error message from the backend.
-        setError(data.message || 'Login failed. Please check your credentials.');
+        setError((data as any).message || 'Login failed. Please check your credentials.');
       }
     } catch (err: any) {
-      // Catch network errors or other unexpected issues
-      setError('An error occurred during login. Please try again.');
+      setError('Could not connect to login server. Please check your internet or try again later.');
     } finally {
       setLoading(false);
     }
