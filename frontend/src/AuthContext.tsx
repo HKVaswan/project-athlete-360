@@ -10,6 +10,7 @@ interface DecodedUser {
 interface AuthContextType {
   token: string | null;
   user: DecodedUser | null;
+  isAuthReady: boolean; // Added for loading state
   login: (token: string) => void;
   logout: () => void;
   isAuthenticated: () => boolean;
@@ -33,6 +34,7 @@ const isTokenValid = (decoded: DecodedUser | null): boolean =>
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<DecodedUser | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false); // New state variable
   const navigate = useNavigate();
 
   // Load token at startup
@@ -47,6 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.removeItem('token');
       }
     }
+    setIsAuthReady(true); // Set state to true when check is complete
   }, []);
 
   // Sync auth state across tabs
@@ -105,7 +108,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ token, user, login, logout, isAuthenticated }}>
+    <AuthContext.Provider value={{ token, user, isAuthReady, login, logout, isAuthenticated }}>
       {children}
     </AuthContext.Provider>
   );
