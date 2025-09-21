@@ -45,10 +45,7 @@ const RequireRoles: React.FC<{ roles: string[]; children: React.ReactNode }> = (
 };
 
 const HomeRedirect: React.FC = () => {
-  const { user, isAuthenticated, loading } = useAuth();
-  if (loading) {
-    return <div className="flex items-center justify-center min-h-screen"><FaSpinner className="animate-spin text-4xl text-blue-600" /></div>;
-  }
+  const { user, isAuthenticated } = useAuth();
   if (!isAuthenticated() || !user) {
     return <Navigate to="/login" replace />;
   }
