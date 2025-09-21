@@ -1,6 +1,7 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { FaSpinner } from "react-icons/fa";
 
 // Components
 import Navbar from "./components/Navbar";
@@ -18,46 +19,61 @@ import AddAthletePage from "./pages/AddAthletePage";
 import EditAthletePage from "./pages/EditAthletePage";
 
 // --- Robust Route Guards ---
-
-// Authenticated Route: waits for user, shows spinner if loading, redirects if not authenticated
 const RequireAuth: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isAuthenticated } = useAuth();
   const location = useLocation();
 
-  if (user === undefined) {
-    // Context not resolved yet (rare); show loading spinner
-    return <div className="flex items-center justify-center min-h-screen"><span>Loading...</span></div>;
-  }
-
   if (!isAuthenticated()) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
-
   return <>{children}</>;
 };
 
-// Role-Based Route
 const RequireRole: React.FC<{ role: string; children: React.ReactNode }> = ({ role, children }) => {
   const { user } = useAuth();
-
   if (!user || user.role !== role) {
     return <Navigate to="/login" replace />;
   }
   return <>{children}</>;
 };
 
-// Multi-Role Route
 const RequireRoles: React.FC<{ roles: string[]; children: React.ReactNode }> = ({ roles, children }) => {
   const { user } = useAuth();
-
   if (!user || !roles.includes(user.role)) {
     return <Navigate to="/login" replace />;
   }
   return <>{children}</>;
 };
 
+const HomeRedirect: React.FC = () => {
+  const { user, isAuthenticated } = useAuth();
+  if (!isAuthenticated() || !user) {
+    return <Navigate to="/login" replace />;
+  }
+  switch (user.role) {
+    case "athlete":
+      return <Navigate to="/athlete-dashboard" replace />;
+    case "coach":
+      return <Navigate to="/coach-dashboard" replace />;
+    case "admin":
+      return <Navigate to="/admin-dashboard" replace />;
+    default:
+      return <Navigate to="/login" replace />;
+  }
+};
+
 // --- Main App ---
 const App: React.FC = () => {
+  const { isAuthReady } = useAuth();
+
+  if (!isAuthReady) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <FaSpinner className="animate-spin text-4xl text-blue-600" />
+      </div>
+    );
+  }
+
   return (
     <Router>
       <AuthProvider>
@@ -67,12 +83,7 @@ const App: React.FC = () => {
           <Route path="/register" element={<Register />} />
 
           {/* Home Route: Redirect based on role */}
-          <Route
-            path="/"
-            element={
-              <HomeRedirect />
-            }
-          />
+          <Route path="/" element={<HomeRedirect />} />
 
           {/* Protected Routes */}
           <Route element={<Layout />}>
@@ -152,25 +163,6 @@ const App: React.FC = () => {
       </AuthProvider>
     </Router>
   );
-};
-
-// HomeRedirect: redirect user based on their role after login
-const HomeRedirect: React.FC = () => {
-  const { user, isAuthenticated } = useAuth();
-
-  if (!isAuthenticated() || !user) {
-    return <Navigate to="/login" replace />;
-  }
-  switch (user.role) {
-    case "athlete":
-      return <Navigate to="/athlete-dashboard" replace />;
-    case "coach":
-      return <Navigate to="/coach-dashboard" replace />;
-    case "admin":
-      return <Navigate to="/admin-dashboard" replace />;
-    default:
-      return <Navigate to="/login" replace />;
-  }
 };
 
 export default App;
