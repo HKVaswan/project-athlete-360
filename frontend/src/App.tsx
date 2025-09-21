@@ -1,6 +1,6 @@
 import React from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
-import { AuthProvider, useAuth } from "./context/AuthContext";
+import { Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
+import { useAuth } from "./context/AuthContext";
 import { FaSpinner } from "react-icons/fa";
 
 // Components
@@ -22,7 +22,6 @@ import EditAthletePage from "./pages/EditAthletePage";
 const RequireAuth: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isAuthenticated } = useAuth();
   const location = useLocation();
-
   if (!isAuthenticated()) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
@@ -46,7 +45,10 @@ const RequireRoles: React.FC<{ roles: string[]; children: React.ReactNode }> = (
 };
 
 const HomeRedirect: React.FC = () => {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen"><FaSpinner className="animate-spin text-4xl text-blue-600" /></div>;
+  }
   if (!isAuthenticated() || !user) {
     return <Navigate to="/login" replace />;
   }
@@ -64,9 +66,8 @@ const HomeRedirect: React.FC = () => {
 
 // --- Main App ---
 const App: React.FC = () => {
-  const { isAuthReady } = useAuth();
-
-  if (!isAuthReady) {
+  const { loading } = useAuth();
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <FaSpinner className="animate-spin text-4xl text-blue-600" />
@@ -75,93 +76,85 @@ const App: React.FC = () => {
   }
 
   return (
-    <Router>
-      <AuthProvider>
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-
-          {/* Home Route: Redirect based on role */}
-          <Route path="/" element={<HomeRedirect />} />
-
-          {/* Protected Routes */}
-          <Route element={<Layout />}>
-            <Route
-              path="/athlete-dashboard"
-              element={
-                <RequireAuth>
-                  <RequireRole role="athlete">
-                    <AthleteDashboard />
-                  </RequireRole>
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/coach-dashboard"
-              element={
-                <RequireAuth>
-                  <RequireRole role="coach">
-                    <CoachDashboard />
-                  </RequireRole>
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/admin-dashboard"
-              element={
-                <RequireAuth>
-                  <RequireRole role="admin">
-                    <AdminDashboard />
-                  </RequireRole>
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/athletes"
-              element={
-                <RequireAuth>
-                  <RequireRoles roles={["coach", "admin"]}>
-                    <AthletesPage />
-                  </RequireRoles>
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/athletes/:id"
-              element={
-                <RequireAuth>
-                  <AthleteProfile />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/athletes/add"
-              element={
-                <RequireAuth>
-                  <RequireRoles roles={["coach", "admin"]}>
-                    <AddAthletePage />
-                  </RequireRoles>
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/athletes/edit/:id"
-              element={
-                <RequireAuth>
-                  <RequireRoles roles={["coach", "admin"]}>
-                    <EditAthletePage />
-                  </RequireRoles>
-                </RequireAuth>
-              }
-            />
-          </Route>
-
-          {/* Fallback Route */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </AuthProvider>
-    </Router>
+    <Routes>
+      {/* Public Routes */}
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/" element={<HomeRedirect />} />
+      {/* Protected Routes */}
+      <Route element={<Layout />}>
+        <Route
+          path="/athlete-dashboard"
+          element={
+            <RequireAuth>
+              <RequireRole role="athlete">
+                <AthleteDashboard />
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/coach-dashboard"
+          element={
+            <RequireAuth>
+              <RequireRole role="coach">
+                <CoachDashboard />
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin-dashboard"
+          element={
+            <RequireAuth>
+              <RequireRole role="admin">
+                <AdminDashboard />
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/athletes"
+          element={
+            <RequireAuth>
+              <RequireRoles roles={["coach", "admin"]}>
+                <AthletesPage />
+              </RequireRoles>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/athletes/:id"
+          element={
+            <RequireAuth>
+              <AthleteProfile />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/athletes/add"
+          element={
+            <RequireAuth>
+              <RequireRoles roles={["coach", "admin"]}>
+                <AddAthletePage />
+              </RequireRoles>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/athletes/edit/:id"
+          element={
+            <RequireAuth>
+              <RequireRoles roles={["coach", "admin"]}>
+                <EditAthletePage />
+              </RequireRoles>
+            </RequireAuth>
+          }
+        />
+      </Route>
+      {/* Fallback Route */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 };
 
