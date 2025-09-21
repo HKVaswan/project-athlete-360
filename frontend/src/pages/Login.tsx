@@ -3,8 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { FaSignInAlt, FaSpinner } from 'react-icons/fa';
 
-// Fix: Change the environment variable to use REACT_APP_API_URL and add a correct fallback.
-const API_URL = process.env.REACT_APP_API_URL || "https://project-athlete-360.onrender.com";
+const API_URL = import.meta.env.VITE_API_URL || "https://project-athlete-360.onrender.com/";
 
 const Login: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -42,12 +41,12 @@ const Login: React.FC = () => {
         login(data.data.token);
         navigate(`/${data.data.role}-dashboard`);
       } else {
-        // Standardize error message for security
-        throw new Error('Invalid username or password. Please try again.');
+        // This is the key change. We now get the specific error message from the backend.
+        setError(data.message || 'Login failed. Please check your credentials.');
       }
     } catch (err: any) {
       // Catch network errors or other unexpected issues
-      setError(err.message || 'An unexpected error occurred. Please try again later.');
+      setError('An error occurred during login. Please try again.');
     } finally {
       setLoading(false);
     }
