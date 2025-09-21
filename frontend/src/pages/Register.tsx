@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { FaUserPlus, FaSpinner, FaCheckCircle } from 'react-icons/fa';
+import { FaUserPlus, FaSpinner, FaCheckCircle, FaExclamationTriangle } from 'react-icons/fa';
 
 const API_URL = (process.env.REACT_APP_API_URL || "https://project-athlete-360.onrender.com").replace(/\/+$/, "");
 
@@ -13,10 +13,10 @@ const initialFields = {
   sport: "",
   gender: "",
   contactInfo: "",
-  role: "athlete", // Default, but you can hide/show role selection
+  role: "athlete",
 };
 
-const emailRegex = /^[\w\-\.]+@([\w\-]+\.)+[\w\-]{2,4}$/;
+const emailRegex = /^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$/;
 const phoneRegex = /^\+?\d{10,15}$/;
 
 const Register: React.FC = () => {
@@ -26,26 +26,16 @@ const Register: React.FC = () => {
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
 
-  // Validate all fields before submit
   const validateForm = () => {
-    if (!fields.username.trim() || fields.username.length < 3)
-      return "Username must be at least 3 characters.";
-    if (!fields.password || fields.password.length < 6)
-      return "Password must be at least 6 characters.";
-    if (fields.password !== fields.confirmPassword)
-      return "Passwords do not match.";
-    if (!fields.name.trim())
-      return "Full name is required.";
-    if (!fields.dob)
-      return "Date of birth is required.";
-    if (new Date(fields.dob) > new Date())
-      return "Date of birth cannot be in the future.";
-    if (!fields.sport.trim())
-      return "Sport is required.";
-    if (!["male", "female", "other"].includes(fields.gender))
-      return "Please select a valid gender.";
-    if (!fields.contactInfo.trim())
-      return "Contact info required.";
+    if (fields.username.trim().length < 3) return "Username must be at least 3 characters.";
+    if (fields.password.length < 6) return "Password must be at least 6 characters.";
+    if (fields.password !== fields.confirmPassword) return "Passwords do not match.";
+    if (!fields.name.trim()) return "Full name is required.";
+    if (!fields.dob) return "Date of birth is required.";
+    if (new Date(fields.dob) > new Date()) return "Date of birth cannot be in the future.";
+    if (!fields.sport.trim()) return "Sport is required.";
+    if (!["male", "female", "other"].includes(fields.gender)) return "Please select a valid gender.";
+    if (!fields.contactInfo.trim()) return "Contact info is required.";
     if (!(emailRegex.test(fields.contactInfo) || phoneRegex.test(fields.contactInfo)))
       return "Contact info must be a valid email or phone number.";
     return null;
@@ -58,6 +48,7 @@ const Register: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccess(false);
 
     const validationError = validateForm();
     if (validationError) {
@@ -84,31 +75,17 @@ const Register: React.FC = () => {
         body: JSON.stringify(registrationData),
       });
 
-      // If backend unreachable, catch fetch errors
-      if (!response) {
-        setError("Cannot reach registration server. Try again later.");
-        setLoading(false);
-        return;
-      }
+      const data = await response.json();
 
-      let data = {};
-      try {
-        data = await response.json();
-      } catch {
-        setError("Server returned an invalid response. Please contact support.");
-        setLoading(false);
-        return;
-      }
-
-      // Use backend error message if any
-      if (response.ok && (data as any).success) {
+      if (response.ok) {
         setSuccess(true);
         setTimeout(() => navigate("/login"), 1800);
       } else {
-        setError((data as any).message || "Registration failed. Please check your details and try again.");
+        // Use the backend's specific error message or a general fallback
+        setError(data.message || "Registration failed. Please check your details and try again.");
       }
     } catch (err: any) {
-      setError("Could not connect to registration server. Please check your internet or try again later.");
+      setError("Network error. Could not connect to the registration server. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -124,7 +101,7 @@ const Register: React.FC = () => {
           <p className="text-gray-500 dark:text-gray-400">Join Project Athlete 360</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-6" autoComplete="off">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4" aria-disabled={loading}>
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Username
@@ -135,11 +112,12 @@ const Register: React.FC = () => {
                 type="text"
                 value={fields.username}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900 disabled:opacity-50"
                 placeholder="Choose a username"
                 required
                 minLength={3}
                 autoFocus
+                disabled={loading}
               />
             </div>
             <div>
@@ -152,11 +130,12 @@ const Register: React.FC = () => {
                 type="password"
                 value={fields.password}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900 disabled:opacity-50"
                 placeholder="Minimum 6 characters"
                 required
                 minLength={6}
                 autoComplete="new-password"
+                disabled={loading}
               />
             </div>
           </div>
@@ -170,11 +149,12 @@ const Register: React.FC = () => {
               type="password"
               value={fields.confirmPassword}
               onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900 disabled:opacity-50"
               placeholder="Re-type password"
               required
               minLength={6}
               autoComplete="new-password"
+              disabled={loading}
             />
           </div>
           <hr className="border-gray-200 dark:border-gray-700" />
@@ -189,9 +169,10 @@ const Register: React.FC = () => {
                 type="text"
                 value={fields.name}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900 disabled:opacity-50"
                 placeholder="e.g., John Doe"
                 required
+                disabled={loading}
               />
             </div>
             <div>
@@ -204,9 +185,10 @@ const Register: React.FC = () => {
                 type="date"
                 value={fields.dob}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900 disabled:opacity-50"
                 required
                 max={new Date().toISOString().split("T")[0]}
+                disabled={loading}
               />
             </div>
             <div>
@@ -219,9 +201,10 @@ const Register: React.FC = () => {
                 type="text"
                 value={fields.sport}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900 disabled:opacity-50"
                 placeholder="e.g., Football, Swimming"
                 required
+                disabled={loading}
               />
             </div>
             <div>
@@ -233,8 +216,9 @@ const Register: React.FC = () => {
                 name="gender"
                 value={fields.gender}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900 disabled:opacity-50"
                 required
+                disabled={loading}
               >
                 <option value="">Select...</option>
                 <option value="male">Male</option>
@@ -252,33 +236,17 @@ const Register: React.FC = () => {
                 type="text"
                 value={fields.contactInfo}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900 disabled:opacity-50"
                 placeholder="Email or phone number"
                 required
+                disabled={loading}
               />
             </div>
-            {/* You can hide/show this role selector as needed */}
-            {/* <div className="md:col-span-2">
-              <label htmlFor="role" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Role
-              </label>
-              <select
-                id="role"
-                name="role"
-                value={fields.role}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900"
-                required
-              >
-                <option value="athlete">Athlete</option>
-                <option value="coach">Coach</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div> */}
           </div>
           {error && (
-            <div className="text-center text-sm text-red-500 bg-red-100 dark:bg-red-900 p-3 rounded-md">
-              {error}
+            <div className="text-center text-sm text-red-500 bg-red-100 dark:bg-red-900 p-3 rounded-md flex items-center justify-center space-x-2">
+              <FaExclamationTriangle className="text-base" />
+              <span>{error}</span>
             </div>
           )}
           {success && (
