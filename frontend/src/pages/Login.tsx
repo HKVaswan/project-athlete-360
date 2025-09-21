@@ -103,11 +103,12 @@ const Login: React.FC = () => {
       return;
     }
 
-    if (response.ok && data.success && data.data && data.data.token && data.data.role) {
+    // Corrected logic: Look for 'user.role' instead of 'role' directly
+    if (response.ok && data.success && data.data && data.data.token && data.data.user && data.data.user.role) {
       setSuccess(true);
       try {
-        login(data.data.token); // Defensive: context login
-        setTimeout(() => navigate(`/${data.data.role}-dashboard`), 1200);
+        login(data.data.token);
+        setTimeout(() => navigate(`/${data.data.user.role}-dashboard`), 1200);
       } catch (err) {
         setError("Critical auth error. Please reload the page.");
         setSuccess(false);
