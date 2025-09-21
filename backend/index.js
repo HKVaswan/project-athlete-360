@@ -8,8 +8,12 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Middleware
-const frontendUrl = process.env.FRONTEND_URL || 'https://your-frontend-url.vercel.app';
-app.use(cors({ origin: frontendUrl }));
+const frontendUrl = 'https://project-athlete-360.vercel.app';
+app.use(cors({ 
+  origin: frontendUrl,
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 
 // JWT Secret Key (MUST BE SET IN ENVIRONMENT)
