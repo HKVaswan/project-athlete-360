@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from './../context/AuthContext';
+import { useTheme } from './../context/ThemeContext'; // <-- Import the new hook
 import {
   FaTachometerAlt,
   FaUsers,
@@ -99,19 +100,16 @@ const groupNavItems = (items: NavItem[]) => {
 
 const Sidebar: React.FC<SidebarProps> = ({ isSidebarOpen, toggleSidebar }) => {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme(); // <-- Use the global theme hook
   const location = useLocation();
-  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState<{ [key: string]: boolean }>({});
-  // Example: { 'Athletes': false, 'Main': true }
 
   if (!user) return null;
 
-  // Role-based navigation
   const roleNav = navigation[user.role as Role] || [];
   const groupedNav = groupNavItems(roleNav);
 
-  // Filtered nav for search
   const filteredGroupedNav = search
     ? Object.fromEntries(
         Object.entries(groupedNav)
@@ -122,8 +120,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isSidebarOpen, toggleSidebar }) => {
           .filter(([, items]) => items.length > 0)
       )
     : groupedNav;
-
-  const handleThemeSwitch = () => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
 
   return (
     <>
@@ -159,7 +155,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isSidebarOpen, toggleSidebar }) => {
           </Link>
           <div className="flex items-center space-x-2">
             <button
-              onClick={handleThemeSwitch}
+              onClick={toggleTheme} // <-- Use the new global toggleTheme function
               className="text-gray-400 hover:text-yellow-400 transition-colors"
               aria-label="Toggle theme"
             >
