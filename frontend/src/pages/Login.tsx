@@ -1,39 +1,57 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { FaSignInAlt, FaSpinner, FaCheckCircle } from 'react-icons/fa';
+import { FaSignInAlt, FaSpinner, FaCheckCircle, FaEye, FaEyeSlash } from 'react-icons/fa';
 
 const API_URL = (process.env.REACT_APP_API_URL || "https://project-athlete-360.onrender.com").replace(/\/+$/, "");
+
+const MIN_USERNAME_LENGTH = 3;
+const MIN_PASSWORD_LENGTH = 6;
 
 const Login: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
   const { login } = useAuth();
+  const usernameRef = useRef<HTMLInputElement>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (error && errorRef.current) errorRef.current.focus();
+  }, [error]);
+
+  const validateForm = () => {
+    if (username.trim().length < MIN_USERNAME_LENGTH)
+      return `Username must be at least ${MIN_USERNAME_LENGTH} characters.`;
+    if (password.length < MIN_PASSWORD_LENGTH)
+      return `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
+    return null;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    if (!username || !password) {
-      setError("Please enter a username and password.");
+    const validationError = validateForm();
+    if (validationError) {
+      setError(validationError);
       setLoading(false);
+      usernameRef.current?.focus();
       return;
     }
 
     try {
       const response = await fetch(`${API_URL}/api/login`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: username.trim(), password }),
       });
 
-      // Handle non-fetch errors, like server not reachable
       if (!response) {
         setError("Cannot reach login server. Try again later.");
         setLoading(false);
@@ -50,11 +68,16 @@ const Login: React.FC = () => {
       }
 
       if (response.ok && (data as any).success) {
-        // Use the login function from AuthContext to set the user and token
+        setSuccess(true);
         login((data as any).data.token);
-        navigate(`/${(data as any).data.role}-dashboard`);
+        setTimeout(() => navigate(`/${(data as any).data.role}-dashboard`), 1200);
       } else {
-        setError((data as any).message || 'Login failed. Please check your credentials.');
+        if ((data as any).message?.toLowerCase().includes('credentials')) {
+          setError('Incorrect username or password.');
+        } else {
+          setError((data as any).message || 'Login failed. Please try again.');
+        }
+        usernameRef.current?.focus();
       }
     } catch (err: any) {
       setError('Could not connect to login server. Please check your internet or try again later.');
@@ -71,46 +94,73 @@ const Login: React.FC = () => {
           <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">
             Welcome Back!
           </h1>
-          <p className="text-gray-500 dark:text-gray-400">
-            Sign in to your account
-          </p>
+          <p className="text-gray-500 dark:text-gray-400">Sign in to your account</p>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6" autoComplete="off">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Username
             </label>
             <input
+              id="username"
               type="text"
+              ref={usernameRef}
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+              onChange={(e) => setUsername(e.target.value.replace(/\s/g, ""))}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900"
               placeholder="Enter your username"
               required
+              minLength={MIN_USERNAME_LENGTH}
+              autoFocus
+              aria-label="Username"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <div className="relative">
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Password
             </label>
             <input
-              type="password"
+              id="password"
+              type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900"
               placeholder="Enter your password"
               required
+              minLength={MIN_PASSWORD_LENGTH}
+              aria-label="Password"
             />
+            <button
+              type="button"
+              className="absolute right-3 top-2 text-gray-600 dark:text-gray-300"
+              onClick={() => setShowPassword((show) => !show)}
+              tabIndex={-1}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <FaEyeSlash /> : <FaEye />}
+            </button>
           </div>
           {error && (
-            <div className="text-center text-sm text-red-500 bg-red-100 dark:bg-red-900 p-3 rounded-md">
+            <div
+              ref={errorRef}
+              tabIndex={-1}
+              className="text-center text-sm text-red-500 bg-red-100 dark:bg-red-900 p-3 rounded-md"
+              aria-live="assertive"
+            >
               {error}
+            </div>
+          )}
+          {success && (
+            <div className="text-center text-green-600 bg-green-100 dark:bg-green-900 p-3 rounded-md flex items-center justify-center space-x-2">
+              <FaCheckCircle />
+              <span>Login successful! Redirecting…</span>
             </div>
           )}
           <button
             type="submit"
-            className="w-full flex items-center justify-center space-x-2 bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 transition-colors duration-200 disabled:bg-blue-400 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center space-x-2 bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 transition-colors duration-200 disabled:bg-blue-400"
             disabled={loading}
+            aria-label="Sign In"
           >
             {loading ? (
               <>
