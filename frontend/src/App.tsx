@@ -21,11 +21,11 @@ import EditAthletePage from "./pages/EditAthletePage";
 
 // Authenticated Route: waits for user, shows spinner if loading, redirects if not authenticated
 const RequireAuth: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, isAuthenticated } = useAuth();
+  const { loading, isAuthenticated } = useAuth();
   const location = useLocation();
 
-  if (user === undefined) {
-    // Context not resolved yet (rare); show loading spinner
+  if (loading) {
+    // Show a loading spinner or a simple message while the auth state is being determined
     return <div className="flex items-center justify-center min-h-screen"><span>Loading...</span></div>;
   }
 
@@ -156,11 +156,16 @@ const App: React.FC = () => {
 
 // HomeRedirect: redirect user based on their role after login
 const HomeRedirect: React.FC = () => {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen"><span>Loading...</span></div>;
+  }
 
   if (!isAuthenticated() || !user) {
     return <Navigate to="/login" replace />;
   }
+  
   switch (user.role) {
     case "athlete":
       return <Navigate to="/athlete-dashboard" replace />;
