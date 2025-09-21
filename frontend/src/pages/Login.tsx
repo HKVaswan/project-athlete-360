@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { FaSignInAlt, FaSpinner, FaCheckCircle, FaEye, FaEyeSlash } from 'react-icons/fa';
 
 // Use your environment variable or default API URL
-const API_URL = (process.env.REACT_APP_API_URL || "https://project-athlete-360.onrender.com").replace(/\/+$/, "");
+const API_URL = (process.env.REACT_APP_API_URL || "https://project-athlete-360.onrender.com/").replace(/\/+$/, "");
 
 const MIN_USERNAME_LENGTH = 3;
 const MIN_PASSWORD_LENGTH = 6;
