@@ -2,9 +2,14 @@ import React, { createContext, useState, useEffect, useContext } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import { useNavigate } from 'react-router-dom';
 
+interface DecodedUser {
+  exp?: number;
+  [key: string]: any;
+}
+
 interface AuthContextType {
   token: string | null;
-  user: any;
+  user: DecodedUser | null;
   login: (token: string) => void;
   logout: () => void;
   isAuthenticated: () => boolean;
@@ -12,54 +17,91 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Defensive JWT decoding
+const safeDecode = (token: string): DecodedUser | null => {
+  try {
+    return jwtDecode<DecodedUser>(token);
+  } catch (e) {
+    console.error('JWT decode error:', e);
+    return null;
+  }
+};
+
+const isTokenValid = (decoded: DecodedUser | null): boolean =>
+  !!decoded?.exp && decoded.exp * 1000 > Date.now();
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [token, setToken] = useState<string | null>(null);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<DecodedUser | null>(null);
   const navigate = useNavigate();
 
-  // Load the token and user from localStorage on initial render
+  // Load token at startup
   useEffect(() => {
-    try {
-      const storedToken = localStorage.getItem('token');
-      if (storedToken) {
-        const decodedUser = jwtDecode(storedToken);
-        // Check if token is expired
-        if (decodedUser.exp && decodedUser.exp * 1000 > Date.now()) {
-          setToken(storedToken);
-          setUser(decodedUser);
-        } else {
-          // Token is expired, clear it
-          localStorage.removeItem('token');
-        }
+    const storedToken = localStorage.getItem('token');
+    if (storedToken) {
+      const decoded = safeDecode(storedToken);
+      if (isTokenValid(decoded)) {
+        setToken(storedToken);
+        setUser(decoded);
+      } else {
+        localStorage.removeItem('token');
       }
-    } catch (e) {
-      console.error("Failed to decode token from localStorage", e);
-      localStorage.removeItem('token');
     }
   }, []);
 
+  // Sync auth state across tabs
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'token') {
+        const newToken = e.newValue;
+        const decoded = newToken ? safeDecode(newToken) : null;
+        if (newToken && isTokenValid(decoded)) {
+          setToken(newToken);
+          setUser(decoded);
+        } else {
+          setToken(null);
+          setUser(null);
+        }
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  // Auto-logout on token expiry
+  useEffect(() => {
+    if (user?.exp) {
+      const delay = user.exp * 1000 - Date.now();
+      if (delay > 0) {
+        const timeout = setTimeout(() => logout(), delay + 1000);
+        return () => clearTimeout(timeout);
+      }
+    }
+  }, [user]);
+
   const login = (jwtToken: string) => {
+    const decoded = safeDecode(jwtToken);
+    if (!isTokenValid(decoded)) {
+      throw new Error('Token is invalid or expired');
+    }
     localStorage.setItem('token', jwtToken);
     setToken(jwtToken);
-    const decodedUser = jwtDecode(jwtToken);
-    setUser(decodedUser);
+    setUser(decoded);
   };
 
   const logout = () => {
     localStorage.removeItem('token');
     setToken(null);
     setUser(null);
-    navigate('/login');
+    if (window.location.pathname !== '/login') {
+      navigate('/login');
+    }
   };
 
-  const isAuthenticated = () => {
+  const isAuthenticated = (): boolean => {
     if (!token) return false;
-    try {
-      const decodedUser = jwtDecode(token);
-      return decodedUser.exp && decodedUser.exp * 1000 > Date.now();
-    } catch (e) {
-      return false;
-    }
+    const decoded = safeDecode(token);
+    return isTokenValid(decoded);
   };
 
   return (
