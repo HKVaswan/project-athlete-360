@@ -1,9 +1,10 @@
+// src/pages/Login.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { FaSignInAlt, FaSpinner, FaCheckCircle, FaEye, FaEyeSlash } from 'react-icons/fa';
 
-// Use your environment variable or default API URL
+// Use your environment variable or fallback URL
 const API_URL = (process.env.REACT_APP_API_URL || "https://project-athlete-360.onrender.com/").replace(/\/+$/, "");
 
 const MIN_USERNAME_LENGTH = 3;
@@ -17,30 +18,12 @@ const Login: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const navigate = useNavigate();
-  let authContext;
-  try {
-    authContext = useAuth();
-  } catch (err) {
-    // If useAuth throws, show a visible error for debugging
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-red-100">
-        <div className="bg-white rounded-lg shadow p-8 max-w-lg">
-          <h2 className="text-xl font-bold text-red-700 mb-4">Critical Error</h2>
-          <p className="text-red-600">Authentication context is not available. Make sure your App is wrapped in <code>AuthProvider</code> and <code>Router</code>.</p>
-          <pre className="mt-4 text-xs text-red-500">{String(err)}</pre>
-        </div>
-      </div>
-    );
-  }
-
-  // Defensive fallback if context is undefined
-  const login = authContext?.login;
-  const contextLoading = authContext?.loading ?? false;
-  const contextError = authContext?.error ?? null;
-
   const usernameRef = useRef<HTMLInputElement>(null);
   const errorRef = useRef<HTMLDivElement>(null);
+
+  const navigate = useNavigate();
+  const authContext = useAuth();
+  const login = authContext?.login;
 
   useEffect(() => {
     if (error && errorRef.current) errorRef.current.focus();
@@ -67,87 +50,39 @@ const Login: React.FC = () => {
       return;
     }
 
-    let response;
     try {
-      response = await fetch(`${API_URL}/api/login`, {
+      const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username.trim(), password }),
+        body: JSON.stringify({ email: username.trim(), password }),
       });
-    } catch (networkErr) {
-      setError("Network error. Could not reach login server.");
-      setLoading(false);
-      return;
-    }
 
-    // Defensive: Handle no response
-    if (!response) {
-      setError("No response from login server.");
-      setLoading(false);
-      return;
-    }
+      if (!response.ok) {
+        setError('Incorrect username or password.');
+        setLoading(false);
+        return;
+      }
 
-    let data: any = {};
-    try {
-      data = await response.json();
-    } catch (jsonErr) {
-      setError("Server returned an invalid response. Please contact support.");
-      setLoading(false);
-      return;
-    }
+      const data = await response.json();
+      if (!data.access_token) {
+        setError('Login failed. Invalid server response.');
+        setLoading(false);
+        return;
+      }
 
-    // Defensive: Check structure
-    if (!('success' in data) || (!data.success && !data.message)) {
-      setError("Unexpected server response. Please contact support.");
-      setLoading(false);
-      return;
-    }
+      // Save token in context
+      login(data.access_token);
 
-    // Corrected logic: Look for 'user.role' instead of 'role' directly
-    if (response.ok && data.success && data.data && data.data.token && data.data.user && data.data.user.role) {
       setSuccess(true);
-      try {
-        login(data.data.token);
-        setTimeout(() => navigate(`/${data.data.user.role}-dashboard`), 1200);
-      } catch (err) {
-        setError("Critical auth error. Please reload the page.");
-        setSuccess(false);
-      }
-    } else {
-      // Defensive: Message handling
-      if (data.message) {
-        if (typeof data.message === 'string' && data.message.toLowerCase().includes('credentials')) {
-          setError('Incorrect username or password.');
-        } else {
-          setError(data.message || 'Login failed. Please try again.');
-        }
-      } else {
-        setError('Login failed. Please try again.');
-      }
-      usernameRef.current?.focus();
-    }
-    setLoading(false);
-  };
+      setTimeout(() => navigate('/athlete-dashboard'), 1000);
 
-  // Context loading/error UI
-  if (contextLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-100">
-        <FaSpinner className="animate-spin text-4xl text-blue-600" />
-        <span className="ml-4 text-lg text-gray-700">Loading authentication…</span>
-      </div>
-    );
-  }
-  if (contextError) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-red-100">
-        <div className="bg-white rounded-lg shadow p-8 max-w-lg">
-          <h2 className="text-xl font-bold text-red-700 mb-4">Authentication Error</h2>
-          <p className="text-red-600">{contextError}</p>
-        </div>
-      </div>
-    );
-  }
+    } catch (err) {
+      console.error(err);
+      setError('Network error. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 px-4 py-8">
@@ -159,6 +94,7 @@ const Login: React.FC = () => {
           </h1>
           <p className="text-gray-500 dark:text-gray-400">Sign in to your account</p>
         </div>
+
         <form onSubmit={handleSubmit} className="space-y-6" autoComplete="off">
           <div>
             <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -175,9 +111,9 @@ const Login: React.FC = () => {
               required
               minLength={MIN_USERNAME_LENGTH}
               autoFocus
-              aria-label="Username"
             />
           </div>
+
           <div className="relative">
             <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Password
@@ -191,39 +127,34 @@ const Login: React.FC = () => {
               placeholder="Enter your password"
               required
               minLength={MIN_PASSWORD_LENGTH}
-              aria-label="Password"
             />
             <button
               type="button"
               className="absolute right-3 top-2 text-gray-600 dark:text-gray-300"
               onClick={() => setShowPassword((show) => !show)}
               tabIndex={-1}
-              aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? <FaEyeSlash /> : <FaEye />}
             </button>
           </div>
+
           {error && (
-            <div
-              ref={errorRef}
-              tabIndex={-1}
-              className="text-center text-sm text-red-500 bg-red-100 dark:bg-red-900 p-3 rounded-md"
-              aria-live="assertive"
-            >
+            <div ref={errorRef} tabIndex={-1} className="text-center text-sm text-red-500 bg-red-100 dark:bg-red-900 p-3 rounded-md" aria-live="assertive">
               {error}
             </div>
           )}
+
           {success && (
             <div className="text-center text-green-600 bg-green-100 dark:bg-green-900 p-3 rounded-md flex items-center justify-center space-x-2">
               <FaCheckCircle />
               <span>Login successful! Redirecting…</span>
             </div>
           )}
+
           <button
             type="submit"
             className="w-full flex items-center justify-center space-x-2 bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 transition-colors duration-200 disabled:bg-blue-400 disabled:cursor-not-allowed"
             disabled={loading}
-            aria-label="Sign In"
           >
             {loading ? (
               <>
@@ -238,12 +169,10 @@ const Login: React.FC = () => {
             )}
           </button>
         </form>
+
         <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
           Don't have an account?{' '}
-          <Link
-            to="/register"
-            className="font-medium text-blue-600 hover:text-blue-500 hover:underline transition-colors"
-          >
+          <Link to="/register" className="font-medium text-blue-600 hover:text-blue-500 hover:underline transition-colors">
             Create an account
           </Link>
         </p>
