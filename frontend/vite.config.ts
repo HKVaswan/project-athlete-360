@@ -1,24 +1,22 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import * as path from 'path';
-import { viteStaticCopy } from 'vite-plugin-static-copy';
 
 export default defineConfig({
-  plugins: [
-    react(),
-    viteStaticCopy({
-      targets: [
-        {
-          src: 'public/_redirects',
-          dest: ''
-        }
-      ]
-    })
-  ],
+  plugins: [react()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  base: './',
+  base: '/', // ✅ required for Vercel
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000', // only for local dev
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
 });
