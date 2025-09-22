@@ -1,3 +1,4 @@
+// src/context/AuthContext.tsx
 import React, { createContext, useState, useEffect, useContext, ReactNode, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -14,7 +15,7 @@ interface AuthContextType {
   token: string | null;
   user: UserInfo | null;
   authError: string | null;
-  login: (newToken: string) => void;
+  login: (token: string, user: UserInfo) => void;
   logout: () => void;
   isAuthenticated: boolean;
   checkAuth: () => Promise<void>;
@@ -51,7 +52,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const checkTokenExpiry = useCallback((exp: number) => {
     if (exp * 1000 < Date.now()) {
-      console.log("Token expired. Logging out.");
       logout();
       return false;
     }
@@ -62,34 +62,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { storedToken, storedUser } = getStorage();
 
     if (!storedToken || !storedUser) {
-      return logout();
+      logout();
+      return;
     }
-    
+
     try {
-      const parsedUser = JSON.parse(storedUser);
-      if (!checkTokenExpiry(parsedUser.exp)) {
-        return;
-      }
+      const parsedUser = JSON.parse(storedUser) as UserInfo;
+
+      if (!checkTokenExpiry(parsedUser.exp)) return;
 
       const response = await fetch(`${API_URL}/api/me`, {
         headers: { 'Authorization': `Bearer ${storedToken}` }
       });
-      
+
       const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Backend rejected token');
-      }
+      if (!response.ok || !data.user) throw new Error('Token invalid or expired');
 
-      const backendExp = data.user.exp;
-      if (!checkTokenExpiry(backendExp)) {
-        return;
-      }
-      
+      if (!checkTokenExpiry(data.user.exp)) return;
+
       setToken(storedToken);
       setUser(parsedUser);
       setAuthError(null);
-
     } catch (error) {
       console.error("Authentication check failed:", error);
       setAuthError("Network or session error. Please log in again.");
@@ -98,43 +92,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [logout, checkTokenExpiry, getStorage]);
 
   useEffect(() => {
-    const isLoginPage = window.location.pathname === '/login';
-    const isRegisterPage = window.location.pathname === '/register';
-    
-    if (!isLoginPage && !isRegisterPage) {
-        checkAuth();
+    const path = window.location.pathname;
+    if (path !== '/login' && path !== '/register') {
+      checkAuth();
     }
   }, [checkAuth]);
 
-  const login = (newToken: string, role: string, username: string, userId: number, exp: number) => {
+  const login = (newToken: string, userInfo: UserInfo) => {
     setToken(newToken);
-    const userInfo: UserInfo = { id: userId, username, role, exp };
     setUser(userInfo);
     setAuthError(null);
 
-    if (role === 'athlete') {
+    if (userInfo.role === 'athlete') {
       sessionStorage.setItem('token', newToken);
       sessionStorage.setItem('user', JSON.stringify(userInfo));
-    } else {
+      navigate('/athlete-dashboard');
+    } else if (userInfo.role === 'coach') {
       localStorage.setItem('token', newToken);
       localStorage.setItem('user', JSON.stringify(userInfo));
-    }
-
-    if (role === 'athlete') {
-      navigate('/athletes');
-    } else if (role === 'coach') {
       navigate('/coach-dashboard');
-    } else if (role === 'admin') {
-      navigate('/admin');
+    } else if (userInfo.role === 'admin') {
+      localStorage.setItem('token', newToken);
+      localStorage.setItem('user', JSON.stringify(userInfo));
+      navigate('/admin-dashboard');
     } else {
       navigate('/login');
     }
   };
 
-  const isAuthenticated = !!token;
+  const isAuthenticated = !!token && !!user;
 
   return (
-    <AuthContext.Provider value={{ token, user, authError, login: login as (token: string, role: string, username: string, userId: number, exp: number) => void, logout, isAuthenticated, checkAuth }}>
+    <AuthContext.Provider value={{ token, user, authError, login, logout, isAuthenticated, checkAuth }}>
       {children}
     </AuthContext.Provider>
   );
@@ -142,8 +131,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
   return context;
 };
