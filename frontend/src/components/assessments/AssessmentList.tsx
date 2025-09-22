@@ -1,5 +1,4 @@
 // src/components/assessments/AssessmentList.tsx
-
 import React from "react";
 import { Assessment } from "../../types/assessment";
 
@@ -11,14 +10,14 @@ interface Props {
 
 const AssessmentList: React.FC<Props> = ({ assessments, onEdit, onDelete }) => {
   if (assessments.length === 0) {
-    return <p className="text-gray-500">No assessments found.</p>;
+    return <p className="text-gray-500 dark:text-gray-400">No assessments found.</p>;
   }
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full border-collapse border">
+      <table className="min-w-full border-collapse border border-gray-300 dark:border-gray-600">
         <thead>
-          <tr className="bg-gray-100">
+          <tr className="bg-gray-100 dark:bg-gray-700">
             <th className="border p-2 text-left">Athlete ID</th>
             <th className="border p-2 text-left">Session ID</th>
             <th className="border p-2 text-left">Metric</th>
@@ -29,7 +28,7 @@ const AssessmentList: React.FC<Props> = ({ assessments, onEdit, onDelete }) => {
         </thead>
         <tbody>
           {assessments.map((a) => (
-            <tr key={a.id} className="hover:bg-gray-50">
+            <tr key={a.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
               <td className="border p-2">{a.athlete_id}</td>
               <td className="border p-2">{a.session_id}</td>
               <td className="border p-2">{a.metric}</td>
@@ -38,13 +37,13 @@ const AssessmentList: React.FC<Props> = ({ assessments, onEdit, onDelete }) => {
               <td className="border p-2 flex gap-2">
                 <button
                   onClick={() => onEdit(a)}
-                  className="bg-yellow-500 text-white px-2 py-1 rounded text-xs"
+                  className="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs"
                 >
                   Edit
                 </button>
                 <button
                   onClick={() => onDelete(a.id)}
-                  className="bg-red-500 text-white px-2 py-1 rounded text-xs"
+                  className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs"
                 >
                   Delete
                 </button>
