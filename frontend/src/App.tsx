@@ -31,8 +31,6 @@ import Analytics from './pages/Analytics';
 import TrainingPlans from './pages/TrainingPlans';
 import CreateAdmin from './pages/CreateAdmin';
 
-<Route path="/create-admin" element={<CreateAdmin />} />
-
 function App() {
   const { isAuthenticated, loading, user } = useAuth();
 
@@ -71,6 +69,7 @@ function App() {
       <Route path="/register" element={<Register />} />
       <Route path="/pa360" element={<Pa360ElevateLandingPage />} />
       <Route path="/unauthorized" element={<Unauthorized />} />
+      <Route path="/create-admin" element={<CreateAdmin />} /> {/* Temporary admin creation */}
 
       {/* Main authenticated layout */}
       <Route element={<Layout />}>
