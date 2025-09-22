@@ -1,21 +1,21 @@
+// src/components/Layout.tsx
 import React, { useState } from 'react';
 import { useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from './../context/AuthContext';
 import Navbar from './Navbar';
-import Sidebar from './Sidebar'; // You'll need to create this file
+import Sidebar from './Sidebar';
 import Footer from './Footer';
 import { FaSpinner } from 'react-icons/fa';
+import classNames from 'classnames';
 
 const Layout: React.FC = () => {
   const { loading, error, isAuthenticated } = useAuth();
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Define routes that should not have the full dashboard layout (e.g., login, register)
   const publicRoutes = ['/login', '/register'];
   const isPublicRoute = publicRoutes.includes(location.pathname);
 
-  // Show a full-screen loading spinner while auth state is being determined
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
@@ -25,7 +25,6 @@ const Layout: React.FC = () => {
     );
   }
 
-  // Handle global authentication errors
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 p-8">
@@ -34,19 +33,17 @@ const Layout: React.FC = () => {
     );
   }
 
-  // Render a minimal layout for public routes
   if (isPublicRoute) {
     return (
       <div className="flex flex-col min-h-screen">
         <Navbar />
         <main className="flex-grow">
-          <Outlet /> {/* Use Outlet for nested routes */}
+          <Outlet />
         </main>
       </div>
     );
   }
 
-  // Render the full dashboard layout for all protected, authenticated routes
   return (
     <div className="flex min-h-screen bg-gray-100 dark:bg-gray-900">
       <Sidebar isSidebarOpen={isSidebarOpen} toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
