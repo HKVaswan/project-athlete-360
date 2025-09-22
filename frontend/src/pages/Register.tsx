@@ -13,7 +13,7 @@ const initialFields = {
   sport: "",
   gender: "",
   contactInfo: "",
-  role: "athlete",
+  role: "athlete", // default
 };
 
 const emailRegex = /^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$/;
@@ -38,6 +38,7 @@ const Register: React.FC = () => {
     if (!fields.contactInfo.trim()) return "Contact info is required.";
     if (!(emailRegex.test(fields.contactInfo) || phoneRegex.test(fields.contactInfo)))
       return "Contact info must be a valid email or phone number.";
+    if (!["athlete", "coach", "admin"].includes(fields.role)) return "Please select a valid role.";
     return null;
   };
 
@@ -81,7 +82,6 @@ const Register: React.FC = () => {
         setSuccess(true);
         setTimeout(() => navigate("/login"), 1800);
       } else {
-        // Use the backend's specific error message or a general fallback
         setError(data.message || "Registration failed. Please check your details and try again.");
       }
     } catch (err: any) {
@@ -217,74 +217,3 @@ const Register: React.FC = () => {
                 value={fields.gender}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900 disabled:opacity-50"
-                required
-                disabled={loading}
-              >
-                <option value="">Select...</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-            <div className="md:col-span-2">
-              <label htmlFor="contactInfo" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Contact Info (Email or Phone)
-              </label>
-              <input
-                id="contactInfo"
-                name="contactInfo"
-                type="text"
-                value={fields.contactInfo}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900 disabled:opacity-50"
-                placeholder="Email or phone number"
-                required
-                disabled={loading}
-              />
-            </div>
-          </div>
-          {error && (
-            <div className="text-center text-sm text-red-500 bg-red-100 dark:bg-red-900 p-3 rounded-md flex items-center justify-center space-x-2">
-              <FaExclamationTriangle className="text-base" />
-              <span>{error}</span>
-            </div>
-          )}
-          {success && (
-            <div className="text-center text-green-600 bg-green-100 dark:bg-green-900 p-3 rounded-md flex items-center justify-center space-x-2">
-              <FaCheckCircle />
-              <span>Registration successful! Redirecting to login…</span>
-            </div>
-          )}
-          <button
-            type="submit"
-            className="w-full flex items-center justify-center space-x-2 bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 transition-colors duration-200 disabled:bg-blue-400"
-            disabled={loading}
-          >
-            {loading ? (
-              <>
-                <FaSpinner className="animate-spin" />
-                <span>Registering...</span>
-              </>
-            ) : (
-              <>
-                <FaUserPlus />
-                <span>Register</span>
-              </>
-            )}
-          </button>
-        </form>
-        <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
-          Already have an account?{' '}
-          <Link
-            to="/login"
-            className="font-medium text-blue-600 hover:text-blue-500 hover:underline transition-colors"
-          >
-            Sign in
-          </Link>
-        </p>
-      </div>
-    </div>
-  );
-};
-
-export default Register;
