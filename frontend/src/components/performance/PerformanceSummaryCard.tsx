@@ -1,5 +1,4 @@
 // src/components/performance/PerformanceSummaryCard.tsx
-
 import React from "react";
 import { PerformanceSummary } from "../../types/performance";
 import { ArrowUp, ArrowDown, Minus } from "lucide-react";
@@ -21,13 +20,13 @@ const PerformanceSummaryCard: React.FC<Props> = ({ summary }) => {
   };
 
   return (
-    <div className="p-4 bg-white shadow rounded-2xl flex items-center justify-between">
+    <div className="p-4 bg-white shadow rounded-2xl flex items-center justify-between space-x-4">
       <div>
-        <h3 className="text-lg font-semibold">Performance Summary</h3>
-        <p>Average Score: {summary.averageScore}</p>
-        <p>Best Score: {summary.bestScore}</p>
+        <h3 className="text-lg font-semibold text-gray-800">Performance Summary</h3>
+        <p className="text-gray-600">Average Score: <span className="font-medium">{summary.averageScore}</span></p>
+        <p className="text-gray-600">Best Score: <span className="font-medium">{summary.bestScore}</span></p>
       </div>
-      <div className="text-3xl">{getTrendIcon()}</div>
+      <div className="text-4xl flex-shrink-0">{getTrendIcon()}</div>
     </div>
   );
 };
