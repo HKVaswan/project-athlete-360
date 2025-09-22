@@ -1,12 +1,73 @@
+// src/pages/AddAthletePage.tsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
+// Reusable input component
+interface InputFieldProps {
+  label: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  type?: string;
+  disabled?: boolean;
+  required?: boolean;
+}
+
+const InputField: React.FC<InputFieldProps> = ({
+  label,
+  value,
+  onChange,
+  type = 'text',
+  disabled = false,
+  required = true,
+}) => (
+  <div>
+    <label className="block text-sm font-medium text-gray-700">{label}</label>
+    <input
+      type={type}
+      value={value}
+      onChange={onChange}
+      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+      disabled={disabled}
+      required={required}
+    />
+  </div>
+);
+
+// Gender select component
+interface SelectFieldProps {
+  label: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  options: string[];
+  disabled?: boolean;
+  required?: boolean;
+}
+
+const SelectField: React.FC<SelectFieldProps> = ({ label, value, onChange, options, disabled = false, required = true }) => (
+  <div>
+    <label className="block text-sm font-medium text-gray-700">{label}</label>
+    <select
+      value={value}
+      onChange={onChange}
+      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+      disabled={disabled}
+      required={required}
+    >
+      <option value="">Select {label}</option>
+      {options.map((opt) => (
+        <option key={opt} value={opt}>{opt}</option>
+      ))}
+    </select>
+  </div>
+);
+
 const AddAthletePage: React.FC = () => {
   const navigate = useNavigate();
   const { token } = useAuth();
+
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -57,87 +118,26 @@ const AddAthletePage: React.FC = () => {
   };
 
   return (
-    <div className="p-4 max-w-lg mx-auto bg-white rounded-xl shadow-md space-y-4">
+    <div className="p-4 max-w-lg mx-auto bg-white rounded-xl shadow-md space-y-6">
       <h1 className="text-2xl font-bold text-center">Add New Athlete</h1>
+
+      {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+
       <form onSubmit={handleSubmit} className="space-y-4">
-        {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Username</label>
-          <input
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-            disabled={loading}
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-            disabled={loading}
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Full Name</label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-            disabled={loading}
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
-          <input
-            type="date"
-            value={dob}
-            onChange={(e) => setDob(e.target.value)}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-            disabled={loading}
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Sport</label>
-          <input
-            type="text"
-            value={sport}
-            onChange={(e) => setSport(e.target.value)}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-            disabled={loading}
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Gender</label>
-          <input
-            type="text"
-            value={gender}
-            onChange={(e) => setGender(e.target.value)}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-            disabled={loading}
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Contact Info</label>
-          <input
-            type="text"
-            value={contactInfo}
-            onChange={(e) => setContactInfo(e.target.value)}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-            disabled={loading}
-            required
-          />
-        </div>
+        <InputField label="Username" value={username} onChange={(e) => setUsername(e.target.value)} disabled={loading} />
+        <InputField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading} />
+        <InputField label="Full Name" value={name} onChange={(e) => setName(e.target.value)} disabled={loading} />
+        <InputField label="Date of Birth" type="date" value={dob} onChange={(e) => setDob(e.target.value)} disabled={loading} />
+        <InputField label="Sport" value={sport} onChange={(e) => setSport(e.target.value)} disabled={loading} />
+        <SelectField
+          label="Gender"
+          value={gender}
+          onChange={(e) => setGender(e.target.value)}
+          options={['Male', 'Female', 'Other']}
+          disabled={loading}
+        />
+        <InputField label="Contact Info" value={contactInfo} onChange={(e) => setContactInfo(e.target.value)} disabled={loading} />
+
         <button
           type="submit"
           className="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50"
@@ -151,4 +151,3 @@ const AddAthletePage: React.FC = () => {
 };
 
 export default AddAthletePage;
- 
