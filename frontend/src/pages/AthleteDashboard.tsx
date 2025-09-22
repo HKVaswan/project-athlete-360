@@ -1,58 +1,74 @@
+// src/pages/AthleteDashboard.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { format } from 'date-fns';
+import { FaSpinner } from 'react-icons/fa';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
+interface TrainingSession {
+  session_date: string;
+  notes: string;
+}
+
+interface PerformanceMetric {
+  metric_name: string;
+  metric_value: string | number;
+  entry_date: string;
+}
+
+interface Athlete {
+  id: number;
+  name: string;
+  sport: string;
+  dob: string;
+  gender: string;
+  contact_info: string;
+  training_sessions: TrainingSession[];
+  performance_metrics: PerformanceMetric[];
+}
+
 const AthleteDashboard: React.FC = () => {
   const { user, token, logout } = useAuth();
-  const [athlete, setAthlete] = useState<any | null>(null);
+  const [athlete, setAthlete] = useState<Athlete | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchAthleteProfile = useCallback(async () => {
     setLoading(true);
     setError(null);
+
     try {
-      if (!user) {
-        throw new Error("User not authenticated.");
-      }
+      if (!user) throw new Error('User not authenticated.');
 
-      // Find the athlete ID associated with the logged-in user
-      const athleteResponse = await fetch(`${API_URL}/api/athletes?userId=${user.userId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+      // Fetch athlete profile by user ID
+      const athleteRes = await fetch(`${API_URL}/api/athletes?userId=${user.id}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
       });
 
-      if (!athleteResponse.ok) {
-        throw new Error("Failed to find your athlete profile.");
-      }
+      if (!athleteRes.ok) throw new Error('Failed to find your athlete profile.');
 
-      const athleteData = await athleteResponse.json();
-      if (!athleteData.success || athleteData.data.length === 0) {
-        throw new Error("No athlete profile found for this user.");
-      }
+      const athleteData = await athleteRes.json();
+      if (!athleteData.success || athleteData.data.length === 0)
+        throw new Error('No athlete profile found for this user.');
+
       const athleteId = athleteData.data[0].id;
-      
-      // Fetch the full profile with sessions and metrics using the athlete ID
-      const profileResponse = await fetch(`${API_URL}/api/athletes/${athleteId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+
+      const profileRes = await fetch(`${API_URL}/api/athletes/${athleteId}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
       });
 
-      if (profileResponse.status === 401) {
+      if (profileRes.status === 401) {
         logout();
         return;
       }
 
-      if (!profileResponse.ok) {
-        const errData = await profileResponse.json();
+      if (!profileRes.ok) {
+        const errData = await profileRes.json();
         throw new Error(errData.message || 'Failed to fetch profile data.');
       }
 
-      const { data } = await profileResponse.json();
+      const { data } = await profileRes.json();
       setAthlete(data);
 
     } catch (err: any) {
@@ -63,72 +79,86 @@ const AthleteDashboard: React.FC = () => {
   }, [user, token, logout]);
 
   useEffect(() => {
-    if (user) {
-      fetchAthleteProfile();
-    }
+    if (user) fetchAthleteProfile();
   }, [fetchAthleteProfile, user]);
 
-  if (loading) return <div className="p-4">Loading your dashboard...</div>;
-  if (error) return (
-    <div className="p-4 text-red-500">
-      {error}
-      <button onClick={fetchAthleteProfile} className="ml-2 underline text-blue-600">
-        Retry
-      </button>
-    </div>
-  );
-  if (!athlete) return <div className="p-4">No athlete profile found.</div>;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh] text-blue-500">
+        <FaSpinner className="animate-spin mr-2 text-2xl" />
+        Loading your dashboard...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 text-red-500 text-center">
+        {error}
+        <button
+          onClick={fetchAthleteProfile}
+          className="ml-2 underline text-blue-600"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (!athlete) {
+    return <div className="p-4 text-gray-500 text-center">No athlete profile found.</div>;
+  }
 
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Welcome, {athlete?.name}!</h1>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        {/* Personal Details Card */}
-        <div className="bg-white p-6 rounded-lg shadow-md md:col-span-1">
-          <h2 className="text-xl font-semibold mb-4">Personal Details</h2>
-          <p><strong>Sport:</strong> {athlete?.sport || 'Not provided'}</p>
-          <p>
-            <strong>Date of Birth:</strong>{' '}
-            {athlete?.dob ? format(new Date(athlete.dob), 'MMMM d, yyyy') : 'Not provided'}
-          </p>
-          <p><strong>Gender:</strong> {athlete?.gender || 'Not provided'}</p>
-          <p><strong>Contact Info:</strong> {athlete?.contact_info || 'Not provided'}</p>
+    <div className="p-6 max-w-5xl mx-auto space-y-6">
+      <h1 className="text-3xl font-bold text-gray-800 dark:text-white">
+        Welcome, {athlete.name}!
+      </h1>
+
+      {/* Personal Details */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md md:col-span-1">
+          <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">Personal Details</h2>
+          <p><strong>Sport:</strong> {athlete.sport || 'Not provided'}</p>
+          <p><strong>Date of Birth:</strong> {athlete.dob ? format(new Date(athlete.dob), 'MMMM d, yyyy') : 'Not provided'}</p>
+          <p><strong>Gender:</strong> {athlete.gender || 'Not provided'}</p>
+          <p><strong>Contact Info:</strong> {athlete.contact_info || 'Not provided'}</p>
         </div>
-        
-        {/* Training Sessions List */}
-        <div className="bg-white p-6 rounded-lg shadow-md md:col-span-2">
-          <h2 className="text-xl font-semibold mb-4">Training Sessions</h2>
-          {athlete?.training_sessions?.length > 0 ? (
+
+        {/* Training Sessions */}
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md md:col-span-2">
+          <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">Training Sessions</h2>
+          {athlete.training_sessions.length > 0 ? (
             <ul className="space-y-4">
-              {athlete.training_sessions.map((session: any, index: number) => (
-                <li key={index} className="p-4 bg-gray-50 rounded-lg border">
+              {athlete.training_sessions.map((session, idx) => (
+                <li key={idx} className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border">
                   <p className="font-semibold">{format(new Date(session.session_date), 'MMMM d, yyyy h:mm a')}</p>
                   <p>{session.notes}</p>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-gray-500">No training sessions recorded.</p>
+            <p className="text-gray-500 dark:text-gray-400">No training sessions recorded.</p>
           )}
         </div>
       </div>
 
-      {/* Performance Metrics Section */}
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <h2 className="text-xl font-semibold mb-4">Performance Metrics</h2>
-        {athlete?.performance_metrics?.length > 0 ? (
+      {/* Performance Metrics */}
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+        <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">Performance Metrics</h2>
+        {athlete.performance_metrics.length > 0 ? (
           <ul className="space-y-4">
-            {athlete.performance_metrics.map((metric: any, index: number) => (
-              <li key={index} className="p-4 bg-gray-50 rounded-lg border">
+            {athlete.performance_metrics.map((metric, idx) => (
+              <li key={idx} className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border">
                 <p><strong>{metric.metric_name}:</strong> {metric.metric_value}</p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
                   {format(new Date(metric.entry_date), 'MMMM d, yyyy')}
                 </p>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="text-gray-500">No performance metrics recorded.</p>
+          <p className="text-gray-500 dark:text-gray-400">No performance metrics recorded.</p>
         )}
       </div>
     </div>
@@ -136,4 +166,3 @@ const AthleteDashboard: React.FC = () => {
 };
 
 export default AthleteDashboard;
- 
