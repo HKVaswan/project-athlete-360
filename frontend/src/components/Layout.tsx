@@ -15,7 +15,6 @@ const Layout: React.FC = () => {
   const publicRoutes = ['/login', '/register', '/pa360', '/create-admin'];
   const isPublicRoute = publicRoutes.includes(location.pathname);
 
-  // Run auth check on mount
   useEffect(() => {
     const verify = async () => {
       await checkAuth();
@@ -24,43 +23,31 @@ const Layout: React.FC = () => {
     verify();
   }, [checkAuth]);
 
+  useEffect(() => {
+    if (!checking) {
+      if (authError && !isPublicRoute) navigate('/login');
+      if (!isAuthenticated && !isPublicRoute) navigate('/login');
+    }
+  }, [checking, authError, isAuthenticated, isPublicRoute, navigate]);
+
   if (checking && !isPublicRoute) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
         <FaSpinner className="animate-spin text-4xl text-blue-600 dark:text-blue-400" />
-        <span className="ml-4 text-lg text-gray-700 dark:text-gray-300">Checking session...</span>
+        <span className="ml-4 text-lg text-gray-700 dark:text-gray-300">
+          Checking session...
+        </span>
       </div>
     );
-  }
-
-  if (authError && !isPublicRoute) {
-    navigate('/login');
-    return null;
-  }
-
-  if (isPublicRoute) {
-    return (
-      <div className="flex flex-col min-h-screen">
-        <Navbar />
-        <main className="flex-grow">
-          <Outlet />
-        </main>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    navigate('/login');
-    return null;
   }
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-100 dark:bg-gray-900">
       <Navbar />
-      <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8">
+      <main className={`flex-1 ${isPublicRoute ? '' : 'overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8'}`}>
         <Outlet />
       </main>
-      <Footer />
+      {!isPublicRoute && <Footer />}
     </div>
   );
 };
