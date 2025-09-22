@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from './../context/AuthContext';
 import Navbar from './Navbar';
-import Sidebar from './Sidebar';
 import Footer from './Footer';
 import { FaSpinner } from 'react-icons/fa';
 
@@ -11,10 +10,9 @@ const Layout: React.FC = () => {
   const { isAuthenticated, authError, checkAuth } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [checking, setChecking] = useState(true);
 
-  const publicRoutes = ['/login', '/register'];
+  const publicRoutes = ['/login', '/register', '/pa360', '/create-admin'];
   const isPublicRoute = publicRoutes.includes(location.pathname);
 
   // Run auth check on mount
@@ -36,7 +34,6 @@ const Layout: React.FC = () => {
   }
 
   if (authError && !isPublicRoute) {
-    // redirect if auth fails
     navigate('/login');
     return null;
   }
@@ -53,21 +50,17 @@ const Layout: React.FC = () => {
   }
 
   if (!isAuthenticated) {
-    // Prevent showing private UI if not logged in
     navigate('/login');
     return null;
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-100 dark:bg-gray-900">
-      <Sidebar isSidebarOpen={isSidebarOpen} toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Navbar toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
-        <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8">
-          <Outlet />
-        </main>
-        <Footer />
-      </div>
+    <div className="flex flex-col min-h-screen bg-gray-100 dark:bg-gray-900">
+      <Navbar />
+      <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8">
+        <Outlet />
+      </main>
+      <Footer />
     </div>
   );
 };
