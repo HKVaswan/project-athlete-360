@@ -1,36 +1,44 @@
 // src/components/Layout.tsx
-import React, { useState } from 'react';
-import { useLocation, Outlet } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from './../context/AuthContext';
 import Navbar from './Navbar';
 import Sidebar from './Sidebar';
 import Footer from './Footer';
 import { FaSpinner } from 'react-icons/fa';
-import classNames from 'classnames';
 
 const Layout: React.FC = () => {
-  const { loading, error, isAuthenticated } = useAuth();
+  const { isAuthenticated, authError, checkAuth } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [checking, setChecking] = useState(true);
 
   const publicRoutes = ['/login', '/register'];
   const isPublicRoute = publicRoutes.includes(location.pathname);
 
-  if (loading) {
+  // Run auth check on mount
+  useEffect(() => {
+    const verify = async () => {
+      await checkAuth();
+      setChecking(false);
+    };
+    verify();
+  }, [checkAuth]);
+
+  if (checking && !isPublicRoute) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
         <FaSpinner className="animate-spin text-4xl text-blue-600 dark:text-blue-400" />
-        <span className="ml-4 text-lg text-gray-700 dark:text-gray-300">Loading...</span>
+        <span className="ml-4 text-lg text-gray-700 dark:text-gray-300">Checking session...</span>
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 p-8">
-        <p>Authentication Error: {error}</p>
-      </div>
-    );
+  if (authError && !isPublicRoute) {
+    // redirect if auth fails
+    navigate('/login');
+    return null;
   }
 
   if (isPublicRoute) {
@@ -42,6 +50,12 @@ const Layout: React.FC = () => {
         </main>
       </div>
     );
+  }
+
+  if (!isAuthenticated) {
+    // Prevent showing private UI if not logged in
+    navigate('/login');
+    return null;
   }
 
   return (
