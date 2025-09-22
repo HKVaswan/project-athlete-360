@@ -1,24 +1,38 @@
+// src/App.tsx
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
+
+// Pages
 import Login from './pages/Login';
 import Register from './pages/Register';
-
-// Import all your dashboard pages here
 import AdminDashboard from './pages/AdminDashboard';
-import Athletes from './pages/Athletes';
-import AllUsers from './pages/AllUsers';
 import CoachDashboard from './pages/CoachDashboard';
 import AthleteDashboard from './pages/AthleteDashboard';
-import Profile from './pages/Profile';
+import ProfilePage from './pages/ProfilePage';
+import PerformancePage from './pages/PerformancePage';
+import TrainingSessionsPage from './pages/TrainingSessionsPage';
+import AthletesPage from './pages/AthletesPage';
+import AddAthletePage from './pages/AddAthletePage';
+import EditAthletePage from './pages/EditAthletePage';
+import AthleteProfile from './pages/AthleteProfile';
+import AllUsers from './pages/AllUsers';
+import AssessmentsPage from './pages/AssessmentsPage';
+import AttendancePage from './pages/AttendancePage';
+import InjuriesPage from './pages/InjuriesPage';
+import FeaturesPage from './pages/FeaturesPage';
+import SessionsPage from './pages/SessionsPage';
+import SettingsPage from './pages/SettingsPage';
+import Pa360ElevateLandingPage from './pages/Pa360ElevateLandingPage';
+import Unauthorized from './pages/Unauthorized';
+import Athletes from './pages/athletes';
+import DashboardPage from './pages/DashboardPage';
 import Analytics from './pages/Analytics';
-import Performance from './pages/Performance';
 import TrainingPlans from './pages/TrainingPlans';
 
 function App() {
   const { isAuthenticated, loading, user } = useAuth();
-  
-  // Conditionally render based on authentication loading state
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -26,49 +40,71 @@ function App() {
       </div>
     );
   }
-  
-  // A helper component to check for a required role
+
+  const getDashboardRoute = () => {
+    if (!isAuthenticated) return "/login";
+    switch (user?.role) {
+      case 'admin':
+        return '/admin-dashboard';
+      case 'coach':
+        return '/coach-dashboard';
+      case 'athlete':
+        return '/athlete-dashboard';
+      default:
+        return '/login';
+    }
+  };
+
   const RequireRole = ({ role, children }: { role: string; children: JSX.Element }) => {
-    if (!isAuthenticated) {
-      return <Navigate to="/login" replace />;
-    }
-    if (user?.role !== role) {
-      return <Navigate to="/dashboard" replace />;
-    }
+    if (!isAuthenticated) return <Navigate to="/login" replace />;
+    if (user?.role !== role) return <Navigate to={getDashboardRoute()} replace />;
     return children;
   };
 
   return (
     <Routes>
       {/* Public routes */}
-      <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" /> : <Login />} />
+      <Route path="/login" element={isAuthenticated ? <Navigate to={getDashboardRoute()} replace /> : <Login />} />
       <Route path="/register" element={<Register />} />
-      
-      {/*
-        The main dashboard layout. All authenticated pages will be children of this route.
-        The layout itself handles the logic of showing a full-screen loading spinner
-        or redirecting to public routes if not authenticated.
-      */}
-      <Route element={<Layout />}>
-        {/* Redirect from root to dashboard */}
-        <Route path="/" element={<Navigate to={isAuthenticated ? (user?.role === 'admin' ? '/admin-dashboard' : (user?.role === 'coach' ? '/coach-dashboard' : '/athlete-dashboard')) : "/login"} replace />} />
+      <Route path="/pa360" element={<Pa360ElevateLandingPage />} />
+      <Route path="/unauthorized" element={<Unauthorized />} />
 
-        {/* Dashboard routes by role */}
+      {/* Main authenticated layout */}
+      <Route element={<Layout />}>
+        <Route path="/" element={<Navigate to={getDashboardRoute()} replace />} />
+
+        {/* Dashboards */}
         <Route path="/admin-dashboard" element={<RequireRole role="admin"><AdminDashboard /></RequireRole>} />
         <Route path="/coach-dashboard" element={<RequireRole role="coach"><CoachDashboard /></RequireRole>} />
         <Route path="/athlete-dashboard" element={<RequireRole role="athlete"><AthleteDashboard /></RequireRole>} />
 
-        {/* Shared and specific routes */}
-        <Route path="/athletes" element={isAuthenticated && (user?.role === 'admin' || user?.role === 'coach') ? <Athletes /> : <Navigate to="/dashboard" />} />
-        <Route path="/users" element={isAuthenticated && user?.role === 'admin' ? <AllUsers /> : <Navigate to="/dashboard" />} />
-        <Route path="/profile" element={isAuthenticated ? <Profile /> : <Navigate to="/login" />} />
-        <Route path="/analytics" element={isAuthenticated && (user?.role === 'admin' || user?.role === 'coach') ? <Analytics /> : <Navigate to="/dashboard" />} />
-        <Route path="/performance" element={isAuthenticated && user?.role === 'athlete' ? <Performance /> : <Navigate to="/dashboard" />} />
-        <Route path="/training" element={isAuthenticated && user?.role === 'athlete' ? <TrainingPlans /> : <Navigate to="/dashboard" />} />
+        {/* Admin/Coach pages */}
+        <Route path="/athletes" element={isAuthenticated && (user?.role === 'admin' || user?.role === 'coach') ? <AthletesPage /> : <Navigate to={getDashboardRoute()} />} />
+        <Route path="/add-athlete" element={isAuthenticated && user?.role === 'admin' ? <AddAthletePage /> : <Navigate to={getDashboardRoute()} />} />
+        <Route path="/edit-athlete/:id" element={isAuthenticated && user?.role === 'admin' ? <EditAthletePage /> : <Navigate to={getDashboardRoute()} />} />
+        <Route path="/athlete-profile/:id" element={isAuthenticated ? <AthleteProfile /> : <Navigate to="/login" />} />
+        <Route path="/users" element={isAuthenticated && user?.role === 'admin' ? <AllUsers /> : <Navigate to={getDashboardRoute()} />} />
+        <Route path="/assessments" element={isAuthenticated ? <AssessmentsPage /> : <Navigate to="/login" />} />
+        <Route path="/attendance" element={isAuthenticated ? <AttendancePage /> : <Navigate to="/login" />} />
+        <Route path="/injuries" element={isAuthenticated ? <InjuriesPage /> : <Navigate to="/login" />} />
+        <Route path="/analytics" element={isAuthenticated && (user?.role === 'admin' || user?.role === 'coach') ? <Analytics /> : <Navigate to={getDashboardRoute()} />} />
+
+        {/* Athlete-specific pages */}
+        <Route path="/performance" element={isAuthenticated && user?.role === 'athlete' ? <PerformancePage /> : <Navigate to={getDashboardRoute()} />} />
+        <Route path="/training" element={isAuthenticated && user?.role === 'athlete' ? <TrainingPlans /> : <Navigate to={getDashboardRoute()} />} />
+        <Route path="/training-sessions" element={isAuthenticated && user?.role === 'athlete' ? <TrainingSessionsPage /> : <Navigate to={getDashboardRoute()} />} />
+        <Route path="/sessions" element={isAuthenticated ? <SessionsPage /> : <Navigate to="/login" />} />
+
+        {/* Other shared pages */}
+        <Route path="/profile" element={isAuthenticated ? <ProfilePage /> : <Navigate to="/login" />} />
+        <Route path="/settings" element={isAuthenticated ? <SettingsPage /> : <Navigate to="/login" />} />
+        <Route path="/features" element={<FeaturesPage />} />
+        <Route path="/athletes-list" element={<Athletes />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
       </Route>
-      
-      {/* Catch-all for undefined routes */}
-      <Route path="*" element={<Navigate to={isAuthenticated ? (user?.role === 'admin' ? '/admin-dashboard' : (user?.role === 'coach' ? '/coach-dashboard' : '/athlete-dashboard')) : "/login"} replace />} />
+
+      {/* Catch-all */}
+      <Route path="*" element={<Navigate to={getDashboardRoute()} replace />} />
     </Routes>
   );
 }
