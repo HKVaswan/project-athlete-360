@@ -16,6 +16,7 @@ import AthletesPage from './pages/AthletesPage';
 import AddAthletePage from './pages/AddAthletePage';
 import EditAthletePage from './pages/EditAthletePage';
 import AthleteProfile from './pages/AthleteProfile';
+import AllUsers from './pages/AllUsers'; // Will create this
 import AssessmentsPage from './pages/AssessmentsPage';
 import AttendancePage from './pages/AttendancePage';
 import InjuriesPage from './pages/InjuriesPage';
@@ -26,7 +27,7 @@ import Pa360ElevateLandingPage from './pages/Pa360ElevateLandingPage';
 import Unauthorized from './pages/Unauthorized';
 import Athletes from './pages/athletes';
 import DashboardPage from './pages/DashboardPage';
-import Analytics from './pages/Analytics';
+import Analytics from './pages/Analytics'; // Will create this
 import TrainingPlans from './pages/TrainingPlans';
 import CreateAdmin from './pages/CreateAdmin';
 
@@ -42,7 +43,7 @@ function App() {
   }
 
   const getDashboardRoute = () => {
-    if (!isAuthenticated) return "/login";
+    if (!isAuthenticated) return '/login';
     switch (user?.role) {
       case 'admin':
         return '/admin-dashboard';
@@ -84,9 +85,7 @@ function App() {
         <Route path="/add-athlete" element={isAuthenticated && user?.role === 'admin' ? <AddAthletePage /> : <Navigate to={getDashboardRoute()} />} />
         <Route path="/edit-athlete/:id" element={isAuthenticated && user?.role === 'admin' ? <EditAthletePage /> : <Navigate to={getDashboardRoute()} />} />
         <Route path="/athlete-profile/:id" element={isAuthenticated ? <AthleteProfile /> : <Navigate to="/login" />} />
-        <Route path="/assessments" element={isAuthenticated ? <AssessmentsPage /> : <Navigate to="/login" />} />
-        <Route path="/attendance" element={isAuthenticated ? <AttendancePage /> : <Navigate to="/login" />} />
-        <Route path="/injuries" element={isAuthenticated ? <InjuriesPage /> : <Navigate to="/login" />} />
+        <Route path="/users" element={isAuthenticated && user?.role === 'admin' ? <AllUsers /> : <Navigate to={getDashboardRoute()} />} />
         <Route path="/analytics" element={isAuthenticated && (user?.role === 'admin' || user?.role === 'coach') ? <Analytics /> : <Navigate to={getDashboardRoute()} />} />
 
         {/* Athlete-specific pages */}
@@ -101,6 +100,9 @@ function App() {
         <Route path="/features" element={<FeaturesPage />} />
         <Route path="/athletes-list" element={<Athletes />} />
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/assessments" element={isAuthenticated ? <AssessmentsPage /> : <Navigate to="/login" />} />
+        <Route path="/attendance" element={isAuthenticated ? <AttendancePage /> : <Navigate to="/login" />} />
+        <Route path="/injuries" element={isAuthenticated ? <InjuriesPage /> : <Navigate to="/login" />} />
       </Route>
 
       {/* Catch-all */}
@@ -109,4 +111,4 @@ function App() {
   );
 }
 
-export default App; 
+export default App;
