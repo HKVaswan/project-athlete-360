@@ -10,7 +10,7 @@ dotenv.config();
 const adminData = {
   username: 'admin',
   password: 'StrongPassword222##', // plain password (will be hashed)
-  name: 'System Admin',
+  name: 'System_Admin',
   dob: '2004-01-01',
   sport: 'running',
   gender: 'Male',
