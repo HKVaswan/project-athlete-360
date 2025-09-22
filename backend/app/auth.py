@@ -2,7 +2,7 @@
 
 import os
 from dotenv import load_dotenv
-from fastapi import Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app import db, models
 from passlib.context import CryptContext
 
-# Load environment variables from .env
+# Load environment variables
 load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
@@ -40,6 +40,8 @@ def verify_password(plain_password, hashed_password):
 
 # Create JWT token
 def create_access_token(data: dict, expires_delta: timedelta = None):
+    if not SECRET_KEY:
+        raise RuntimeError("SECRET_KEY is not set in environment variables")
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
@@ -72,4 +74,31 @@ def require_role(allowed_roles: list):
             raise HTTPException(status_code=403, detail="Forbidden: Insufficient role")
         return current_user
     return wrapper
- 
+
+# -------------------
+# FastAPI Router
+# -------------------
+router = APIRouter(prefix="/api/auth", tags=["Auth"])
+
+@router.post("/login")
+def login(email: str, password: str, db: Session = Depends(get_db)):
+    user = db.query(models.AppUser).filter(models.AppUser.email == email).first()
+    if not user or not verify_password(password, user.password):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    token = create_access_token({"sub": str(user.id)})
+    return {"access_token": token, "token_type": "bearer"}
+
+@router.post("/register")
+def register(email: str, password: str, db: Session = Depends(get_db)):
+    existing_user = db.query(models.AppUser).filter(models.AppUser.email == email).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="User already exists")
+    
+    hashed_pw = hash_password(password)
+    new_user = models.AppUser(email=email, password=hashed_pw)
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    token = create_access_token({"sub": str(new_user.id)})
+    return {"access_token": token, "token_type": "bearer"}
