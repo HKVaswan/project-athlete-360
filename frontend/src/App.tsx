@@ -16,7 +16,6 @@ import AthletesPage from './pages/AthletesPage';
 import AddAthletePage from './pages/AddAthletePage';
 import EditAthletePage from './pages/EditAthletePage';
 import AthleteProfile from './pages/AthleteProfile';
-import AllUsers from './pages/AllUsers';
 import AssessmentsPage from './pages/AssessmentsPage';
 import AttendancePage from './pages/AttendancePage';
 import InjuriesPage from './pages/InjuriesPage';
@@ -85,7 +84,6 @@ function App() {
         <Route path="/add-athlete" element={isAuthenticated && user?.role === 'admin' ? <AddAthletePage /> : <Navigate to={getDashboardRoute()} />} />
         <Route path="/edit-athlete/:id" element={isAuthenticated && user?.role === 'admin' ? <EditAthletePage /> : <Navigate to={getDashboardRoute()} />} />
         <Route path="/athlete-profile/:id" element={isAuthenticated ? <AthleteProfile /> : <Navigate to="/login" />} />
-        <Route path="/users" element={isAuthenticated && user?.role === 'admin' ? <AllUsers /> : <Navigate to={getDashboardRoute()} />} />
         <Route path="/assessments" element={isAuthenticated ? <AssessmentsPage /> : <Navigate to="/login" />} />
         <Route path="/attendance" element={isAuthenticated ? <AttendancePage /> : <Navigate to="/login" />} />
         <Route path="/injuries" element={isAuthenticated ? <InjuriesPage /> : <Navigate to="/login" />} />
