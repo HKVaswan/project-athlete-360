@@ -29,6 +29,9 @@ import Athletes from './pages/athletes';
 import DashboardPage from './pages/DashboardPage';
 import Analytics from './pages/Analytics';
 import TrainingPlans from './pages/TrainingPlans';
+import CreateAdmin from './pages/CreateAdmin';
+
+<Route path="/create-admin" element={<CreateAdmin />} />
 
 function App() {
   const { isAuthenticated, loading, user } = useAuth();
