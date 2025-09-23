@@ -4,22 +4,41 @@ import { Assessment, CreateAssessmentInput, UpdateAssessmentInput } from "../typ
 
 export const assessmentsService = {
   async getAll(): Promise<Assessment[]> {
-    const response = await api.get("/assessments");
-    return response.data;
+    try {
+      const response = await api.get("/assessments");
+      return response.data;
+    } catch (err) {
+      console.error("Failed to fetch assessments:", err);
+      throw err;
+    }
   },
 
   async create(data: CreateAssessmentInput): Promise<Assessment> {
-    const response = await api.post("/assessments", data);
-    return response.data;
+    try {
+      const response = await api.post("/assessments", data);
+      return response.data;
+    } catch (err) {
+      console.error("Failed to create assessment:", err);
+      throw err;
+    }
   },
 
   async update(id: string, data: UpdateAssessmentInput): Promise<Assessment> {
-    const response = await api.put(`/assessments/${id}`, data);
-    return response.data;
+    try {
+      const response = await api.put(`/assessments/${id}`, data);
+      return response.data;
+    } catch (err) {
+      console.error(`Failed to update assessment ${id}:`, err);
+      throw err;
+    }
   },
 
   async remove(id: string): Promise<void> {
-    await api.delete(`/assessments/${id}`);
+    try {
+      await api.delete(`/assessments/${id}`);
+    } catch (err) {
+      console.error(`Failed to delete assessment ${id}:`, err);
+      throw err;
+    }
   },
 };
- 
