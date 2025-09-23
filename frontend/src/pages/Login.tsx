@@ -12,8 +12,8 @@ import {
 } from "react-icons/fa";
 import SEO from "../components/SEO";
 
-// Use your environment variable or fallback URL
-const API_URL = (process.env.REACT_APP_API_URL || "https://project-athlete-360.onrender.com/").replace(/\/+$/, "");
+// ✅ Correct Vite environment variable usage
+const API_URL = (import.meta.env.VITE_API_URL || "https://project-athlete-360.onrender.com").replace(/\/+$/, "");
 
 const MIN_USERNAME_LENGTH = 3;
 const MIN_PASSWORD_LENGTH = 6;
@@ -67,19 +67,33 @@ const Login: React.FC = () => {
 
       if (!response.ok) {
         setError("Incorrect username or password.");
+        setLoading(false);
         return;
       }
 
       const data = await response.json();
-      if (!data.access_token) {
+
+      if (!data.access_token || !data.user) {
         setError("Login failed. Invalid server response.");
+        setLoading(false);
         return;
       }
 
-      login?.(data.access_token);
+      // ✅ Pass both token and user info
+      login?.(data.access_token, data.user);
+
+      // ✅ Determine dynamic redirect based on user role
+      const dashboardRoute = (() => {
+        switch (data.user.role) {
+          case 'admin': return '/admin-dashboard';
+          case 'coach': return '/coach-dashboard';
+          case 'athlete': return '/athlete-dashboard';
+          default: return '/login';
+        }
+      })();
 
       setSuccess(true);
-      setTimeout(() => navigate("/athlete-dashboard"), 1200);
+      setTimeout(() => navigate(dashboardRoute), 1200);
     } catch (err) {
       console.error(err);
       setError("Network error. Please try again later.");
@@ -94,7 +108,6 @@ const Login: React.FC = () => {
 
   return (
     <>
-      {/* ✅ SEO Component */}
       <SEO
         title="Login - Project Athlete 360"
         description="Access your Project Athlete 360 account to manage athletes, sessions, and performance."
@@ -115,18 +128,10 @@ const Login: React.FC = () => {
           </div>
 
           {/* Form */}
-          <form
-            onSubmit={handleSubmit}
-            className="space-y-6"
-            autoComplete="off"
-            noValidate
-          >
+          <form onSubmit={handleSubmit} className="space-y-6" autoComplete="off" noValidate>
             {/* Username */}
             <div>
-              <label
-                htmlFor="username"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-              >
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Username
               </label>
               <input
@@ -145,10 +150,7 @@ const Login: React.FC = () => {
 
             {/* Password */}
             <div className="relative">
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-              >
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Password
               </label>
               <input
