@@ -9,7 +9,8 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  base: '/', // ✅ required for Vercel
+  // ✅ Use relative base for static hosting on Render
+  base: './',
   server: {
     port: 5173, // optional, Vite default is 5173
     open: true, // automatically opens browser on dev
@@ -27,4 +28,4 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: true, // optional, helpful for debugging production
   },
-}); 
+});
