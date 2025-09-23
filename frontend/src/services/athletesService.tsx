@@ -1,29 +1,49 @@
+// src/services/athletesService.ts
 import api from "./api";
 
-interface Athlete {
+export interface Athlete {
   id: number;
   name: string;
   athlete_id: string;
 }
 
 export const athletesService = {
-  getAthletes: async (): Promise<Athlete[]> => {
-    const response = await api.get('/api/athletes');
-    return response.data;
+  getAll: async (): Promise<Athlete[]> => {
+    try {
+      const response = await api.get("/api/athletes");
+      return response.data;
+    } catch (err) {
+      console.error("Failed to fetch athletes:", err);
+      throw err;
+    }
   },
 
-  createAthlete: async (name: string, athlete_id: string): Promise<Athlete> => {
-    const response = await api.post('/api/athletes', { name, athlete_id });
-    return response.data;
+  create: async (name: string, athlete_id: string): Promise<Athlete> => {
+    try {
+      const response = await api.post("/api/athletes", { name, athlete_id });
+      return response.data;
+    } catch (err) {
+      console.error("Failed to create athlete:", err);
+      throw err;
+    }
   },
 
-  deleteAthlete: async (id: number): Promise<void> => {
-    await api.delete(`/api/athletes/${id}`);
+  update: async (id: number, name: string, athlete_id: string): Promise<Athlete> => {
+    try {
+      const response = await api.put(`/api/athletes/${id}`, { name, athlete_id });
+      return response.data;
+    } catch (err) {
+      console.error(`Failed to update athlete ${id}:`, err);
+      throw err;
+    }
   },
 
-  updateAthlete: async (id: number, name: string, athlete_id: string): Promise<Athlete> => {
-    const response = await api.put(`/api/athletes/${id}`, { name, athlete_id });
-    return response.data;
-  }
+  remove: async (id: number): Promise<void> => {
+    try {
+      await api.delete(`/api/athletes/${id}`);
+    } catch (err) {
+      console.error(`Failed to delete athlete ${id}:`, err);
+      throw err;
+    }
+  },
 };
-
