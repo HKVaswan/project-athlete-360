@@ -27,4 +27,4 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: true, // optional, helpful for debugging production
   },
-});
+}); 
