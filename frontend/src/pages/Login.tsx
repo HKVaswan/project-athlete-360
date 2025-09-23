@@ -1,8 +1,15 @@
 // src/pages/Login.tsx
-import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { FaSignInAlt, FaSpinner, FaCheckCircle, FaEye, FaEyeSlash } from 'react-icons/fa';
+import React, { useState, useRef, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import {
+  FaSignInAlt,
+  FaSpinner,
+  FaCheckCircle,
+  FaEye,
+  FaEyeSlash,
+  FaExclamationTriangle,
+} from "react-icons/fa";
 
 // Use your environment variable or fallback URL
 const API_URL = (process.env.REACT_APP_API_URL || "https://project-athlete-360.onrender.com/").replace(/\/+$/, "");
@@ -11,9 +18,10 @@ const MIN_USERNAME_LENGTH = 3;
 const MIN_PASSWORD_LENGTH = 6;
 
 const Login: React.FC = () => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [capsLock, setCapsLock] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -22,8 +30,7 @@ const Login: React.FC = () => {
   const errorRef = useRef<HTMLDivElement>(null);
 
   const navigate = useNavigate();
-  const authContext = useAuth();
-  const login = authContext?.login;
+  const { login } = useAuth() ?? {};
 
   useEffect(() => {
     if (error && errorRef.current) errorRef.current.focus();
@@ -52,52 +59,65 @@ const Login: React.FC = () => {
 
     try {
       const response = await fetch(`${API_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: username.trim(), password }),
       });
 
       if (!response.ok) {
-        setError('Incorrect username or password.');
-        setLoading(false);
+        setError("Incorrect username or password.");
         return;
       }
 
       const data = await response.json();
       if (!data.access_token) {
-        setError('Login failed. Invalid server response.');
-        setLoading(false);
+        setError("Login failed. Invalid server response.");
         return;
       }
 
-      // Save token in context
-      login(data.access_token);
+      login?.(data.access_token);
 
       setSuccess(true);
-      setTimeout(() => navigate('/athlete-dashboard'), 1000);
-
+      setTimeout(() => navigate("/athlete-dashboard"), 1200);
     } catch (err) {
       console.error(err);
-      setError('Network error. Please try again later.');
+      setError("Network error. Please try again later.");
     } finally {
       setLoading(false);
     }
   };
 
+  const handleCapsLock = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    setCapsLock(e.getModifierState("CapsLock"));
+  };
+
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 px-4 py-8">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-8 sm:p-10 w-full max-w-lg transition-all duration-300 transform scale-95 md:scale-100">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-8 sm:p-10 w-full max-w-lg transition-all duration-300">
+        {/* Header */}
         <div className="text-center mb-8">
           <FaSignInAlt className="mx-auto text-4xl text-blue-600 dark:text-blue-400 mb-3" />
           <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">
             Welcome Back!
           </h1>
-          <p className="text-gray-500 dark:text-gray-400">Sign in to your account</p>
+          <p className="text-gray-500 dark:text-gray-400">
+            Sign in to your account
+          </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6" autoComplete="off">
+        {/* Form */}
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-6"
+          autoComplete="off"
+          noValidate
+        >
+          {/* Username */}
           <div>
-            <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label
+              htmlFor="username"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+            >
               Username
             </label>
             <input
@@ -106,7 +126,7 @@ const Login: React.FC = () => {
               ref={usernameRef}
               value={username}
               onChange={(e) => setUsername(e.target.value.replace(/\s/g, ""))}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900"
               placeholder="Enter your username"
               required
               minLength={MIN_USERNAME_LENGTH}
@@ -114,8 +134,12 @@ const Login: React.FC = () => {
             />
           </div>
 
+          {/* Password */}
           <div className="relative">
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label
+              htmlFor="password"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+            >
               Password
             </label>
             <input
@@ -123,37 +147,56 @@ const Login: React.FC = () => {
               type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-900"
+              onKeyUp={handleCapsLock}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900"
               placeholder="Enter your password"
               required
               minLength={MIN_PASSWORD_LENGTH}
             />
             <button
               type="button"
-              className="absolute right-3 top-2 text-gray-600 dark:text-gray-300"
+              className="absolute right-3 top-9 text-gray-600 dark:text-gray-300"
               onClick={() => setShowPassword((show) => !show)}
               tabIndex={-1}
+              aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? <FaEyeSlash /> : <FaEye />}
             </button>
           </div>
 
-          {error && (
-            <div ref={errorRef} tabIndex={-1} className="text-center text-sm text-red-500 bg-red-100 dark:bg-red-900 p-3 rounded-md" aria-live="assertive">
-              {error}
+          {/* Caps Lock Warning */}
+          {capsLock && (
+            <div className="text-yellow-600 bg-yellow-100 dark:bg-yellow-900 p-2 rounded-md text-sm flex items-center gap-2">
+              <FaExclamationTriangle />
+              <span>Caps Lock is on</span>
             </div>
           )}
 
+          {/* Error */}
+          {error && (
+            <div
+              ref={errorRef}
+              tabIndex={-1}
+              className="text-center text-sm text-red-600 bg-red-100 dark:bg-red-900 p-3 rounded-md flex items-center justify-center gap-2"
+              aria-live="assertive"
+            >
+              <FaExclamationTriangle />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* Success */}
           {success && (
-            <div className="text-center text-green-600 bg-green-100 dark:bg-green-900 p-3 rounded-md flex items-center justify-center space-x-2">
+            <div className="text-center text-green-600 bg-green-100 dark:bg-green-900 p-3 rounded-md flex items-center justify-center gap-2">
               <FaCheckCircle />
               <span>Login successful! Redirecting…</span>
             </div>
           )}
 
+          {/* Submit Button */}
           <button
             type="submit"
-            className="w-full flex items-center justify-center space-x-2 bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 transition-colors duration-200 disabled:bg-blue-400 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 transition-colors duration-200 disabled:bg-blue-400 disabled:cursor-not-allowed"
             disabled={loading}
           >
             {loading ? (
@@ -170,9 +213,13 @@ const Login: React.FC = () => {
           </button>
         </form>
 
+        {/* Footer */}
         <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
-          Don't have an account?{' '}
-          <Link to="/register" className="font-medium text-blue-600 hover:text-blue-500 hover:underline transition-colors">
+          Don&apos;t have an account?{" "}
+          <Link
+            to="/register"
+            className="font-medium text-blue-600 hover:text-blue-500 hover:underline transition-colors"
+          >
             Create an account
           </Link>
         </p>
