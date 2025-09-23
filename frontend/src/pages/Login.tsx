@@ -1,4 +1,18 @@
 // src/pages/Login.tsx
+import SEO from "../components/SEO";
+
+const Login = () => {
+  return (
+    <>
+      <SEO
+        title="Login - Project Athlete 360"
+        description="Access your Project Athlete 360 account to manage athletes, sessions, and performance."
+        url="https://projectathlete360.com/login"
+      />
+      {/* Rest of your Login page JSX */}
+    </>
+  );
+};
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
