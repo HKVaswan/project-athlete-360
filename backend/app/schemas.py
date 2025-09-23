@@ -1,25 +1,24 @@
-# app/schemas.py
-
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import date, datetime
+from uuid import UUID
 
 # -------------------------------
 # User Schemas
 # -------------------------------
-
 class UserBase(BaseModel):
     username: str
+    email: str
 
 class UserCreate(UserBase):
     password: str
-    role_id: str
-    institution_id: Optional[str] = None
+    role_id: UUID
+    institution_id: Optional[UUID] = None
 
 class UserOut(UserBase):
-    id: str
-    role_id: str
-    institution_id: Optional[str] = None
+    id: UUID
+    role_id: UUID
+    institution_id: Optional[UUID] = None
 
     class Config:
         orm_mode = True
@@ -27,19 +26,19 @@ class UserOut(UserBase):
 # -------------------------------
 # Athlete Schemas
 # -------------------------------
-
 class AthleteBase(BaseModel):
-    name: str
+    first_name: str
+    last_name: Optional[str] = None
     dob: Optional[date] = None
-    sport_id: str
-    user_id: Optional[str] = None
+    primary_sport_id: UUID
+    user_id: Optional[UUID] = None
 
 class AthleteCreate(AthleteBase):
     pass
 
 class AthleteOut(AthleteBase):
-    id: str
-    institution_id: str
+    id: UUID
+    institution_id: UUID
 
     class Config:
         orm_mode = True
@@ -47,18 +46,17 @@ class AthleteOut(AthleteBase):
 # -------------------------------
 # Team Schemas
 # -------------------------------
-
 class TeamBase(BaseModel):
     name: str
-    sport_id: str
-    coach_id: Optional[str] = None
+    sport_id: UUID
+    coach_id: Optional[UUID] = None
 
 class TeamCreate(TeamBase):
     pass
 
 class TeamOut(TeamBase):
-    id: str
-    institution_id: str
+    id: UUID
+    institution_id: UUID
     created_at: datetime
     updated_at: datetime
 
@@ -68,10 +66,9 @@ class TeamOut(TeamBase):
 # -------------------------------
 # Session Schemas
 # -------------------------------
-
 class SessionBase(BaseModel):
-    team_id: str
-    coach_id: Optional[str] = None
+    team_id: UUID
+    coach_id: Optional[UUID] = None
     title: str
     start_ts: datetime
     end_ts: Optional[datetime] = None
@@ -82,7 +79,7 @@ class SessionCreate(SessionBase):
     pass
 
 class SessionOut(SessionBase):
-    id: str
+    id: UUID
     created_at: datetime
     updated_at: datetime
 
@@ -92,10 +89,9 @@ class SessionOut(SessionBase):
 # -------------------------------
 # Attendance Schemas
 # -------------------------------
-
 class AttendanceBase(BaseModel):
-    session_id: str
-    athlete_id: str
+    session_id: UUID
+    athlete_id: UUID
     status: str
     notes: Optional[str] = None
 
@@ -103,7 +99,7 @@ class AttendanceCreate(AttendanceBase):
     pass
 
 class AttendanceOut(AttendanceBase):
-    id: str
+    id: UUID
     recorded_at: datetime
 
     class Config:
@@ -112,17 +108,19 @@ class AttendanceOut(AttendanceBase):
 # -------------------------------
 # Assessment Schemas
 # -------------------------------
-
-class AssessmentCreate(BaseModel):
-    athlete_id: str
-    assessment_type_id: str
+class AssessmentBase(BaseModel):
+    athlete_id: UUID
+    assessment_type_id: UUID
     value: float
     notes: Optional[str] = None
-    recorded_by: Optional[str] = None
 
-class AssessmentOut(AssessmentCreate):
-    id: str
+class AssessmentCreate(AssessmentBase):
+    recorded_by: Optional[UUID] = None
+
+class AssessmentOut(AssessmentBase):
+    id: UUID
     recorded_at: datetime
+    recorded_by: Optional[UUID] = None
 
     class Config:
         orm_mode = True
@@ -130,18 +128,20 @@ class AssessmentOut(AssessmentCreate):
 # -------------------------------
 # Injury Schemas
 # -------------------------------
-
-class InjuryCreate(BaseModel):
-    athlete_id: str
-    reported_by: Optional[str] = None
+class InjuryBase(BaseModel):
+    athlete_id: UUID
     description: Optional[str] = None
     diagnosis: Optional[str] = None
     date_reported: date
     status: str
     restricted: bool
 
-class InjuryOut(InjuryCreate):
-    id: str
+class InjuryCreate(InjuryBase):
+    reported_by: Optional[UUID] = None
+
+class InjuryOut(InjuryBase):
+    id: UUID
+    reported_by: Optional[UUID] = None
     created_at: datetime
 
     class Config:
