@@ -12,4 +12,4 @@
     "forceConsistentCasingInFileNames": true
   },
   "include": ["vite.config.ts", "vite.config.*.ts"]  // Include variants if any
-}
+} 
