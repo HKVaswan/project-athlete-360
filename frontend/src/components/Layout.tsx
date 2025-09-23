@@ -12,21 +12,32 @@ const Layout: React.FC = () => {
   const navigate = useNavigate();
   const [checking, setChecking] = useState(true);
 
+  // Use startsWith to handle query params or trailing slashes
   const publicRoutes = ['/login', '/register', '/pa360', '/create-admin'];
-  const isPublicRoute = publicRoutes.includes(location.pathname);
+  const isPublicRoute = publicRoutes.some((route) =>
+    location.pathname.startsWith(route)
+  );
 
   useEffect(() => {
     const verify = async () => {
-      await checkAuth();
-      setChecking(false);
+      try {
+        await checkAuth();
+      } catch (err) {
+        console.error('Auth check failed:', err);
+      } finally {
+        setChecking(false);
+      }
     };
     verify();
   }, [checkAuth]);
 
   useEffect(() => {
     if (!checking) {
-      if (authError && !isPublicRoute) navigate('/login');
-      if (!isAuthenticated && !isPublicRoute) navigate('/login');
+      if (!isPublicRoute) {
+        if (authError || !isAuthenticated) {
+          navigate('/login', { replace: true });
+        }
+      }
     }
   }, [checking, authError, isAuthenticated, isPublicRoute, navigate]);
 
@@ -44,7 +55,11 @@ const Layout: React.FC = () => {
   return (
     <div className="flex flex-col min-h-screen bg-gray-100 dark:bg-gray-900">
       <Navbar />
-      <main className={`flex-1 ${isPublicRoute ? '' : 'overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8'}`}>
+      <main
+        className={`flex-1 ${
+          isPublicRoute ? '' : 'overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8'
+        }`}
+      >
         <Outlet />
       </main>
       {!isPublicRoute && <Footer />}
