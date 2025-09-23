@@ -75,4 +75,4 @@ const TrainingSessionsPage: React.FC = () => {
   );
 };
 
-export default TrainingSessionsPage;
+export default TrainingSessionsPage; 
