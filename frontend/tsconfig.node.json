@@ -6,7 +6,10 @@
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "isolatedModules": true,
-    "noEmit": true
+    "noEmit": true,
+    "strict": true,                 // Enable strict type checks
+    "esModuleInterop": true,        // Better compatibility with commonjs modules
+    "forceConsistentCasingInFileNames": true
   },
-  "include": ["vite.config.ts"]
+  "include": ["vite.config.ts", "vite.config.*.ts"]  // Include variants if any
 }
