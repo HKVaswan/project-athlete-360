@@ -9,6 +9,21 @@ import {
   FaExclamationTriangle,
 } from "react-icons/fa";
 
+import SEO from "../components/SEO";
+
+const Register = () => {
+  return (
+    <>
+      <SEO
+        title="Register - Project Athlete 360"
+        description="Create your Project Athlete 360 account and start managing athletes and training plans."
+        url="https://projectathlete360.com/register"
+      />
+      {/* Rest of your Register page JSX */}
+    </>
+  );
+};
+
 const API_URL = (
   process.env.REACT_APP_API_URL ||
   "https://project-athlete-360.onrender.com"
