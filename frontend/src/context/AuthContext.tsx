@@ -52,6 +52,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const checkTokenExpiry = useCallback((exp: number) => {
     if (exp * 1000 < Date.now()) {
+      console.warn("Token expired:", exp);
       logout();
       return false;
     }
@@ -62,22 +63,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { storedToken, storedUser } = getStorage();
 
     if (!storedToken || !storedUser) {
+      console.warn("No token or user in storage");
       logout();
       return;
     }
 
     try {
       const parsedUser = JSON.parse(storedUser) as UserInfo;
+      console.log("Parsed user from storage:", parsedUser);
 
       if (!checkTokenExpiry(parsedUser.exp)) return;
 
       const response = await fetch(`${API_URL}/api/me`, {
-        headers: { 'Authorization': `Bearer ${storedToken}` }
+        headers: { 'Authorization': `Bearer ${storedToken}` },
       });
 
-      const data = await response.json();
+      if (!response.ok) {
+        console.warn("Auth API responded with error:", response.status);
+        logout();
+        return;
+      }
 
-      if (!response.ok || !data.user) throw new Error('Token invalid or expired');
+      const data = await response.json();
+      console.log("Auth API response:", data);
+
+      if (!data.user) {
+        console.warn("No user in API response");
+        logout();
+        return;
+      }
 
       if (!checkTokenExpiry(data.user.exp)) return;
 
@@ -103,19 +117,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(userInfo);
     setAuthError(null);
 
-    if (userInfo.role === 'athlete') {
-      sessionStorage.setItem('token', newToken);
-      sessionStorage.setItem('user', JSON.stringify(userInfo));
-      navigate('/athlete-dashboard');
-    } else if (userInfo.role === 'coach') {
-      localStorage.setItem('token', newToken);
-      localStorage.setItem('user', JSON.stringify(userInfo));
-      navigate('/coach-dashboard');
-    } else if (userInfo.role === 'admin') {
-      localStorage.setItem('token', newToken);
-      localStorage.setItem('user', JSON.stringify(userInfo));
-      navigate('/admin-dashboard');
-    } else {
+    try {
+      if (userInfo.role === 'athlete') {
+        sessionStorage.setItem('token', newToken);
+        sessionStorage.setItem('user', JSON.stringify(userInfo));
+        navigate('/athlete-dashboard');
+      } else if (userInfo.role === 'coach') {
+        localStorage.setItem('token', newToken);
+        localStorage.setItem('user', JSON.stringify(userInfo));
+        navigate('/coach-dashboard');
+      } else if (userInfo.role === 'admin') {
+        localStorage.setItem('token', newToken);
+        localStorage.setItem('user', JSON.stringify(userInfo));
+        navigate('/admin-dashboard');
+      } else {
+        console.warn("Unknown role during login:", userInfo.role);
+        navigate('/login');
+      }
+    } catch (err) {
+      console.error("Error during login storage:", err);
       navigate('/login');
     }
   };
