@@ -1,4 +1,5 @@
 # app/main.py
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -14,32 +15,49 @@ from app.routers import (
     injuries
 )
 
+# ---------------------------
+# FastAPI app initialization
+# ---------------------------
 app = FastAPI(
     title="Athlete Management System",
     description="Backend API for managing athletes, teams, sessions, and performance metrics.",
-    version="1.0.0"
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json"
 )
 
+# ---------------------------
 # CORS setup (allow frontend domains)
+# ---------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # You can restrict to your frontend domain
+    allow_origins=["*"],  # Change to frontend domains in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
 )
 
+# ---------------------------
 # Include routers
-app.include_router(institutions.router)
-app.include_router(athletes.router)
-app.include_router(auth_router.router)
-app.include_router(teams.router)
-app.include_router(sessions.router)
-app.include_router(attendance.router)
-app.include_router(assessments.router)
-app.include_router(injuries.router)
+# ---------------------------
+routers = [
+    institutions.router,
+    athletes.router,
+    auth_router.router,
+    teams.router,
+    sessions.router,
+    attendance.router,
+    assessments.router,
+    injuries.router
+]
 
+for r in routers:
+    app.include_router(r)
+
+# ---------------------------
+# Root endpoint
+# ---------------------------
 @app.get("/", tags=["Root"])
 def root():
     return {"message": "Welcome to Athlete Management API"}
- 
