@@ -1,8 +1,18 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { FaUserPlus, FaSpinner, FaCheckCircle, FaExclamationTriangle } from 'react-icons/fa';
+// src/pages/Register.tsx
 
-const API_URL = (process.env.REACT_APP_API_URL || "https://project-athlete-360.onrender.com").replace(/\/+$/, "");
+import React, { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import {
+  FaUserPlus,
+  FaSpinner,
+  FaCheckCircle,
+  FaExclamationTriangle,
+} from "react-icons/fa";
+
+const API_URL = (
+  process.env.REACT_APP_API_URL ||
+  "https://project-athlete-360.onrender.com"
+).replace(/\/+$/, "");
 
 const initialFields = {
   username: "",
@@ -27,22 +37,35 @@ const Register: React.FC = () => {
   const navigate = useNavigate();
 
   const validateForm = () => {
-    if (fields.username.trim().length < 3) return "Username must be at least 3 characters.";
-    if (fields.password.length < 6) return "Password must be at least 6 characters.";
-    if (fields.password !== fields.confirmPassword) return "Passwords do not match.";
+    if (fields.username.trim().length < 3)
+      return "Username must be at least 3 characters.";
+    if (fields.password.length < 6)
+      return "Password must be at least 6 characters.";
+    if (fields.password !== fields.confirmPassword)
+      return "Passwords do not match.";
     if (!fields.name.trim()) return "Full name is required.";
     if (!fields.dob) return "Date of birth is required.";
-    if (new Date(fields.dob) > new Date()) return "Date of birth cannot be in the future.";
+    if (new Date(fields.dob) > new Date())
+      return "Date of birth cannot be in the future.";
     if (!fields.sport.trim()) return "Sport is required.";
-    if (!["male", "female", "other"].includes(fields.gender)) return "Please select a valid gender.";
+    if (!["male", "female", "other"].includes(fields.gender))
+      return "Please select a valid gender.";
     if (!fields.contactInfo.trim()) return "Contact info is required.";
-    if (!(emailRegex.test(fields.contactInfo) || phoneRegex.test(fields.contactInfo)))
+    if (
+      !(
+        emailRegex.test(fields.contactInfo) ||
+        phoneRegex.test(fields.contactInfo)
+      )
+    )
       return "Contact info must be a valid email or phone number.";
-    if (!["athlete", "coach", "admin"].includes(fields.role)) return "Please select a valid role.";
+    if (!["athlete", "coach", "admin"].includes(fields.role))
+      return "Please select a valid role.";
     return null;
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     setFields({ ...fields, [e.target.name]: e.target.value });
   };
 
@@ -82,10 +105,15 @@ const Register: React.FC = () => {
         setSuccess(true);
         setTimeout(() => navigate("/login"), 1800);
       } else {
-        setError(data.message || "Registration failed. Please check your details and try again.");
+        setError(
+          data.message ||
+            "Registration failed. Please check your details and try again."
+        );
       }
     } catch (err: any) {
-      setError("Network error. Could not connect to the registration server. Please try again.");
+      setError(
+        "Network error. Could not connect to the registration server. Please try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -94,146 +122,150 @@ const Register: React.FC = () => {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 px-4 py-8">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-8 sm:p-10 w-full max-w-lg transition-all duration-300">
+        {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">
             Create Your Account
           </h1>
-          <p className="text-gray-500 dark:text-gray-400">Join Project Athlete 360</p>
+          <p className="text-gray-500 dark:text-gray-400">
+            Join Project Athlete 360
+          </p>
         </div>
 
+        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6" autoComplete="off">
           {/* Username + Password */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Username
-              </label>
-              <input
-                id="username"
-                name="username"
-                type="text"
-                value={fields.username}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
-                placeholder="Choose a username"
-                required
-                minLength={3}
-                autoFocus
-                disabled={loading}
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                value={fields.password}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
-                placeholder="Minimum 6 characters"
-                required
-                minLength={6}
-                autoComplete="new-password"
-                disabled={loading}
-              />
-            </div>
+            <InputField
+              id="username"
+              name="username"
+              label="Username"
+              type="text"
+              value={fields.username}
+              onChange={handleChange}
+              placeholder="Choose a username"
+              disabled={loading}
+              required
+            />
+            <InputField
+              id="password"
+              name="password"
+              label="Password"
+              type="password"
+              value={fields.password}
+              onChange={handleChange}
+              placeholder="Minimum 6 characters"
+              disabled={loading}
+              required
+            />
           </div>
 
           {/* Confirm Password */}
-          <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Confirm Password
-            </label>
-            <input
-              id="confirmPassword"
-              name="confirmPassword"
-              type="password"
-              value={fields.confirmPassword}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
-              placeholder="Re-type password"
-              required
-              minLength={6}
-              autoComplete="new-password"
-              disabled={loading}
-            />
-          </div>
+          <InputField
+            id="confirmPassword"
+            name="confirmPassword"
+            label="Confirm Password"
+            type="password"
+            value={fields.confirmPassword}
+            onChange={handleChange}
+            placeholder="Re-type password"
+            disabled={loading}
+            required
+          />
 
           <hr className="border-gray-200 dark:border-gray-700" />
 
           {/* Name, DOB, Sport, Gender */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium">Full Name</label>
-              <input id="name" name="name" type="text" value={fields.name} onChange={handleChange} required disabled={loading} />
-            </div>
-            <div>
-              <label htmlFor="dob" className="block text-sm font-medium">Date of Birth</label>
-              <input id="dob" name="dob" type="date" value={fields.dob} onChange={handleChange} required disabled={loading} />
-            </div>
-            <div>
-              <label htmlFor="sport" className="block text-sm font-medium">Sport</label>
-              <input id="sport" name="sport" type="text" value={fields.sport} onChange={handleChange} required disabled={loading} />
-            </div>
-            <div>
-              <label htmlFor="gender" className="block text-sm font-medium">Gender</label>
-              <select id="gender" name="gender" value={fields.gender} onChange={handleChange} required disabled={loading}>
-                <option value="">Select…</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Contact Info */}
-          <div>
-            <label htmlFor="contactInfo" className="block text-sm font-medium">Contact Info (Email or Phone)</label>
-            <input
-              id="contactInfo"
-              name="contactInfo"
+            <InputField
+              id="name"
+              name="name"
+              label="Full Name"
               type="text"
-              value={fields.contactInfo}
+              value={fields.name}
               onChange={handleChange}
-              placeholder="Email or phone number"
-              required
               disabled={loading}
+              required
+            />
+            <InputField
+              id="dob"
+              name="dob"
+              label="Date of Birth"
+              type="date"
+              value={fields.dob}
+              onChange={handleChange}
+              disabled={loading}
+              required
+            />
+            <InputField
+              id="sport"
+              name="sport"
+              label="Sport"
+              type="text"
+              value={fields.sport}
+              onChange={handleChange}
+              disabled={loading}
+              required
+            />
+            <SelectField
+              id="gender"
+              name="gender"
+              label="Gender"
+              value={fields.gender}
+              onChange={handleChange}
+              disabled={loading}
+              required
+              options={[
+                { value: "", label: "Select…" },
+                { value: "male", label: "Male" },
+                { value: "female", label: "Female" },
+                { value: "other", label: "Other" },
+              ]}
             />
           </div>
 
+          {/* Contact Info */}
+          <InputField
+            id="contactInfo"
+            name="contactInfo"
+            label="Contact Info (Email or Phone)"
+            type="text"
+            value={fields.contactInfo}
+            onChange={handleChange}
+            placeholder="Email or phone number"
+            disabled={loading}
+            required
+          />
+
           {/* Role Selection */}
-          <div>
-            <label htmlFor="role" className="block text-sm font-medium">Role</label>
-            <select
-              id="role"
-              name="role"
-              value={fields.role}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
-              disabled={loading}
-            >
-              <option value="athlete">Athlete</option>
-              <option value="coach" disabled>Coach (Restricted)</option>
-              <option value="admin" disabled>Admin (Restricted)</option>
-            </select>
-            <p className="text-xs text-gray-500 mt-1">Only Athletes can register directly. For Coach/Admin access, please contact the administrator.</p>
-          </div>
+          <SelectField
+            id="role"
+            name="role"
+            label="Role"
+            value={fields.role}
+            onChange={handleChange}
+            disabled={loading}
+            options={[
+              { value: "athlete", label: "Athlete" },
+              { value: "coach", label: "Coach (Restricted)", disabled: true },
+              { value: "admin", label: "Admin (Restricted)", disabled: true },
+            ]}
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Only Athletes can register directly. For Coach/Admin access, please
+            contact the administrator.
+          </p>
 
           {/* Messages */}
           {error && (
-            <div className="text-center text-sm text-red-500 bg-red-100 p-3 rounded-md flex items-center justify-center space-x-2">
-              <FaExclamationTriangle className="text-base" />
-              <span>{error}</span>
-            </div>
+            <Alert type="error" message={error} icon={<FaExclamationTriangle />} />
           )}
           {success && (
-            <div className="text-center text-green-600 bg-green-100 p-3 rounded-md flex items-center justify-center space-x-2">
-              <FaCheckCircle />
-              <span>Registration successful! Redirecting to login…</span>
-            </div>
+            <Alert
+              type="success"
+              message="Registration successful! Redirecting to login…"
+              icon={<FaCheckCircle />}
+            />
           )}
 
           {/* Submit */}
@@ -256,13 +288,127 @@ const Register: React.FC = () => {
           </button>
         </form>
 
+        {/* Login link */}
         <p className="mt-6 text-center text-sm text-gray-500">
-          Already have an account?{' '}
-          <Link to="/login" className="font-medium text-blue-600 hover:underline">Sign in</Link>
+          Already have an account?{" "}
+          <Link to="/login" className="font-medium text-blue-600 hover:underline">
+            Sign in
+          </Link>
         </p>
       </div>
     </div>
   );
 };
+
+/* -------------------------
+   Reusable Form Components
+--------------------------*/
+
+interface InputFieldProps {
+  id: string;
+  name: string;
+  label: string;
+  type: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  disabled?: boolean;
+  required?: boolean;
+  placeholder?: string;
+}
+
+const InputField: React.FC<InputFieldProps> = ({
+  id,
+  name,
+  label,
+  type,
+  value,
+  onChange,
+  disabled,
+  required,
+  placeholder,
+}) => (
+  <div>
+    <label
+      htmlFor={id}
+      className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+    >
+      {label}
+    </label>
+    <input
+      id={id}
+      name={name}
+      type={type}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      required={required}
+      disabled={disabled}
+      className="w-full px-4 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
+    />
+  </div>
+);
+
+interface SelectFieldProps {
+  id: string;
+  name: string;
+  label: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  disabled?: boolean;
+  required?: boolean;
+  options: { value: string; label: string; disabled?: boolean }[];
+}
+
+const SelectField: React.FC<SelectFieldProps> = ({
+  id,
+  name,
+  label,
+  value,
+  onChange,
+  disabled,
+  required,
+  options,
+}) => (
+  <div>
+    <label
+      htmlFor={id}
+      className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+    >
+      {label}
+    </label>
+    <select
+      id={id}
+      name={name}
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      required={required}
+      className="w-full px-4 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
+    >
+      {options.map((opt) => (
+        <option key={opt.value} value={opt.value} disabled={opt.disabled}>
+          {opt.label}
+        </option>
+      ))}
+    </select>
+  </div>
+);
+
+interface AlertProps {
+  type: "error" | "success";
+  message: string;
+  icon: React.ReactNode;
+}
+
+const Alert: React.FC<AlertProps> = ({ type, message, icon }) => (
+  <div
+    className={`text-center text-sm ${
+      type === "error" ? "text-red-500 bg-red-100" : "text-green-600 bg-green-100"
+    } p-3 rounded-md flex items-center justify-center space-x-2`}
+  >
+    {icon}
+    <span>{message}</span>
+  </div>
+);
 
 export default Register;
