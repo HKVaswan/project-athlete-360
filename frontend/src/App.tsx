@@ -24,7 +24,7 @@ import FeaturesPage from './pages/FeaturesPage';
 import SessionsPage from './pages/SessionsPage';
 import TrainingSessionsPage from './pages/TrainingSessionsPage';
 import TrainingPlans from './pages/TrainingPlans';
-import PerformancePage from './pages/PerformancePage'; // <-- Added missing import
+import PerformancePage from './pages/PerformancePage';
 
 // Lazy-loaded pages
 const Analytics = lazy(() => import('./pages/Analytics'));
@@ -42,7 +42,7 @@ const RequireRole = ({
 }) => {
   const { isAuthenticated, user } = useAuth();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (!roles.includes(user?.role || '')) return <Navigate to="/" replace />;
+  if (!roles.includes(user?.role || '')) return <Navigate to="/unauthorized" replace />;
   return children;
 };
 
@@ -81,11 +81,12 @@ const App: React.FC = () => {
       <Route path="/register" element={<Register />} />
       <Route path="/pa360" element={<Pa360ElevateLandingPage />} />
       <Route path="/unauthorized" element={<Unauthorized />} />
-      <Route path="/create-admin" element={<CreateAdmin />} /> {/* Temporary */}
+      <Route path="/create-admin" element={<CreateAdmin />} />
 
       {/* Authenticated routes */}
       <Route element={<Layout />}>
-        <Route path="/" element={<Navigate to={getDashboardRoute()} replace />} />
+        {/* Set landing page / directly to Pa360ElevateLandingPage */}
+        <Route path="/" element={<Pa360ElevateLandingPage />} />
 
         {/* Dashboards */}
         <Route
@@ -218,7 +219,7 @@ const App: React.FC = () => {
       </Route>
 
       {/* Catch-all */}
-      <Route path="*" element={<Navigate to={getDashboardRoute()} replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 };
