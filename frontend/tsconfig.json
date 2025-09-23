@@ -18,8 +18,11 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+    "incremental": true,             // Enables faster incremental builds
+    "types": ["vite/client"]         // Include Vite client types for import.meta.env
   },
   "include": ["src"],
+  "exclude": ["node_modules", "dist"], 
   "references": [{ "path": "./tsconfig.node.json" }]
 }
