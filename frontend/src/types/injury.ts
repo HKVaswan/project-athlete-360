@@ -2,14 +2,16 @@
 
 export interface Injury {
   id: string;
-  athleteId: string;
+  athlete_id: string;
   description: string;
   date: string; // ISO string
   severity: "minor" | "moderate" | "severe";
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface InjuryPayload {
-  athleteId: string;
+  athlete_id: string;
   description: string;
   date: string;
   severity: "minor" | "moderate" | "severe";
