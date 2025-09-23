@@ -24,6 +24,7 @@ import FeaturesPage from './pages/FeaturesPage';
 import SessionsPage from './pages/SessionsPage';
 import TrainingSessionsPage from './pages/TrainingSessionsPage';
 import TrainingPlans from './pages/TrainingPlans';
+import PerformancePage from './pages/PerformancePage'; // <-- Added missing import
 
 // Lazy-loaded pages
 const Analytics = lazy(() => import('./pages/Analytics'));
