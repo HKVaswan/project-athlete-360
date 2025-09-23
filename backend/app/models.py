@@ -221,4 +221,14 @@ class Injury(Base):
     __tablename__ = "injury"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     athlete_id = Column(UUID(as_uuid=True), ForeignKey("athlete.id"))
-    reported_by = Column
+    reported_by = Column(UUID(as_uuid=True), ForeignKey("app_user.id"))
+    description = Column(String)
+    diagnosis = Column(String)
+    date_reported = Column(Date)
+    status = Column(String)
+    restricted = Column(Boolean, default=False)
+    metadata = Column(JSON)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    athlete = relationship("Athlete", back_populates="injuries")
