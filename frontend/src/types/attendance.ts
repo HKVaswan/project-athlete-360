@@ -2,14 +2,15 @@
 
 export interface AttendanceRecord {
   id: string;
-  sessionId: string;
-  athleteId: string;
+  session_id: string;
+  athlete_id: string;
   present: boolean;
+  created_at?: string; // optional timestamp
+  updated_at?: string; // optional timestamp
 }
 
 export interface AttendancePayload {
-  sessionId: string;
-  athleteId: string;
+  session_id: string;
+  athlete_id: string;
   present: boolean;
 }
- 
