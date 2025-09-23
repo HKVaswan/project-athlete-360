@@ -5,11 +5,21 @@ import { format } from 'date-fns';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
+interface Athlete {
+  id: string;
+  name: string;
+  dob?: string;
+  sport?: string;
+  gender?: string;
+  contact_info?: string;
+}
+
 const EditAthletePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { token, logout } = useAuth();
-  const [athlete, setAthlete] = useState<any | null>(null);
+
+  const [athlete, setAthlete] = useState<Athlete | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,6 +32,7 @@ const EditAthletePage: React.FC = () => {
   const [contactInfo, setContactInfo] = useState('');
 
   const fetchAthlete = useCallback(async () => {
+    if (!id) return;
     setLoading(true);
     setError(null);
     try {
@@ -43,7 +54,6 @@ const EditAthletePage: React.FC = () => {
 
       const { data } = await response.json();
       setAthlete(data);
-      // Pre-populate form fields
       setName(data.name || '');
       setDob(data.dob ? format(new Date(data.dob), 'yyyy-MM-dd') : '');
       setSport(data.sport || '');
@@ -57,15 +67,21 @@ const EditAthletePage: React.FC = () => {
   }, [id, token, logout]);
 
   useEffect(() => {
+    let isMounted = true;
     fetchAthlete();
+    return () => {
+      isMounted = false; // cleanup to prevent state update on unmounted component
+    };
   }, [fetchAthlete]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!id) return;
+
     setIsSubmitting(true);
     setError(null);
 
-    const updatedAthlete = {
+    const updatedAthlete: Partial<Athlete> = {
       name,
       dob,
       sport,
@@ -97,15 +113,18 @@ const EditAthletePage: React.FC = () => {
     }
   };
 
-  if (loading) return <div className="p-4">Loading...</div>;
-  if (error) return <div className="p-4 text-red-500">{error}</div>;
-  if (!athlete) return <div className="p-4">Athlete not found.</div>;
+  if (loading) return <div className="p-6 text-center text-gray-600">Loading athlete data...</div>;
+  if (error) return <div className="p-6 text-center text-red-500">{error}</div>;
+  if (!athlete) return <div className="p-6 text-center">Athlete not found.</div>;
 
   return (
-    <div className="p-4 max-w-lg mx-auto bg-white rounded-xl shadow-md space-y-4">
-      <h1 className="text-2xl font-bold text-center">Edit {athlete.name}'s Profile</h1>
+    <div className="p-6 max-w-lg mx-auto bg-white rounded-xl shadow-md">
+      <h1 className="text-2xl font-bold text-center mb-4">
+        Edit {athlete.name}'s Profile
+      </h1>
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+
         <div>
           <label className="block text-sm font-medium text-gray-700">Full Name</label>
           <input
@@ -117,6 +136,7 @@ const EditAthletePage: React.FC = () => {
             required
           />
         </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
           <input
@@ -128,6 +148,7 @@ const EditAthletePage: React.FC = () => {
             required
           />
         </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-700">Sport</label>
           <input
@@ -139,17 +160,23 @@ const EditAthletePage: React.FC = () => {
             required
           />
         </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-700">Gender</label>
-          <input
-            type="text"
+          <select
             value={gender}
             onChange={(e) => setGender(e.target.value)}
             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
             disabled={isSubmitting}
             required
-          />
+          >
+            <option value="">Select gender</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
+          </select>
         </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-700">Contact Info</label>
           <input
@@ -161,9 +188,10 @@ const EditAthletePage: React.FC = () => {
             required
           />
         </div>
+
         <button
           type="submit"
-          className="w-full bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50"
+          className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50"
           disabled={isSubmitting}
         >
           {isSubmitting ? 'Saving...' : 'Save Changes'}
@@ -174,4 +202,3 @@ const EditAthletePage: React.FC = () => {
 };
 
 export default EditAthletePage;
- 
