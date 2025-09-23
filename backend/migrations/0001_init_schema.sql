@@ -1,32 +1,40 @@
--- 0001_init_schema.sql
--- SQL Migration: Schema for Athlete Management System (v1.1)
--- Designed for PostgreSQL. Requires pgcrypto (gen_random_uuid) or adjust for uuid-ossp.
+-- 0001_init_schema_updated.sql
+-- SQL Migration: Schema for Athlete Management System (v1.2)
+-- PostgreSQL, requires pgcrypto (gen_random_uuid)
 -- Run: CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 BEGIN;
 
+-- ===========================
+-- Utility: trigger for updated_at
+-- ===========================
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+   NEW.updated_at = NOW();
+   RETURN NEW;
+END;
+$$ LANGUAGE 'plpgsql';
+
+-- ===========================
 -- Lookup: user roles
+-- ===========================
 CREATE TABLE IF NOT EXISTS user_role (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  code TEXT UNIQUE, -- 'admin','coach','physio','parent','athlete'
+  code TEXT UNIQUE,
   name TEXT NOT NULL,
   description TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Lookup: sports
-CREATE TABLE IF NOT EXISTS sport (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  institution_id UUID REFERENCES institution(id) ON DELETE CASCADE,
-  code TEXT UNIQUE, -- short code like 'football', 'athletics'
-  name TEXT NOT NULL,
-  metadata JSONB,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+CREATE TRIGGER tr_user_role_updated_at
+BEFORE UPDATE ON user_role
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Institutions (multi-tenant)
+-- ===========================
+-- Institutions
+-- ===========================
 CREATE TABLE IF NOT EXISTS institution (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
@@ -37,7 +45,13 @@ CREATE TABLE IF NOT EXISTS institution (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Users (admins, coaches, physios, parents, athletes-as-users)
+CREATE TRIGGER tr_institution_updated_at
+BEFORE UPDATE ON institution
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ===========================
+-- Users
+-- ===========================
 CREATE TABLE IF NOT EXISTS app_user (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   institution_id UUID REFERENCES institution(id) ON DELETE CASCADE,
@@ -52,7 +66,16 @@ CREATE TABLE IF NOT EXISTS app_user (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Athletes (separate profile; may link to app_user)
+-- Ensure emails are unique ignoring case
+CREATE UNIQUE INDEX IF NOT EXISTS idx_app_user_email_lower ON app_user(LOWER(email));
+
+CREATE TRIGGER tr_app_user_updated_at
+BEFORE UPDATE ON app_user
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ===========================
+-- Athletes
+-- ===========================
 CREATE TABLE IF NOT EXISTS athlete (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   institution_id UUID REFERENCES institution(id) ON DELETE CASCADE,
@@ -70,7 +93,30 @@ CREATE TABLE IF NOT EXISTS athlete (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Teams / Squads
+CREATE TRIGGER tr_athlete_updated_at
+BEFORE UPDATE ON athlete
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ===========================
+-- Sports
+-- ===========================
+CREATE TABLE IF NOT EXISTS sport (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  institution_id UUID REFERENCES institution(id) ON DELETE CASCADE,
+  code TEXT UNIQUE,
+  name TEXT NOT NULL,
+  metadata JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TRIGGER tr_sport_updated_at
+BEFORE UPDATE ON sport
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ===========================
+-- Teams
+-- ===========================
 CREATE TABLE IF NOT EXISTS team (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   institution_id UUID REFERENCES institution(id) ON DELETE CASCADE,
@@ -82,7 +128,13 @@ CREATE TABLE IF NOT EXISTS team (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Roster (athlete membership in a team)
+CREATE TRIGGER tr_team_updated_at
+BEFORE UPDATE ON team
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ===========================
+-- Roster
+-- ===========================
 CREATE TABLE IF NOT EXISTS roster (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   team_id UUID REFERENCES team(id) ON DELETE CASCADE,
@@ -96,11 +148,17 @@ CREATE TABLE IF NOT EXISTS roster (
   UNIQUE(team_id, athlete_id)
 );
 
+CREATE TRIGGER tr_roster_updated_at
+BEFORE UPDATE ON roster
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ===========================
 -- Training Sessions
+-- ===========================
 CREATE TABLE IF NOT EXISTS session (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   team_id UUID REFERENCES team(id) ON DELETE CASCADE,
-  coach_id UUID REFERENCES app_user(id),
+  coach_id UUID REFERENCES app_user(id) ON DELETE SET NULL,
   title TEXT,
   start_ts TIMESTAMPTZ NOT NULL,
   end_ts TIMESTAMPTZ,
@@ -111,13 +169,19 @@ CREATE TABLE IF NOT EXISTS session (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Attendance Records
+CREATE TRIGGER tr_session_updated_at
+BEFORE UPDATE ON session
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ===========================
+-- Attendance
+-- ===========================
 CREATE TABLE IF NOT EXISTS attendance (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   session_id UUID REFERENCES session(id) ON DELETE CASCADE,
   athlete_id UUID REFERENCES athlete(id) ON DELETE CASCADE,
   status TEXT CHECK (status IN ('present','absent','injured','excused')),
-  recorded_by UUID REFERENCES app_user(id),
+  recorded_by UUID REFERENCES app_user(id) ON DELETE SET NULL,
   recorded_at TIMESTAMPTZ DEFAULT NOW(),
   metadata JSONB,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -125,7 +189,13 @@ CREATE TABLE IF NOT EXISTS attendance (
   UNIQUE(session_id, athlete_id)
 );
 
--- Assessment / Performance Test Definitions
+CREATE TRIGGER tr_attendance_updated_at
+BEFORE UPDATE ON attendance
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ===========================
+-- Assessment Types
+-- ===========================
 CREATE TABLE IF NOT EXISTS assessment_type (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   institution_id UUID REFERENCES institution(id) ON DELETE CASCADE,
@@ -138,7 +208,13 @@ CREATE TABLE IF NOT EXISTS assessment_type (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Assessment Results (time-series)
+CREATE TRIGGER tr_assessment_type_updated_at
+BEFORE UPDATE ON assessment_type
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ===========================
+-- Assessment Results
+-- ===========================
 CREATE TABLE IF NOT EXISTS assessment_result (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   athlete_id UUID REFERENCES athlete(id) ON DELETE CASCADE,
@@ -146,17 +222,23 @@ CREATE TABLE IF NOT EXISTS assessment_result (
   value NUMERIC NOT NULL,
   notes TEXT,
   recorded_at TIMESTAMPTZ DEFAULT NOW(),
-  recorded_by UUID REFERENCES app_user(id),
+  recorded_by UUID REFERENCES app_user(id) ON DELETE SET NULL,
   metadata JSONB,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Injuries & Medical Records
+CREATE TRIGGER tr_assessment_result_updated_at
+BEFORE UPDATE ON assessment_result
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ===========================
+-- Injuries
+-- ===========================
 CREATE TABLE IF NOT EXISTS injury (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   athlete_id UUID REFERENCES athlete(id) ON DELETE CASCADE,
-  reported_by UUID REFERENCES app_user(id),
+  reported_by UUID REFERENCES app_user(id) ON DELETE SET NULL,
   description TEXT,
   diagnosis TEXT,
   date_reported DATE NOT NULL,
@@ -168,7 +250,13 @@ CREATE TABLE IF NOT EXISTS injury (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Audit log (simple change tracking)
+CREATE TRIGGER tr_injury_updated_at
+BEFORE UPDATE ON injury
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ===========================
+-- Audit Log
+-- ===========================
 CREATE TABLE IF NOT EXISTS audit_log (
   id BIGSERIAL PRIMARY KEY,
   institution_id UUID,
@@ -180,7 +268,9 @@ CREATE TABLE IF NOT EXISTS audit_log (
   diff JSONB
 );
 
--- Indexes for common queries
+-- ===========================
+-- Indexes
+-- ===========================
 CREATE INDEX IF NOT EXISTS idx_athlete_institution ON athlete(institution_id);
 CREATE INDEX IF NOT EXISTS idx_team_institution ON team(institution_id);
 CREATE INDEX IF NOT EXISTS idx_assessment_athlete ON assessment_result(athlete_id);
