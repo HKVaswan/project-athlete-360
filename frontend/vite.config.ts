@@ -11,12 +11,20 @@ export default defineConfig({
   },
   base: '/', // ✅ required for Vercel
   server: {
+    port: 5173, // optional, Vite default is 5173
+    open: true, // automatically opens browser on dev
     proxy: {
+      // Local dev proxy to backend
       '/api': {
-        target: 'http://localhost:5000', // only for local dev
+        target: process.env.VITE_API_URL || 'http://localhost:5000',
         changeOrigin: true,
         secure: false,
+        rewrite: (path) => path.replace(/^\/api/, '/api'),
       },
     },
+  },
+  build: {
+    outDir: 'dist',
+    sourcemap: true, // optional, helpful for debugging production
   },
 });
