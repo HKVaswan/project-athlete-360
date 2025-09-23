@@ -1,4 +1,16 @@
 // src/pages/Login.tsx
+import React, { useState, useRef, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import {
+  FaSignInAlt,
+  FaSpinner,
+  FaCheckCircle,
+  FaEye,
+  FaEyeSlash,
+  FaExclamationTriangle,
+} from "react-icons/fa";
+
 import SEO from "../components/SEO";
 
 const Login = () => {
@@ -13,17 +25,6 @@ const Login = () => {
     </>
   );
 };
-import React, { useState, useRef, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
-import {
-  FaSignInAlt,
-  FaSpinner,
-  FaCheckCircle,
-  FaEye,
-  FaEyeSlash,
-  FaExclamationTriangle,
-} from "react-icons/fa";
 
 // Use your environment variable or fallback URL
 const API_URL = (process.env.REACT_APP_API_URL || "https://project-athlete-360.onrender.com/").replace(/\/+$/, "");
