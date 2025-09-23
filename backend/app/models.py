@@ -1,24 +1,23 @@
 # backend/app/models.py
 
-from sqlalchemy import Column, String, Boolean, Date, DateTime, ForeignKey, JSON, Numeric, Text
+from sqlalchemy import Column, String, Boolean, Date, DateTime, ForeignKey, JSON, Float
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
+from datetime import datetime
 import uuid
-from app.db import Base  # Make sure you have Base = declarative_base() in db.py
+from app.db import Base
 
 # -------------------------------
-# Lookup: User Roles
+# User Roles
 # -------------------------------
 class UserRole(Base):
     __tablename__ = "user_role"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    code = Column(String, unique=True, nullable=False)
+    code = Column(String, unique=True, index=True)
     name = Column(String, nullable=False)
-    description = Column(Text)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
+    description = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     users = relationship("AppUser", back_populates="role")
 
 # -------------------------------
@@ -28,12 +27,11 @@ class Institution(Base):
     __tablename__ = "institution"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String, nullable=False)
-    address = Column(Text)
+    address = Column(String)
     timezone = Column(String, default="Asia/Kolkata")
     metadata = Column(JSON)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     users = relationship("AppUser", back_populates="institution")
     sports = relationship("Sport", back_populates="institution")
     teams = relationship("Team", back_populates="institution")
@@ -49,18 +47,16 @@ class AppUser(Base):
     full_name = Column(String, nullable=False)
     role_id = Column(UUID(as_uuid=True), ForeignKey("user_role.id"))
     phone = Column(String)
-    password_hash = Column(String)
+    password = Column(String)
     is_active = Column(Boolean, default=True)
     settings = Column(JSON)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
     role = relationship("UserRole", back_populates="users")
     institution = relationship("Institution", back_populates="users")
     athletes = relationship("Athlete", back_populates="user")
     sessions = relationship("Session", back_populates="coach")
-    assessment_results = relationship("AssessmentResult", back_populates="recorded_by_user")
-    injuries_reported = relationship("Injury", back_populates="reported_by_user")
 
 # -------------------------------
 # Sports
@@ -72,9 +68,9 @@ class Sport(Base):
     code = Column(String, unique=True)
     name = Column(String, nullable=False)
     metadata = Column(JSON)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
     institution = relationship("Institution", back_populates="sports")
     athletes = relationship("Athlete", back_populates="primary_sport")
     teams = relationship("Team", back_populates="sport")
@@ -86,7 +82,7 @@ class Athlete(Base):
     __tablename__ = "athlete"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     institution_id = Column(UUID(as_uuid=True), ForeignKey("institution.id"))
-    user_id = Column(UUID(as_uuid=True), ForeignKey("app_user.id"))
+    user_id = Column(UUID(as_uuid=True), ForeignKey("app_user.id"), nullable=True)
     first_name = Column(String, nullable=False)
     last_name = Column(String)
     dob = Column(Date)
@@ -96,14 +92,14 @@ class Athlete(Base):
     grade = Column(String)
     emergency_contact = Column(JSON)
     metadata = Column(JSON)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
     user = relationship("AppUser", back_populates="athletes")
     primary_sport = relationship("Sport", back_populates="athletes")
     rosters = relationship("Roster", back_populates="athlete")
-    attendance_records = relationship("Attendance", back_populates="athlete")
-    assessment_results = relationship("AssessmentResult", back_populates="athlete")
+    attendances = relationship("Attendance", back_populates="athlete")
+    assessments = relationship("AssessmentResult", back_populates="athlete")
     injuries = relationship("Injury", back_populates="athlete")
 
 # -------------------------------
@@ -117,9 +113,9 @@ class Team(Base):
     sport_id = Column(UUID(as_uuid=True), ForeignKey("sport.id"))
     season = Column(String)
     metadata = Column(JSON)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
     institution = relationship("Institution", back_populates="teams")
     sport = relationship("Sport", back_populates="teams")
     rosters = relationship("Roster", back_populates="team")
@@ -137,9 +133,9 @@ class Roster(Base):
     role = Column(String)
     joined_at = Column(Date)
     metadata = Column(JSON)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
     team = relationship("Team", back_populates="rosters")
     athlete = relationship("Athlete", back_populates="rosters")
 
@@ -152,17 +148,17 @@ class Session(Base):
     team_id = Column(UUID(as_uuid=True), ForeignKey("team.id"))
     coach_id = Column(UUID(as_uuid=True), ForeignKey("app_user.id"))
     title = Column(String)
-    start_ts = Column(DateTime)
+    start_ts = Column(DateTime, nullable=False)
     end_ts = Column(DateTime)
     location = Column(String)
-    notes = Column(Text)
+    notes = Column(String)
     metadata = Column(JSON)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
     team = relationship("Team", back_populates="sessions")
     coach = relationship("AppUser", back_populates="sessions")
-    attendance_records = relationship("Attendance", back_populates="session")
+    attendances = relationship("Attendance", back_populates="session")
 
 # -------------------------------
 # Attendance
@@ -174,17 +170,16 @@ class Attendance(Base):
     athlete_id = Column(UUID(as_uuid=True), ForeignKey("athlete.id"))
     status = Column(String)
     recorded_by = Column(UUID(as_uuid=True), ForeignKey("app_user.id"))
-    recorded_at = Column(DateTime, server_default=func.now())
+    recorded_at = Column(DateTime, default=datetime.utcnow)
     metadata = Column(JSON)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
-    session = relationship("Session", back_populates="attendance_records")
-    athlete = relationship("Athlete", back_populates="attendance_records")
-    recorder = relationship("AppUser", back_populates="attendance_records")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    session = relationship("Session", back_populates="attendances")
+    athlete = relationship("Athlete", back_populates="attendances")
 
 # -------------------------------
-# Assessment Types & Results
+# Assessment Types
 # -------------------------------
 class AssessmentType(Base):
     __tablename__ = "assessment_type"
@@ -195,27 +190,29 @@ class AssessmentType(Base):
     unit = Column(String)
     normative_ranges = Column(JSON)
     config = Column(JSON)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
     results = relationship("AssessmentResult", back_populates="assessment_type")
 
+# -------------------------------
+# Assessment Results
+# -------------------------------
 class AssessmentResult(Base):
     __tablename__ = "assessment_result"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     athlete_id = Column(UUID(as_uuid=True), ForeignKey("athlete.id"))
     assessment_type_id = Column(UUID(as_uuid=True), ForeignKey("assessment_type.id"))
-    value = Column(Numeric, nullable=False)
-    notes = Column(Text)
-    recorded_at = Column(DateTime(timezone=True), server_default=func.now())
+    value = Column(Float, nullable=False)
+    notes = Column(String)
+    recorded_at = Column(DateTime, default=datetime.utcnow)
     recorded_by = Column(UUID(as_uuid=True), ForeignKey("app_user.id"))
     metadata = Column(JSON)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
-    athlete = relationship("Athlete", back_populates="assessment_results")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    athlete = relationship("Athlete", back_populates="assessments")
     assessment_type = relationship("AssessmentType", back_populates="results")
-    recorded_by_user = relationship("AppUser", back_populates="assessment_results")
 
 # -------------------------------
 # Injuries
@@ -224,15 +221,4 @@ class Injury(Base):
     __tablename__ = "injury"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     athlete_id = Column(UUID(as_uuid=True), ForeignKey("athlete.id"))
-    reported_by = Column(UUID(as_uuid=True), ForeignKey("app_user.id"))
-    description = Column(Text)
-    diagnosis = Column(Text)
-    date_reported = Column(Date)
-    status = Column(String)  # e.g., open, closed
-    restricted = Column(Boolean, default=False)
-    metadata = Column(JSON)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
-    athlete = relationship("Athlete", back_populates="injuries")
-    reported_by_user = relationship("AppUser", back_populates="injuries_reported")
+    reported_by = Column
