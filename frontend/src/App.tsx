@@ -3,6 +3,7 @@ import React, { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
+import RouteErrorBoundary from './components/RouteErrorBoundary'; // ✅ Import
 
 // Pages
 import Login from './pages/Login';
@@ -77,32 +78,37 @@ const App: React.FC = () => {
 
       {/* Routes wrapped with Layout */}
       <Route element={<Layout />}>
-        {/* ✅ Landing page */}
         <Route path="/" element={<Pa360ElevateLandingPage />} />
 
-        {/* Dashboards */}
+        {/* Dashboards with error isolation */}
         <Route
           path="/admin-dashboard"
           element={
-            <RequireRole roles={['admin']}>
-              <AdminDashboard />
-            </RequireRole>
+            <RouteErrorBoundary>
+              <RequireRole roles={['admin']}>
+                <AdminDashboard />
+              </RequireRole>
+            </RouteErrorBoundary>
           }
         />
         <Route
           path="/coach-dashboard"
           element={
-            <RequireRole roles={['coach']}>
-              <CoachDashboard />
-            </RequireRole>
+            <RouteErrorBoundary>
+              <RequireRole roles={['coach']}>
+                <CoachDashboard />
+              </RequireRole>
+            </RouteErrorBoundary>
           }
         />
         <Route
           path="/athlete-dashboard"
           element={
-            <RequireRole roles={['athlete']}>
-              <AthleteDashboard />
-            </RequireRole>
+            <RouteErrorBoundary>
+              <RequireRole roles={['athlete']}>
+                <AthleteDashboard />
+              </RequireRole>
+            </RouteErrorBoundary>
           }
         />
 
@@ -110,102 +116,125 @@ const App: React.FC = () => {
         <Route
           path="/athletes"
           element={
-            <RequireRole roles={['admin', 'coach']}>
-              <AthletesPage />
-            </RequireRole>
+            <RouteErrorBoundary>
+              <RequireRole roles={['admin', 'coach']}>
+                <AthletesPage />
+              </RequireRole>
+            </RouteErrorBoundary>
           }
         />
         <Route
           path="/add-athlete"
           element={
-            <RequireRole roles={['admin']}>
-              <AddAthletePage />
-            </RequireRole>
+            <RouteErrorBoundary>
+              <RequireRole roles={['admin']}>
+                <AddAthletePage />
+              </RequireRole>
+            </RouteErrorBoundary>
           }
         />
         <Route
           path="/edit-athlete/:id"
           element={
-            <RequireRole roles={['admin']}>
-              <EditAthletePage />
-            </RequireRole>
+            <RouteErrorBoundary>
+              <RequireRole roles={['admin']}>
+                <EditAthletePage />
+              </RequireRole>
+            </RouteErrorBoundary>
           }
         />
-        <Route path="/athlete-profile/:id" element={<AthleteProfile />} />
         <Route
           path="/users"
           element={
-            <RequireRole roles={['admin']}>
-              <AllUsers />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="/analytics"
-          element={
-            <RequireRole roles={['admin', 'coach']}>
-              <Suspense fallback={<div>Loading Analytics...</div>}>
-                <Analytics />
-              </Suspense>
-            </RequireRole>
+            <RouteErrorBoundary>
+              <RequireRole roles={['admin']}>
+                <AllUsers />
+              </RequireRole>
+            </RouteErrorBoundary>
           }
         />
 
-        {/* Athlete-specific pages */}
+        {/* Analytics (lazy + risky) */}
+        <Route
+          path="/analytics"
+          element={
+            <RouteErrorBoundary>
+              <RequireRole roles={['admin', 'coach']}>
+                <Suspense fallback={<div>Loading Analytics...</div>}>
+                  <Analytics />
+                </Suspense>
+              </RequireRole>
+            </RouteErrorBoundary>
+          }
+        />
+
+        {/* Athlete pages */}
         <Route
           path="/performance"
           element={
-            <RequireRole roles={['athlete']}>
-              <PerformancePage />
-            </RequireRole>
+            <RouteErrorBoundary>
+              <RequireRole roles={['athlete']}>
+                <PerformancePage />
+              </RequireRole>
+            </RouteErrorBoundary>
           }
         />
         <Route
           path="/training"
           element={
-            <RequireRole roles={['athlete']}>
-              <TrainingPlans />
-            </RequireRole>
+            <RouteErrorBoundary>
+              <RequireRole roles={['athlete']}>
+                <TrainingPlans />
+              </RequireRole>
+            </RouteErrorBoundary>
           }
         />
         <Route
           path="/training-sessions"
           element={
-            <RequireRole roles={['athlete']}>
-              <TrainingSessionsPage />
-            </RequireRole>
+            <RouteErrorBoundary>
+              <RequireRole roles={['athlete']}>
+                <TrainingSessionsPage />
+              </RequireRole>
+            </RouteErrorBoundary>
           }
         />
 
         {/* Shared pages */}
-        <Route path="/sessions" element={<SessionsPage />} />
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/features" element={<FeaturesPage />} />
+        <Route path="/sessions" element={<RouteErrorBoundary><SessionsPage /></RouteErrorBoundary>} />
+        <Route path="/profile" element={<RouteErrorBoundary><ProfilePage /></RouteErrorBoundary>} />
+        <Route path="/settings" element={<RouteErrorBoundary><SettingsPage /></RouteErrorBoundary>} />
+        <Route path="/features" element={<RouteErrorBoundary><FeaturesPage /></RouteErrorBoundary>} />
 
         {/* Lazy-loaded shared pages */}
         <Route
           path="/assessments"
           element={
-            <Suspense fallback={<div>Loading Assessments...</div>}>
-              <AssessmentsPage />
-            </Suspense>
+            <RouteErrorBoundary>
+              <Suspense fallback={<div>Loading Assessments...</div>}>
+                <AssessmentsPage />
+              </Suspense>
+            </RouteErrorBoundary>
           }
         />
         <Route
           path="/attendance"
           element={
-            <Suspense fallback={<div>Loading Attendance...</div>}>
-              <AttendancePage />
-            </Suspense>
+            <RouteErrorBoundary>
+              <Suspense fallback={<div>Loading Attendance...</div>}>
+                <AttendancePage />
+              </Suspense>
+            </RouteErrorBoundary>
           }
         />
         <Route
           path="/injuries"
           element={
-            <Suspense fallback={<div>Loading Injuries...</div>}>
-              <InjuriesPage />
-            </Suspense>
+            <RouteErrorBoundary>
+              <Suspense fallback={<div>Loading Injuries...</div>}>
+                <InjuriesPage />
+              </Suspense>
+            </RouteErrorBoundary>
           }
         />
       </Route>
