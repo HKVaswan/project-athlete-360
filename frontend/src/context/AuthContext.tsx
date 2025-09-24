@@ -1,5 +1,12 @@
 // src/context/AuthContext.tsx
-import React, { createContext, useState, useEffect, useContext, ReactNode, useCallback } from 'react';
+import React, {
+  createContext,
+  useState,
+  useEffect,
+  useContext,
+  ReactNode,
+  useCallback,
+} from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -18,7 +25,7 @@ interface AuthContextType {
   login: (token: string, user: UserInfo) => void;
   logout: () => void;
   isAuthenticated: boolean;
-  checkAuth: () => Promise<void>;
+  checkAuth: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -30,14 +37,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const navigate = useNavigate();
 
   const getStorage = useCallback(() => {
-    const storedToken = sessionStorage.getItem('token') || localStorage.getItem('token');
-    const storedUser = sessionStorage.getItem('user') || localStorage.getItem('user');
+    const storedToken =
+      sessionStorage.getItem('token') || localStorage.getItem('token');
+    const storedUser =
+      sessionStorage.getItem('user') || localStorage.getItem('user');
     return { storedToken, storedUser };
   }, []);
 
   const clearStorage = useCallback(() => {
-    sessionStorage.removeItem('token');
-    sessionStorage.removeItem('user');
+    sessionStorage.clear();
     localStorage.removeItem('token');
     localStorage.removeItem('user');
   }, []);
@@ -46,68 +54,70 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setToken(null);
     setUser(null);
     clearStorage();
-    setAuthError("Session expired. Please log in again.");
-    navigate('/login');
-  }, [navigate, clearStorage]);
+    setAuthError('Session expired. Please log in again.');
+    // ⚠️ don’t force navigate instantly → let Layout handle redirect
+  }, [clearStorage]);
 
-  const checkTokenExpiry = useCallback((exp: number) => {
-    if (exp * 1000 < Date.now()) {
-      console.warn("Token expired:", exp);
-      logout();
-      return false;
-    }
-    return true;
-  }, [logout]);
+  const checkTokenExpiry = useCallback(
+    (exp?: number) => {
+      if (!exp) return true; // if API doesn’t return exp, skip
+      if (exp * 1000 < Date.now()) {
+        console.warn('⚠️ Token expired at', exp);
+        logout();
+        return false;
+      }
+      return true;
+    },
+    [logout]
+  );
 
-  const checkAuth = useCallback(async () => {
+  const checkAuth = useCallback(async (): Promise<boolean> => {
     const { storedToken, storedUser } = getStorage();
 
     if (!storedToken || !storedUser) {
-      console.warn("No token or user in storage");
+      console.warn('⚠️ No token or user in storage');
       logout();
-      return;
+      return false;
     }
 
     try {
       const parsedUser = JSON.parse(storedUser) as UserInfo;
-      console.log("Parsed user from storage:", parsedUser);
-
-      if (!checkTokenExpiry(parsedUser.exp)) return;
+      if (!checkTokenExpiry(parsedUser.exp)) return false;
 
       const response = await fetch(`${API_URL}/api/me`, {
-        headers: { 'Authorization': `Bearer ${storedToken}` },
+        headers: { Authorization: `Bearer ${storedToken}` },
       });
 
       if (!response.ok) {
-        console.warn("Auth API responded with error:", response.status);
+        console.warn('⚠️ Auth API responded with', response.status);
         logout();
-        return;
+        return false;
       }
 
       const data = await response.json();
-      console.log("Auth API response:", data);
+      console.log('✅ Auth API response:', data);
 
-      if (!data.user) {
-        console.warn("No user in API response");
-        logout();
-        return;
-      }
+      // trust backend first
+      const apiUser: UserInfo = data.user || parsedUser;
 
-      if (!checkTokenExpiry(data.user.exp)) return;
+      if (!checkTokenExpiry(apiUser.exp)) return false;
 
       setToken(storedToken);
-      setUser(parsedUser);
+      setUser(apiUser);
       setAuthError(null);
+      return true;
     } catch (error) {
-      console.error("Authentication check failed:", error);
-      setAuthError("Network or session error. Please log in again.");
+      console.error('❌ Authentication check failed:', error);
+      setAuthError('Network or session error.');
       logout();
+      return false;
     }
   }, [logout, checkTokenExpiry, getStorage]);
 
   useEffect(() => {
+    // only check auth if not on login/register
     const path = window.location.pathname;
-    if (path !== '/login' && path !== '/register') {
+    if (!['/login', '/register'].includes(path)) {
       checkAuth();
     }
   }, [checkAuth]);
@@ -118,24 +128,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setAuthError(null);
 
     try {
+      // ✅ store consistently in localStorage
+      localStorage.setItem('token', newToken);
+      localStorage.setItem('user', JSON.stringify(userInfo));
+
       if (userInfo.role === 'athlete') {
-        sessionStorage.setItem('token', newToken);
-        sessionStorage.setItem('user', JSON.stringify(userInfo));
         navigate('/athlete-dashboard');
       } else if (userInfo.role === 'coach') {
-        localStorage.setItem('token', newToken);
-        localStorage.setItem('user', JSON.stringify(userInfo));
         navigate('/coach-dashboard');
       } else if (userInfo.role === 'admin') {
-        localStorage.setItem('token', newToken);
-        localStorage.setItem('user', JSON.stringify(userInfo));
         navigate('/admin-dashboard');
       } else {
-        console.warn("Unknown role during login:", userInfo.role);
+        console.warn('⚠️ Unknown role during login:', userInfo.role);
         navigate('/login');
       }
     } catch (err) {
-      console.error("Error during login storage:", err);
+      console.error('❌ Error during login storage:', err);
       navigate('/login');
     }
   };
@@ -143,7 +151,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isAuthenticated = !!token && !!user;
 
   return (
-    <AuthContext.Provider value={{ token, user, authError, login, logout, isAuthenticated, checkAuth }}>
+    <AuthContext.Provider
+      value={{
+        token,
+        user,
+        authError,
+        login,
+        logout,
+        isAuthenticated,
+        checkAuth,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
