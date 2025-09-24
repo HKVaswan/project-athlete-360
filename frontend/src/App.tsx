@@ -32,7 +32,7 @@ const AssessmentsPage = lazy(() => import('./pages/AssessmentsPage'));
 const AttendancePage = lazy(() => import('./pages/AttendancePage'));
 const InjuriesPage = lazy(() => import('./pages/InjuriesPage'));
 
-// Role-based route wrapper
+// ✅ Role-based route wrapper
 const RequireRole = ({
   roles,
   children,
@@ -47,15 +47,7 @@ const RequireRole = ({
 };
 
 const App: React.FC = () => {
-  const { isAuthenticated, loading, user } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-xl">Loading...</div>
-      </div>
-    );
-  }
+  const { isAuthenticated, user } = useAuth();
 
   const getDashboardRoute = () => {
     if (!isAuthenticated) return '/login';
@@ -83,9 +75,9 @@ const App: React.FC = () => {
       <Route path="/unauthorized" element={<Unauthorized />} />
       <Route path="/create-admin" element={<CreateAdmin />} />
 
-      {/* Authenticated routes */}
+      {/* Routes wrapped with Layout */}
       <Route element={<Layout />}>
-        {/* Set landing page / directly to Pa360ElevateLandingPage */}
+        {/* ✅ Landing page */}
         <Route path="/" element={<Pa360ElevateLandingPage />} />
 
         {/* Dashboards */}
