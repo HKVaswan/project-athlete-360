@@ -12,7 +12,7 @@ const Layout: React.FC = () => {
   const navigate = useNavigate();
   const [checking, setChecking] = useState(true);
 
-  // Use startsWith to handle query params or trailing slashes
+  // Define public routes
   const publicRoutes = ['/login', '/register', '/pa360', '/create-admin'];
   const isPublicRoute = publicRoutes.some((route) =>
     location.pathname.startsWith(route)
@@ -23,7 +23,7 @@ const Layout: React.FC = () => {
       try {
         await checkAuth();
       } catch (err) {
-        console.error('Auth check failed:', err);
+        console.error('❌ Auth check failed:', err);
       } finally {
         setChecking(false);
       }
@@ -32,11 +32,13 @@ const Layout: React.FC = () => {
   }, [checkAuth]);
 
   useEffect(() => {
-    if (!checking) {
-      if (!isPublicRoute) {
-        if (authError || !isAuthenticated) {
-          navigate('/login', { replace: true });
-        }
+    if (!checking && !isPublicRoute) {
+      if (authError || !isAuthenticated) {
+        console.warn(
+          '⚠️ Redirecting to login because auth failed',
+          { authError, isAuthenticated }
+        );
+        navigate('/login', { replace: true });
       }
     }
   }, [checking, authError, isAuthenticated, isPublicRoute, navigate]);
@@ -52,9 +54,26 @@ const Layout: React.FC = () => {
     );
   }
 
+  // If something goes really wrong, show fallback UI instead of blank
+  if (!isPublicRoute && !isAuthenticated && !checking) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 text-center p-6">
+        <h1 className="text-2xl font-bold text-red-600 mb-4">
+          Session expired or authentication failed
+        </h1>
+        <button
+          onClick={() => navigate('/login')}
+          className="px-6 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700"
+        >
+          Go to Login
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-gray-100 dark:bg-gray-900">
-      <Navbar />
+      {!isPublicRoute && <Navbar />}
       <main
         className={`flex-1 ${
           isPublicRoute ? '' : 'overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8'
