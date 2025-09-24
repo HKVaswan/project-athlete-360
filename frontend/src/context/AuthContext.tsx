@@ -26,6 +26,8 @@ interface AuthContextType {
   logout: () => void;
   isAuthenticated: boolean;
   checkAuth: () => Promise<boolean>;
+  loginUser: (email: string, password: string) => Promise<boolean>;
+  registerUser: (email: string, password: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -55,12 +57,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
     clearStorage();
     setAuthError('Session expired. Please log in again.');
-    // ⚠️ don’t force navigate instantly → let Layout handle redirect
   }, [clearStorage]);
 
   const checkTokenExpiry = useCallback(
     (exp?: number) => {
-      if (!exp) return true; // if API doesn’t return exp, skip
+      if (!exp) return true;
       if (exp * 1000 < Date.now()) {
         console.warn('⚠️ Token expired at', exp);
         logout();
@@ -97,7 +98,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const data = await response.json();
       console.log('✅ Auth API response:', data);
 
-      // trust backend first
       const apiUser: UserInfo = data.user || parsedUser;
 
       if (!checkTokenExpiry(apiUser.exp)) return false;
@@ -115,7 +115,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [logout, checkTokenExpiry, getStorage]);
 
   useEffect(() => {
-    // only check auth if not on login/register
     const path = window.location.pathname;
     if (!['/login', '/register'].includes(path)) {
       checkAuth();
@@ -128,23 +127,59 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setAuthError(null);
 
     try {
-      // ✅ store consistently in localStorage
       localStorage.setItem('token', newToken);
       localStorage.setItem('user', JSON.stringify(userInfo));
 
-      if (userInfo.role === 'athlete') {
-        navigate('/athlete-dashboard');
-      } else if (userInfo.role === 'coach') {
-        navigate('/coach-dashboard');
-      } else if (userInfo.role === 'admin') {
-        navigate('/admin-dashboard');
-      } else {
+      if (userInfo.role === 'athlete') navigate('/athlete-dashboard');
+      else if (userInfo.role === 'coach') navigate('/coach-dashboard');
+      else if (userInfo.role === 'admin') navigate('/admin-dashboard');
+      else {
         console.warn('⚠️ Unknown role during login:', userInfo.role);
         navigate('/login');
       }
     } catch (err) {
       console.error('❌ Error during login storage:', err);
       navigate('/login');
+    }
+  };
+
+  // ✅ New: loginUser helper
+  const loginUser = async (email: string, password: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`${API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      if (!response.ok) throw new Error('Invalid credentials');
+      const data = await response.json();
+      const dummyUser: UserInfo = { id: 0, username: email, role: 'athlete', exp: Date.now() / 1000 + 3600 }; // adjust as needed
+      login(data.access_token, dummyUser);
+      return true;
+    } catch (err) {
+      console.error('❌ Login failed:', err);
+      setAuthError('Login failed. Check credentials.');
+      return false;
+    }
+  };
+
+  // ✅ New: registerUser helper
+  const registerUser = async (email: string, password: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`${API_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      if (!response.ok) throw new Error('Registration failed');
+      const data = await response.json();
+      const dummyUser: UserInfo = { id: 0, username: email, role: 'athlete', exp: Date.now() / 1000 + 3600 };
+      login(data.access_token, dummyUser);
+      return true;
+    } catch (err) {
+      console.error('❌ Registration failed:', err);
+      setAuthError('Registration failed. Email may already exist.');
+      return false;
     }
   };
 
@@ -160,6 +195,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         logout,
         isAuthenticated,
         checkAuth,
+        loginUser,
+        registerUser,
       }}
     >
       {children}
