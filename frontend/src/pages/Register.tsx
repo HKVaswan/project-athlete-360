@@ -7,6 +7,7 @@ import {
   FaCheckCircle,
   FaExclamationTriangle,
 } from "react-icons/fa";
+import SEO from "../components/SEO";
 
 const API_URL = (import.meta.env.VITE_API_URL || "https://project-athlete-360.onrender.com").replace(/\/+$/, "");
 
@@ -61,6 +62,7 @@ const Register: React.FC = () => {
       setError(validationError);
       return;
     }
+
     setLoading(true);
 
     const registrationData = {
@@ -74,167 +76,175 @@ const Register: React.FC = () => {
       role: fields.role,
     };
 
-    // inside handleSubmit
-try {
-  const response = await fetch(`${API_URL}/api/auth/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(registrationData),
-  });
+    try {
+      const response = await fetch(`${API_URL}/api/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(registrationData),
+      });
 
-  const data = await response.json();
+      const data = await response.json();
 
-  if (response.ok) {
-    setSuccess(true);
-    setTimeout(() => navigate("/login"), 1800);
-  } else {
-    setError(data.message || "Registration failed. Please check your details and try again.");
-  }
-} catch (err) {
-  setError("Network error. Could not connect to the registration server. Please try again.");
-} finally {
-  setLoading(false);
-}
+      if (response.ok) {
+        setSuccess(true);
+        setTimeout(() => navigate("/login"), 1800);
+      } else {
+        setError(data.message || "Registration failed. Please check your details and try again.");
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Network error. Could not connect to the registration server. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 px-4 py-8">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-8 sm:p-10 w-full max-w-lg transition-all duration-300">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">Create Your Account</h1>
-          <p className="text-gray-500 dark:text-gray-400">Join Project Athlete 360</p>
-        </div>
+    <>
+      <SEO
+        title="Register - Project Athlete 360"
+        description="Create your Project Athlete 360 account to join the community of athletes and coaches."
+        url="https://projectathlete360.com/register"
+      />
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-6" autoComplete="off">
-          {/* Username & Password */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <InputField
-              id="username"
-              name="username"
-              label="Username"
-              type="text"
-              value={fields.username}
-              onChange={handleChange}
-              placeholder="Choose a username"
-              disabled={loading}
-              required
-            />
-            <InputField
-              id="password"
-              name="password"
-              label="Password"
-              type="password"
-              value={fields.password}
-              onChange={handleChange}
-              placeholder="Minimum 6 characters"
-              disabled={loading}
-              required
-            />
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 px-4 py-8">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-8 sm:p-10 w-full max-w-lg transition-all duration-300">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">Create Your Account</h1>
+            <p className="text-gray-500 dark:text-gray-400">Join Project Athlete 360</p>
           </div>
 
-          {/* Confirm Password */}
-          <InputField
-            id="confirmPassword"
-            name="confirmPassword"
-            label="Confirm Password"
-            type="password"
-            value={fields.confirmPassword}
-            onChange={handleChange}
-            placeholder="Re-type password"
-            disabled={loading}
-            required
-          />
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-6" autoComplete="off">
+            {/* Username & Password */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <InputField
+                id="username"
+                name="username"
+                label="Username"
+                type="text"
+                value={fields.username}
+                onChange={handleChange}
+                placeholder="Choose a username"
+                disabled={loading}
+                required
+              />
+              <InputField
+                id="password"
+                name="password"
+                label="Password"
+                type="password"
+                value={fields.password}
+                onChange={handleChange}
+                placeholder="Minimum 6 characters"
+                disabled={loading}
+                required
+              />
+            </div>
 
-          <hr className="border-gray-200 dark:border-gray-700" />
-
-          {/* Name, DOB, Sport, Gender */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <InputField id="name" name="name" label="Full Name" type="text" value={fields.name} onChange={handleChange} disabled={loading} required />
-            <InputField id="dob" name="dob" label="Date of Birth" type="date" value={fields.dob} onChange={handleChange} disabled={loading} required />
-            <InputField id="sport" name="sport" label="Sport" type="text" value={fields.sport} onChange={handleChange} disabled={loading} required />
-            <SelectField
-              id="gender"
-              name="gender"
-              label="Gender"
-              value={fields.gender}
+            {/* Confirm Password */}
+            <InputField
+              id="confirmPassword"
+              name="confirmPassword"
+              label="Confirm Password"
+              type="password"
+              value={fields.confirmPassword}
               onChange={handleChange}
+              placeholder="Re-type password"
               disabled={loading}
               required
+            />
+
+            <hr className="border-gray-200 dark:border-gray-700" />
+
+            {/* Name, DOB, Sport, Gender */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <InputField id="name" name="name" label="Full Name" type="text" value={fields.name} onChange={handleChange} disabled={loading} required />
+              <InputField id="dob" name="dob" label="Date of Birth" type="date" value={fields.dob} onChange={handleChange} disabled={loading} required />
+              <InputField id="sport" name="sport" label="Sport" type="text" value={fields.sport} onChange={handleChange} disabled={loading} required />
+              <SelectField
+                id="gender"
+                name="gender"
+                label="Gender"
+                value={fields.gender}
+                onChange={handleChange}
+                disabled={loading}
+                required
+                options={[
+                  { value: "", label: "Select…" },
+                  { value: "male", label: "Male" },
+                  { value: "female", label: "Female" },
+                  { value: "other", label: "Other" },
+                ]}
+              />
+            </div>
+
+            {/* Contact Info */}
+            <InputField
+              id="contactInfo"
+              name="contactInfo"
+              label="Contact Info (Email or Phone)"
+              type="text"
+              value={fields.contactInfo}
+              onChange={handleChange}
+              placeholder="Email or phone number"
+              disabled={loading}
+              required
+            />
+
+            {/* Role */}
+            <SelectField
+              id="role"
+              name="role"
+              label="Role"
+              value={fields.role}
+              onChange={handleChange}
+              disabled={loading}
               options={[
-                { value: "", label: "Select…" },
-                { value: "male", label: "Male" },
-                { value: "female", label: "Female" },
-                { value: "other", label: "Other" },
+                { value: "athlete", label: "Athlete" },
+                { value: "coach", label: "Coach (Restricted)", disabled: true },
+                { value: "admin", label: "Admin (Restricted)", disabled: true },
               ]}
             />
-          </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Only Athletes can register directly. For Coach/Admin access, please contact the administrator.
+            </p>
 
-          {/* Contact Info */}
-          <InputField
-            id="contactInfo"
-            name="contactInfo"
-            label="Contact Info (Email or Phone)"
-            type="text"
-            value={fields.contactInfo}
-            onChange={handleChange}
-            placeholder="Email or phone number"
-            disabled={loading}
-            required
-          />
+            {/* Messages */}
+            {error && <Alert type="error" message={error} icon={<FaExclamationTriangle />} />}
+            {success && <Alert type="success" message="Registration successful! Redirecting to login…" icon={<FaCheckCircle />} />}
 
-          {/* Role */}
-          <SelectField
-            id="role"
-            name="role"
-            label="Role"
-            value={fields.role}
-            onChange={handleChange}
-            disabled={loading}
-            options={[
-              { value: "athlete", label: "Athlete" },
-              { value: "coach", label: "Coach (Restricted)", disabled: true },
-              { value: "admin", label: "Admin (Restricted)", disabled: true },
-            ]}
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            Only Athletes can register directly. For Coach/Admin access, please contact the administrator.
+            {/* Submit */}
+            <button
+              type="submit"
+              className="w-full flex items-center justify-center space-x-2 bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 transition-colors duration-200 disabled:bg-blue-400"
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <FaSpinner className="animate-spin" />
+                  <span>Registering...</span>
+                </>
+              ) : (
+                <>
+                  <FaUserPlus />
+                  <span>Register</span>
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Login Link */}
+          <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            Already have an account?{" "}
+            <Link to="/login" className="font-medium text-blue-600 hover:underline">
+              Sign in
+            </Link>
           </p>
-
-          {/* Messages */}
-          {error && <Alert type="error" message={error} icon={<FaExclamationTriangle />} />}
-          {success && <Alert type="success" message="Registration successful! Redirecting to login…" icon={<FaCheckCircle />} />}
-
-          {/* Submit */}
-          <button
-            type="submit"
-            className="w-full flex items-center justify-center space-x-2 bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 transition-colors duration-200 disabled:bg-blue-400"
-            disabled={loading}
-          >
-            {loading ? (
-              <>
-                <FaSpinner className="animate-spin" />
-                <span>Registering...</span>
-              </>
-            ) : (
-              <>
-                <FaUserPlus />
-                <span>Register</span>
-              </>
-            )}
-          </button>
-        </form>
-
-        {/* Login Link */}
-        <p className="mt-6 text-center text-sm text-gray-500">
-          Already have an account?{" "}
-          <Link to="/login" className="font-medium text-blue-600 hover:underline">
-            Sign in
-          </Link>
-        </p>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
@@ -242,6 +252,13 @@ try {
 Reusable Form Components
 --------------------------*/
 
+interface InputFieldProps {
+  id: string;
+  name: string;
+  label: string;
+  type: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInput
 interface InputFieldProps {
   id: string;
   name: string;
@@ -266,7 +283,7 @@ const InputField: React.FC<InputFieldProps> = ({ id, name, label, type, value, o
       placeholder={placeholder}
       required={required}
       disabled={disabled}
-      className="w-full px-4 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
+      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
     />
   </div>
 );
@@ -285,7 +302,15 @@ interface SelectFieldProps {
 const SelectField: React.FC<SelectFieldProps> = ({ id, name, label, value, onChange, disabled, required, options }) => (
   <div>
     <label htmlFor={id} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{label}</label>
-    <select id={id} name={name} value={value} onChange={onChange} disabled={disabled} required={required} className="w-full px-4 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50">
+    <select
+      id={id}
+      name={name}
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      required={required}
+      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+    >
       {options.map((opt) => (
         <option key={opt.value} value={opt.value} disabled={opt.disabled}>{opt.label}</option>
       ))}
@@ -300,7 +325,12 @@ interface AlertProps {
 }
 
 const Alert: React.FC<AlertProps> = ({ type, message, icon }) => (
-  <div className={`text-center text-sm ${type === "error" ? "text-red-500 bg-red-100" : "text-green-600 bg-green-100"} p-3 rounded-md flex items-center justify-center space-x-2`}>
+  <div
+    className={`text-center text-sm p-3 rounded-md flex items-center justify-center space-x-2 ${
+      type === "error" ? "text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900" : "text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900"
+    }`}
+    role="alert"
+  >
     {icon}
     <span>{message}</span>
   </div>
