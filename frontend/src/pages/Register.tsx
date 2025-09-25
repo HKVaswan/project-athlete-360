@@ -74,26 +74,27 @@ const Register: React.FC = () => {
       role: fields.role,
     };
 
-    try {
-      const response = await fetch(`${API_URL}/api/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(registrationData),
-      });
+    // inside handleSubmit
+try {
+  const response = await fetch(`${API_URL}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(registrationData),
+  });
 
-      const data = await response.json();
+  const data = await response.json();
 
-      if (response.ok) {
-        setSuccess(true);
-        setTimeout(() => navigate("/login"), 1800);
-      } else {
-        setError(data.message || "Registration failed. Please check your details and try again.");
-      }
-    } catch (err) {
-      setError("Network error. Could not connect to the registration server. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+  if (response.ok) {
+    setSuccess(true);
+    setTimeout(() => navigate("/login"), 1800);
+  } else {
+    setError(data.message || "Registration failed. Please check your details and try again.");
+  }
+} catch (err) {
+  setError("Network error. Could not connect to the registration server. Please try again.");
+} finally {
+  setLoading(false);
+}
   };
 
   return (
