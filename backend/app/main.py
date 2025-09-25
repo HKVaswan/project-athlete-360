@@ -1,7 +1,10 @@
-# app/main.py
+# backend/app/main.py
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+# Import database
+from app.db import Base, engine
 
 # Import routers
 from app.routers import (
@@ -14,6 +17,12 @@ from app.routers import (
     assessments,
     injuries
 )
+
+# ---------------------------
+# Create database tables
+# ---------------------------
+# This will create all tables from models.py if they don't exist
+Base.metadata.create_all(bind=engine)
 
 # ---------------------------
 # FastAPI app initialization
