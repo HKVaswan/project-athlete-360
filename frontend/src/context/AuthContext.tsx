@@ -26,8 +26,16 @@ interface AuthContextType {
   logout: () => void;
   isAuthenticated: boolean;
   checkAuth: () => Promise<boolean>;
-  loginUser: (email: string, password: string) => Promise<boolean>;
-  registerUser: (email: string, password: string) => Promise<boolean>;
+  loginUser: (username: string, password: string) => Promise<boolean>;
+  registerUser: (
+    username: string,
+    password: string,
+    name: string,
+    dob: string,
+    sport: string,
+    gender: string,
+    contact_info: string
+  ) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -98,7 +106,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const data = await response.json();
       console.log('✅ Auth API response:', data);
 
-      const apiUser: UserInfo = data.user || parsedUser;
+      const apiUser: UserInfo = data.data || parsedUser;
 
       if (!checkTokenExpiry(apiUser.exp)) return false;
 
@@ -143,18 +151,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // ✅ New: loginUser helper
-  const loginUser = async (email: string, password: string): Promise<boolean> => {
+  // ✅ Login User
+  const loginUser = async (username: string, password: string): Promise<boolean> => {
     try {
-      const response = await fetch(`${API_URL}/api/auth/login`, {
+      const response = await fetch(`${API_URL}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ username, password }),
       });
       if (!response.ok) throw new Error('Invalid credentials');
       const data = await response.json();
-      const dummyUser: UserInfo = { id: 0, username: email, role: 'athlete', exp: Date.now() / 1000 + 3600 }; // adjust as needed
-      login(data.access_token, dummyUser);
+
+      if (!data.success) throw new Error(data.message);
+
+      const token = data.data.token;
+      const role = data.data.role || 'athlete';
+
+      const dummyUser: UserInfo = {
+        id: 0,
+        username,
+        role,
+        exp: Date.now() / 1000 + 3600,
+      };
+
+      login(token, dummyUser);
       return true;
     } catch (err) {
       console.error('❌ Login failed:', err);
@@ -163,22 +183,50 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // ✅ New: registerUser helper
-  const registerUser = async (email: string, password: string): Promise<boolean> => {
+  // ✅ Register User
+  const registerUser = async (
+    username: string,
+    password: string,
+    name: string,
+    dob: string,
+    sport: string,
+    gender: string,
+    contact_info: string
+  ): Promise<boolean> => {
     try {
-      const response = await fetch(`${API_URL}/api/auth/register`, {
+      const response = await fetch(`${API_URL}/api/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({
+          username,
+          password,
+          name,
+          dob,
+          sport,
+          gender,
+          contact_info,
+        }),
       });
       if (!response.ok) throw new Error('Registration failed');
       const data = await response.json();
-      const dummyUser: UserInfo = { id: 0, username: email, role: 'athlete', exp: Date.now() / 1000 + 3600 };
-      login(data.access_token, dummyUser);
+
+      if (!data.success) throw new Error(data.message);
+
+      const role = data.data.user.role || 'athlete';
+      const dummyUser: UserInfo = {
+        id: 0,
+        username,
+        role,
+        exp: Date.now() / 1000 + 3600,
+      };
+
+      const token = data.data.token || '';
+      if (token) login(token, dummyUser);
+
       return true;
     } catch (err) {
       console.error('❌ Registration failed:', err);
-      setAuthError('Registration failed. Email may already exist.');
+      setAuthError('Registration failed. Please check your details.');
       return false;
     }
   };
