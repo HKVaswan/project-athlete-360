@@ -1,11 +1,13 @@
 // src/pages/Register.tsx
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
   FaUserPlus,
   FaSpinner,
   FaCheckCircle,
   FaExclamationTriangle,
+  FaEye,
+  FaEyeSlash,
 } from "react-icons/fa";
 import SEO from "../components/SEO";
 
@@ -28,9 +30,15 @@ const phoneRegex = /^\+?\d{10,15}$/;
 
 const Register: React.FC = () => {
   const [fields, setFields] = useState(initialFields);
+  const [showPassword, setShowPassword] = useState(false);
+  const [capsLock, setCapsLock] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  const usernameRef = useRef<HTMLInputElement>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
+
   const navigate = useNavigate();
 
   const validateForm = () => {
@@ -52,6 +60,10 @@ const Register: React.FC = () => {
     setFields({ ...fields, [e.target.name]: e.target.value });
   };
 
+  const handleCapsLock = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    setCapsLock(e.getModifierState("CapsLock"));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -60,6 +72,7 @@ const Register: React.FC = () => {
     const validationError = validateForm();
     if (validationError) {
       setError(validationError);
+      usernameRef.current?.focus();
       return;
     }
 
@@ -129,19 +142,41 @@ const Register: React.FC = () => {
                 placeholder="Choose a username"
                 disabled={loading}
                 required
+                ref={usernameRef}
               />
-              <InputField
-                id="password"
-                name="password"
-                label="Password"
-                type="password"
-                value={fields.password}
-                onChange={handleChange}
-                placeholder="Minimum 6 characters"
-                disabled={loading}
-                required
-              />
+
+              <div className="relative">
+                <InputField
+                  id="password"
+                  name="password"
+                  label="Password"
+                  type={showPassword ? "text" : "password"}
+                  value={fields.password}
+                  onChange={handleChange}
+                  onKeyUp={handleCapsLock}
+                  placeholder="Minimum 6 characters"
+                  disabled={loading}
+                  required
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-9 text-gray-600 dark:text-gray-300"
+                  onClick={() => setShowPassword((show) => !show)}
+                  tabIndex={-1}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <FaEyeSlash /> : <FaEye />}
+                </button>
+              </div>
             </div>
+
+            {/* Caps Lock Warning */}
+            {capsLock && (
+              <div className="text-yellow-600 bg-yellow-100 dark:bg-yellow-900 p-2 rounded-md text-sm flex items-center gap-2">
+                <FaExclamationTriangle />
+                <span>Caps Lock is on</span>
+              </div>
+            )}
 
             {/* Confirm Password */}
             <InputField
@@ -258,35 +293,31 @@ interface InputFieldProps {
   label: string;
   type: string;
   value: string;
-  onChange: (e: React.ChangeEvent<HTMLInput
-interface InputFieldProps {
-  id: string;
-  name: string;
-  label: string;
-  type: string;
-  value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   disabled?: boolean;
   required?: boolean;
   placeholder?: string;
+  ref?: React.Ref<HTMLInputElement>;
 }
 
-const InputField: React.FC<InputFieldProps> = ({ id, name, label, type, value, onChange, disabled, required, placeholder }) => (
-  <div>
-    <label htmlFor={id} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{label}</label>
-    <input
-      id={id}
-      name={name}
-      type={type}
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-      required={required}
-      disabled={disabled}
-      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-    />
+const InputField = React.forwardRef<HTMLInputElement, InputFieldProps>(
+  ({ id, name, label, type, value, onChange, disabled, required, placeholder }, ref) => (
+    <div>
+      <label htmlFor={id} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{label}</label>
+      <input
+        id={id}
+        name={name}
+        type={type}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        required={required}
+        disabled={disabled}
+        ref={ref}
+        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+/>
   </div>
-);
+));
 
 interface SelectFieldProps {
   id: string;
@@ -312,7 +343,9 @@ const SelectField: React.FC<SelectFieldProps> = ({ id, name, label, value, onCha
       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
     >
       {options.map((opt) => (
-        <option key={opt.value} value={opt.value} disabled={opt.disabled}>{opt.label}</option>
+        <option key={opt.value} value={opt.value} disabled={opt.disabled}>
+          {opt.label}
+        </option>
       ))}
     </select>
   </div>
@@ -327,7 +360,9 @@ interface AlertProps {
 const Alert: React.FC<AlertProps> = ({ type, message, icon }) => (
   <div
     className={`text-center text-sm p-3 rounded-md flex items-center justify-center space-x-2 ${
-      type === "error" ? "text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900" : "text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900"
+      type === "error"
+        ? "text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900"
+        : "text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900"
     }`}
     role="alert"
   >
