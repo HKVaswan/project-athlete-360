@@ -12,7 +12,6 @@ import {
 } from "react-icons/fa";
 import SEO from "../components/SEO";
 
-// ✅ Correct Vite environment variable usage
 const API_URL = (import.meta.env.VITE_API_URL || "https://project-athlete-360.onrender.com").replace(/\/+$/, "");
 
 const MIN_USERNAME_LENGTH = 3;
@@ -59,6 +58,7 @@ const Login: React.FC = () => {
     }
 
     try {
+      // Step 1: Login to get token
       const response = await fetch(`${API_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -72,40 +72,40 @@ const Login: React.FC = () => {
       }
 
       const data = await response.json();
+      if (!data.access_token) {
+        setError("Login failed. Invalid server response.");
+        setLoading(false);
+        return;
+      }
 
-if (!data.access_token) {
-  setError("Login failed. Invalid server response.");
-  setLoading(false);
-  return;
-}
+      // Step 2: Fetch user info
+      const meResponse = await fetch(`${API_URL}/api/me`, {
+        headers: { Authorization: `Bearer ${data.access_token}` },
+      });
+      const meData = await meResponse.json();
 
-// 🔑 Get user from /api/me using the token
-const meResponse = await fetch(`${API_URL}/api/me`, {
-  headers: { Authorization: `Bearer ${data.access_token}` },
-});
-const meData = await meResponse.json();
+      if (!meResponse.ok || !meData.user) {
+        setError("Login failed. Could not fetch user info.");
+        setLoading(false);
+        return;
+      }
 
-if (!meResponse.ok || !meData.user) {
-  setError("Login failed. Could not fetch user info.");
-  setLoading(false);
-  return;
-}
+      // Step 3: Store token & user in context
+      login?.(data.access_token, meData.user);
 
-// ✅ Pass both token and user info
-login?.(data.access_token, meData.user);
-
-      // ✅ Determine dynamic redirect based on user role
+      // Step 4: Redirect based on role
       const dashboardRoute = (() => {
-        switch (data.user.role) {
-          case 'admin': return '/admin-dashboard';
-          case 'coach': return '/coach-dashboard';
-          case 'athlete': return '/athlete-dashboard';
-          default: return '/login';
+        switch (meData.user.role) {
+          case "admin": return "/admin-dashboard";
+          case "coach": return "/coach-dashboard";
+          case "athlete": return "/athlete-dashboard";
+          default: return "/login";
         }
       })();
 
       setSuccess(true);
       setTimeout(() => navigate(dashboardRoute), 1200);
+
     } catch (err) {
       console.error(err);
       setError("Network error. Please try again later.");
@@ -141,7 +141,6 @@ login?.(data.access_token, meData.user);
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6" autoComplete="off" noValidate>
-            {/* Username */}
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Username
@@ -160,7 +159,6 @@ login?.(data.access_token, meData.user);
               />
             </div>
 
-            {/* Password */}
             <div className="relative">
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Password
@@ -187,7 +185,6 @@ login?.(data.access_token, meData.user);
               </button>
             </div>
 
-            {/* Caps Lock Warning */}
             {capsLock && (
               <div className="text-yellow-600 bg-yellow-100 dark:bg-yellow-900 p-2 rounded-md text-sm flex items-center gap-2">
                 <FaExclamationTriangle />
@@ -195,7 +192,6 @@ login?.(data.access_token, meData.user);
               </div>
             )}
 
-            {/* Error */}
             {error && (
               <div
                 ref={errorRef}
@@ -208,7 +204,6 @@ login?.(data.access_token, meData.user);
               </div>
             )}
 
-            {/* Success */}
             {success && (
               <div className="text-center text-green-600 bg-green-100 dark:bg-green-900 p-3 rounded-md flex items-center justify-center gap-2">
                 <FaCheckCircle />
@@ -216,7 +211,6 @@ login?.(data.access_token, meData.user);
               </div>
             )}
 
-            {/* Submit Button */}
             <button
               type="submit"
               className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 transition-colors duration-200 disabled:bg-blue-400 disabled:cursor-not-allowed"
@@ -236,7 +230,6 @@ login?.(data.access_token, meData.user);
             </button>
           </form>
 
-          {/* Footer */}
           <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
             Don&apos;t have an account?{" "}
             <Link
