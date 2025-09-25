@@ -73,14 +73,26 @@ const Login: React.FC = () => {
 
       const data = await response.json();
 
-      if (!data.access_token || !data.user) {
-        setError("Login failed. Invalid server response.");
-        setLoading(false);
-        return;
-      }
+if (!data.access_token) {
+  setError("Login failed. Invalid server response.");
+  setLoading(false);
+  return;
+}
 
-      // ✅ Pass both token and user info
-      login?.(data.access_token, data.user);
+// 🔑 Get user from /api/me using the token
+const meResponse = await fetch(`${API_URL}/api/me`, {
+  headers: { Authorization: `Bearer ${data.access_token}` },
+});
+const meData = await meResponse.json();
+
+if (!meResponse.ok || !meData.user) {
+  setError("Login failed. Could not fetch user info.");
+  setLoading(false);
+  return;
+}
+
+// ✅ Pass both token and user info
+login?.(data.access_token, meData.user);
 
       // ✅ Determine dynamic redirect based on user role
       const dashboardRoute = (() => {
