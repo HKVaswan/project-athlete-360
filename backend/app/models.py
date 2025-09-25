@@ -43,10 +43,9 @@ class AppUser(Base):
     __tablename__ = "app_user"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     institution_id = Column(UUID(as_uuid=True), ForeignKey("institution.id"))
-    email = Column(String, unique=True, nullable=False)
+    contact_info = Column(String, unique=True, nullable=False)  # Updated field
     full_name = Column(String, nullable=False)
     role_id = Column(UUID(as_uuid=True), ForeignKey("user_role.id"))
-    phone = Column(String)
     password = Column(String)
     is_active = Column(Boolean, default=True)
     settings = Column(JSON)
