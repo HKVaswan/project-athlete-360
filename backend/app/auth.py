@@ -1,4 +1,4 @@
-# app/auth.py
+# backend/app/auth.py
 
 import os
 from dotenv import load_dotenv
@@ -7,20 +7,29 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from app import db, models, schemas
-from passlib.context import CryptContext
-from typing import List
+from typing import List, Optional
+from uuid import UUID
 
+from app import db, models
+from passlib.context import CryptContext
+from pydantic import BaseModel, EmailStr
+
+# -----------------------------
 # Load environment variables
+# -----------------------------
 load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
+# -----------------------------
 # OAuth2 scheme
+# -----------------------------
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
+# -----------------------------
 # Password hashing context
+# -----------------------------
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # -----------------------------
@@ -78,7 +87,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 # -----------------------------
 def require_role(allowed_roles: List[str]):
     def wrapper(current_user: models.AppUser = Depends(get_current_user)):
-        user_role = current_user.role.role_name if current_user.role else None
+        user_role = current_user.role.name if current_user.role else None
         if user_role not in allowed_roles:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: Insufficient role")
         return current_user
@@ -89,9 +98,9 @@ def require_role(allowed_roles: List[str]):
 # -----------------------------
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
+# -----------------------------
 # Pydantic models for request/response
-from pydantic import BaseModel, EmailStr
-
+# -----------------------------
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
@@ -99,6 +108,9 @@ class LoginRequest(BaseModel):
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
+    full_name: str
+    role_id: Optional[UUID] = None
+    institution_id: Optional[UUID] = None
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -120,9 +132,25 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     existing_user = db.query(models.AppUser).filter(models.AppUser.email == payload.email).first()
     if existing_user:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User already exists")
-    
+
     hashed_pw = hash_password(payload.password)
-    new_user = models.AppUser(email=payload.email, password=hashed_pw)
+
+    # If role_id not provided, assign default role "Athlete"
+    if not payload.role_id:
+        default_role = db.query(models.UserRole).filter(models.UserRole.code == "ATHLETE").first()
+        if not default_role:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Default role not found")
+        role_id = default_role.id
+    else:
+        role_id = payload.role_id
+
+    new_user = models.AppUser(
+        email=payload.email,
+        password=hashed_pw,
+        full_name=payload.full_name,
+        role_id=role_id,
+        institution_id=payload.institution_id
+    )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
