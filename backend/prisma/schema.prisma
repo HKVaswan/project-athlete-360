@@ -8,18 +8,18 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  username     String   @unique
-  email        String?  @unique
+  id           String          @id @default(uuid())
+  username     String          @unique
+  email        String?         @unique
   passwordHash String
   name         String?
-  role         Role     @default(athlete)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  athlete      Athlete? @relation(fields: [athleteId], references: [id])
-  athleteId    String?
+  role         Role            @default(athlete)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
   settings     Json?
   tokens       RefreshToken[]
+  // ✅ Relation: User ↔ Athlete (no fields/references here)
+  athlete      Athlete?        @relation("UserAthlete")
 }
 
 model RefreshToken {
@@ -33,84 +33,91 @@ model RefreshToken {
 }
 
 model Athlete {
-  id           String    @id @default(uuid())
-  userId       String?   @unique
-  user         User?     @relation(fields: [userId], references: [id])
-  athleteId    String?   @unique
+  id           String          @id @default(uuid())
+  userId       String?         @unique
+  // ✅ Relation: Athlete ↔ User (this side defines the fields)
+  user         User?           @relation("UserAthlete", fields: [userId], references: [id])
+  athleteCode  String?         @unique
   name         String
   dob          DateTime?
   sport        String?
   gender       String?
   contactInfo  String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  sessions     Session[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  // ✅ Back-relations
+  sessions     Session[]       @relation("AthleteSessions")
   assessments  Assessment[]
   injuries     Injury[]
   performances Performance[]
+  attendance   Attendance[]
 }
 
 model Session {
-  id           String   @id @default(uuid())
-  name         String
-  coachId      String?
-  date         DateTime
-  duration     Int?
-  notes        String?
+  id            String          @id @default(uuid())
+  name          String
+  coachId       String?
+  date          DateTime
+  duration      Int?
+  notes         String?
   institutionId String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  attendance   Attendance[]
-  assessments  Assessment[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  // ✅ Back-relations
+  assessments   Assessment[]
+  attendance    Attendance[]
+  athletes      Athlete[]       @relation("AthleteSessions")
 }
 
 model Assessment {
-  id           String   @id @default(uuid())
-  athleteId    String
-  athlete      Athlete  @relation(fields: [athleteId], references: [id])
-  sessionId    String?
-  session      Session? @relation(fields: [sessionId], references: [id])
+  id            String    @id @default(uuid())
+  athleteId     String
+  athlete       Athlete   @relation(fields: [athleteId], references: [id])
+  sessionId     String?
+  session       Session?  @relation(fields: [sessionId], references: [id])
   institutionId String?
-  metric       String
-  valueText    String?
-  valueNumber  Float?
-  notes        String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  metric        String
+  valueText     String?
+  valueNumber   Float?
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
 model Performance {
-  id             String   @id @default(uuid())
+  id             String    @id @default(uuid())
   athleteId      String
-  athlete        Athlete  @relation(fields: [athleteId], references: [id])
+  athlete        Athlete   @relation(fields: [athleteId], references: [id])
   assessmentType String
   score          Float
   date           DateTime
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }
 
 model Injury {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   athleteId   String
-  athlete     Athlete  @relation(fields: [athleteId], references: [id])
+  athlete     Athlete   @relation(fields: [athleteId], references: [id])
   description String
   date        DateTime
   severity    Severity
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 model Attendance {
-  id        String   @id @default(uuid())
-  sessionId String
-  session   Session  @relation(fields: [sessionId], references: [id])
-  athleteId String
-  athlete   Athlete  @relation(fields: [athleteId], references: [id])
-  status    AttendanceStatus
-  remarks   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String            @id @default(uuid())
+  sessionId  String
+  session    Session           @relation(fields: [sessionId], references: [id])
+  athleteId  String
+  athlete    Athlete           @relation(fields: [athleteId], references: [id])
+  status     AttendanceStatus
+  remarks    String?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
 
   @@unique([sessionId, athleteId])
 }
