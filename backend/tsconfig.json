@@ -13,8 +13,8 @@
     "noImplicitAny": false,
     "moduleResolution": "node",
     "sourceMap": true,
-    "types": ["node", "jest"]
+    "types": ["node"]
   },
-  "include": ["src/**/*", "prisma/**/*"],
+  "include": ["src/**/*", "prisma/seed.ts"],
   "exclude": ["node_modules", "dist"]
 }
