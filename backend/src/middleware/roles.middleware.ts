@@ -1,9 +1,18 @@
 import { Request, Response, NextFunction } from "express";
+import { AuthRequest } from "../types";
 
-export function requireRole(...allowedRoles: string[]) {
-  return (req: Request & { user?: any }, res: Response, next: NextFunction) => {
-    const role = req.user?.role;
-    if (!role || !allowedRoles.includes(role)) return res.status(403).json({ message: "Access denied. Insufficient permissions." });
+export const requireRole = (roles: string | string[]) => {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const allowedRoles = Array.isArray(roles) ? roles : [roles];
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ message: "Forbidden: insufficient role" });
+    }
+
     next();
   };
-}
+};
+
