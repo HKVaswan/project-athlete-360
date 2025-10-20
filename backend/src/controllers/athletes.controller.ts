@@ -1,8 +1,9 @@
-// src/controllers/athletes.controller.ts
 import { Request, Response } from "express";
 import prisma from "../prismaClient";
 import logger from "../logger";
 
+// ───────────────────────────────
+// Get all athletes
 export const getAthletes = async (_req: Request, res: Response) => {
   try {
     const athletes = await prisma.athlete.findMany({
@@ -16,14 +17,19 @@ export const getAthletes = async (_req: Request, res: Response) => {
   }
 };
 
+// ───────────────────────────────
+// Get athlete by ID
 export const getAthleteById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const athlete = await prisma.athlete.findUnique({
       where: { id },
       include: {
-        training_sessions: true,
-        performance_metrics: true,
+        sessions: true, // ✅ updated
+        performances: true, // ✅ updated
+        assessments: true,
+        injuries: true,
+        attendance: true,
       },
     });
     if (!athlete) return res.status(404).json({ success: false, message: "Athlete not found" });
@@ -34,11 +40,13 @@ export const getAthleteById = async (req: Request, res: Response) => {
   }
 };
 
+// ───────────────────────────────
+// Create athlete
 export const createAthlete = async (req: Request, res: Response) => {
   try {
-    const { name, sport, dob, gender, contact_info, athleteId } = req.body;
+    const { name, sport, dob, gender, contactInfo } = req.body; // ✅ fixed field names
     const newAthlete = await prisma.athlete.create({
-      data: { name, sport, dob, gender, contact_info, athleteId },
+      data: { name, sport, dob, gender, contactInfo },
     });
     res.status(201).json({ success: true, data: newAthlete });
   } catch (err) {
@@ -47,6 +55,8 @@ export const createAthlete = async (req: Request, res: Response) => {
   }
 };
 
+// ───────────────────────────────
+// Update athlete
 export const updateAthlete = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -58,6 +68,8 @@ export const updateAthlete = async (req: Request, res: Response) => {
   }
 };
 
+// ───────────────────────────────
+// Delete athlete
 export const deleteAthlete = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -69,30 +81,45 @@ export const deleteAthlete = async (req: Request, res: Response) => {
   }
 };
 
+// ───────────────────────────────
+// Add session to athlete
 export const addTrainingSession = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { session_date, notes } = req.body;
-    const session = await prisma.trainingSession.create({
-      data: { athleteId: id, session_date, notes },
+    const { name, date, duration, notes } = req.body;
+    const session = await prisma.session.create({
+      data: {
+        name,
+        date,
+        duration,
+        notes,
+        athletes: { connect: { id } },
+      },
     });
     res.status(201).json({ success: true, data: session });
   } catch (err) {
-    logger.error("Failed to add training session: " + err);
+    logger.error("Failed to add session: " + err);
     res.status(400).json({ success: false, message: "Failed to add session" });
   }
 };
 
+// ───────────────────────────────
+// Add performance record
 export const addPerformanceMetric = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { metric_name, metric_value, notes } = req.body;
-    const metric = await prisma.performanceMetric.create({
-      data: { athleteId: id, metric_name, metric_value: parseFloat(metric_value), notes },
+    const { assessmentType, score } = req.body;
+    const metric = await prisma.performance.create({
+      data: {
+        athleteId: id,
+        assessmentType,
+        score: parseFloat(score),
+        date: new Date(),
+      },
     });
     res.status(201).json({ success: true, data: metric });
   } catch (err) {
-    logger.error("Failed to add performance metric: " + err);
-    res.status(400).json({ success: false, message: "Failed to add metric" });
+    logger.error("Failed to add performance record: " + err);
+    res.status(400).json({ success: false, message: "Failed to add performance record" });
   }
 };
