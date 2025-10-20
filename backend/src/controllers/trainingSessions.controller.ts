@@ -9,7 +9,7 @@ const prisma = new PrismaClient();
 // Get all training sessions
 export async function getTrainingSessions(_req: Request, res: Response) {
   try {
-    const sessions = await prisma.trainingSession.findMany({
+    const sessions = await prisma.session.findMany({
       include: {
         coach: { select: { name: true, email: true } },
         athletes: { select: { id: true, name: true, sport: true } },
@@ -29,7 +29,7 @@ export async function getTrainingSessions(_req: Request, res: Response) {
 export async function getTrainingSessionById(req: Request, res: Response) {
   try {
     const { id } = req.params;
-    const session = await prisma.trainingSession.findUnique({
+    const session = await prisma.session.findUnique({
       where: { id },
       include: {
         coach: true,
@@ -65,7 +65,7 @@ export async function createTrainingSession(req: Request, res: Response) {
 export async function updateTrainingSession(req: Request, res: Response) {
   try {
     const { id } = req.params;
-    const updated = await prisma.trainingSession.update({
+    const updated = await prisma.session.update({
       where: { id },
       data: req.body,
     });
@@ -81,7 +81,7 @@ export async function updateTrainingSession(req: Request, res: Response) {
 export async function deleteTrainingSession(req: Request, res: Response) {
   try {
     const { id } = req.params;
-    await prisma.trainingSession.delete({ where: { id } });
+    await prisma.session.delete({ where: { id } });
     res.json({ success: true, message: "Training session deleted" });
   } catch (err) {
     logger.error("Failed to delete training session: " + err);
@@ -95,7 +95,7 @@ export async function addAthleteToTrainingSession(req: Request, res: Response) {
   try {
     const { id } = req.params;
     const { athleteId } = req.body;
-    const updated = await prisma.trainingSession.update({
+    const updated = await prisma.session.update({
       where: { id },
       data: {
         athletes: { connect: { id: athleteId } },
