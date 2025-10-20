@@ -1,43 +1,49 @@
 import { Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
+import prisma from "../prismaClient";
 import logger from "../logger";
 
-const prisma = new PrismaClient();
-
+// ───────────────────────────────
 // Get all sessions
-export async function getTrainingSessions(_req: Request, res: Response) {
+export const getTrainingSessions = async (_req: Request, res: Response) => {
   try {
     const sessions = await prisma.session.findMany({
       include: {
         athletes: { select: { id: true, name: true, sport: true } },
+        coach: { select: { id: true, name: true } }, // ✅ added optional coach details
       },
       orderBy: { date: "desc" },
     });
     res.json({ success: true, data: sessions });
   } catch (err) {
     logger.error("Failed to fetch training sessions: " + err);
-    res.status(500).json({ message: "Failed to fetch training sessions" });
+    res.status(500).json({ success: false, message: "Failed to fetch training sessions" });
   }
-}
+};
 
+// ───────────────────────────────
 // Get specific session
-export async function getTrainingSessionById(req: Request, res: Response) {
+export const getTrainingSessionById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const session = await prisma.session.findUnique({
       where: { id },
-      include: { athletes: true },
+      include: {
+        athletes: true,
+        coach: true,
+        feedbacks: true, // ✅ added to match schema
+      },
     });
-    if (!session) return res.status(404).json({ message: "Session not found" });
+    if (!session) return res.status(404).json({ success: false, message: "Session not found" });
     res.json({ success: true, data: session });
   } catch (err) {
     logger.error("Error fetching training session: " + err);
-    res.status(500).json({ message: "Error fetching training session" });
+    res.status(500).json({ success: false, message: "Error fetching training session" });
   }
-}
+};
 
+// ───────────────────────────────
 // Create session
-export async function createTrainingSession(req: Request, res: Response) {
+export const createTrainingSession = async (req: Request, res: Response) => {
   try {
     const { name, coachId, date, duration, notes } = req.body;
     const session = await prisma.session.create({
@@ -46,12 +52,13 @@ export async function createTrainingSession(req: Request, res: Response) {
     res.status(201).json({ success: true, data: session });
   } catch (err) {
     logger.error("Failed to create session: " + err);
-    res.status(400).json({ message: "Failed to create session" });
+    res.status(400).json({ success: false, message: "Failed to create session" });
   }
-}
+};
 
+// ───────────────────────────────
 // Update session
-export async function updateTrainingSession(req: Request, res: Response) {
+export const updateTrainingSession = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const updated = await prisma.session.update({
@@ -61,24 +68,26 @@ export async function updateTrainingSession(req: Request, res: Response) {
     res.json({ success: true, data: updated });
   } catch (err) {
     logger.error("Failed to update session: " + err);
-    res.status(400).json({ message: "Failed to update session" });
+    res.status(400).json({ success: false, message: "Failed to update session" });
   }
-}
+};
 
+// ───────────────────────────────
 // Delete session
-export async function deleteTrainingSession(req: Request, res: Response) {
+export const deleteTrainingSession = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     await prisma.session.delete({ where: { id } });
     res.json({ success: true, message: "Session deleted" });
   } catch (err) {
     logger.error("Failed to delete session: " + err);
-    res.status(400).json({ message: "Failed to delete session" });
+    res.status(400).json({ success: false, message: "Failed to delete session" });
   }
-}
+};
 
+// ───────────────────────────────
 // Add athlete to session
-export async function addAthleteToTrainingSession(req: Request, res: Response) {
+export const addAthleteToTrainingSession = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { athleteId } = req.body;
@@ -91,6 +100,27 @@ export async function addAthleteToTrainingSession(req: Request, res: Response) {
     res.json({ success: true, data: updated });
   } catch (err) {
     logger.error("Failed to add athlete: " + err);
-    res.status(400).json({ message: "Failed to add athlete" });
+    res.status(400).json({ success: false, message: "Failed to add athlete" });
   }
-}
+};
+
+// ───────────────────────────────
+// Add feedback to session (NEW ✅)
+export const addFeedbackToTrainingSession = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { coachId, comment, rating } = req.body;
+    const feedback = await prisma.trainingFeedback.create({
+      data: {
+        sessionId: id,
+        coachId,
+        comment,
+        rating,
+      },
+    });
+    res.status(201).json({ success: true, data: feedback });
+  } catch (err) {
+    logger.error("Failed to add feedback: " + err);
+    res.status(400).json({ success: false, message: "Failed to add feedback" });
+  }
+};
