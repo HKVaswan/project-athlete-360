@@ -3,7 +3,7 @@ import prisma from "../prismaClient";
 import logger from "../logger";
 
 export const getPerformanceData = async (athleteId: string) => {
-  return await prisma.performanceMetric.findMany({
+  return await prisma.performance.findMany({
     where: { athleteId },
     orderBy: { date: "asc" },
   });
@@ -11,7 +11,7 @@ export const getPerformanceData = async (athleteId: string) => {
 
 export const getPerformanceSummary = async (athleteId: string) => {
   try {
-    const records = await prisma.performanceMetric.findMany({ where: { athleteId } });
+    const records = await prisma.performance.findMany({ where: { athleteId } });
     if (!records.length) return { averageScore: 0, bestScore: 0, trend: "stable" };
 
     const scores = records.map(r => r.metric_value);
