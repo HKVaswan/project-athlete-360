@@ -1,6 +1,16 @@
+// src/middleware/roles.middleware.ts
 import { Request, Response, NextFunction } from "express";
-import { AuthRequest } from "../types";
 
+// ✅ Define AuthRequest type inline (no need for external import)
+interface AuthRequest extends Request {
+  user?: {
+    id?: string;
+    role?: string;
+    [key: string]: any;
+  };
+}
+
+// ✅ Role-based access middleware
 export const requireRole = (roles: string | string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
@@ -15,4 +25,3 @@ export const requireRole = (roles: string | string[]) => {
     next();
   };
 };
-
