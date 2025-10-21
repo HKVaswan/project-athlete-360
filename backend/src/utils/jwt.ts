@@ -1,17 +1,18 @@
 // src/utils/jwt.ts
-import jwt, { Secret, JwtPayload } from "jsonwebtoken";
+import jwt, { Secret, JwtPayload, SignOptions } from "jsonwebtoken";
 import logger from "../logger";
 
-// Use strict Secret type and fallback for safety
-const JWT_SECRET = process.env.JWT_SECRET as Secret;
-const REFRESH_SECRET = process.env.REFRESH_TOKEN_SECRET as Secret;
+const JWT_SECRET: Secret = process.env.JWT_SECRET || "default_secret";
+const REFRESH_SECRET: Secret = process.env.REFRESH_TOKEN_SECRET || "default_refresh_secret";
 
 // ───────────────────────────────
 // Generate Access Token
 export function generateAccessToken(payload: Record<string, any>): string {
   try {
-    const expiresIn = process.env.JWT_EXPIRES_IN || "1h";
-    return jwt.sign(payload, JWT_SECRET, { expiresIn });
+    const options: SignOptions = {
+      expiresIn: (process.env.JWT_EXPIRES_IN as string) || "1h",
+    };
+    return jwt.sign(payload, JWT_SECRET, options);
   } catch (err) {
     logger.error("Error generating access token: " + err);
     throw new Error("Token generation failed");
@@ -22,7 +23,8 @@ export function generateAccessToken(payload: Record<string, any>): string {
 // Generate Refresh Token
 export function generateRefreshToken(payload: Record<string, any>): string {
   try {
-    return jwt.sign(payload, REFRESH_SECRET, { expiresIn: "7d" });
+    const options: SignOptions = { expiresIn: "7d" };
+    return jwt.sign(payload, REFRESH_SECRET, options);
   } catch (err) {
     logger.error("Error generating refresh token: " + err);
     throw new Error("Refresh token generation failed");
