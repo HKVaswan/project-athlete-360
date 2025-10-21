@@ -1,16 +1,19 @@
-// src/middleware/roles.middleware.ts
 import { Request, Response, NextFunction } from "express";
 
-// ✅ Define AuthRequest type inline (no need for external import)
-interface AuthRequest extends Request {
-  user?: {
-    id?: string;
-    role?: string;
-    [key: string]: any;
-  };
+// ✅ Define a compatible type for user payload
+interface AuthenticatedUser {
+  id: string;
+  role: string;
+  username?: string;
+  [key: string]: any;
 }
 
-// ✅ Role-based access middleware
+// ✅ Extend Express Request safely
+export interface AuthRequest extends Request {
+  user?: AuthenticatedUser;
+}
+
+// ✅ Role-based access control middleware
 export const requireRole = (roles: string | string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
@@ -18,7 +21,10 @@ export const requireRole = (roles: string | string[]) => {
     }
 
     const allowedRoles = Array.isArray(roles) ? roles : [roles];
-    if (!allowedRoles.includes(req.user.role)) {
+    const userRole = req.user.role;
+
+    // ✅ Ensure role exists before checking
+    if (!userRole || !allowedRoles.includes(userRole)) {
       return res.status(403).json({ message: "Forbidden: insufficient role" });
     }
 
