@@ -30,9 +30,9 @@ export const register = async (req: Request, res: Response) => {
       },
     });
 
-    // ✅ Use plain string fallback for safety
+    // ✅ Fix: Proper jwt.StringValue casting for expiresIn
     const secret = process.env.JWT_SECRET || "default_secret";
-    const expiresIn: string | number = process.env.JWT_EXPIRES_IN || "1h";
+    const expiresIn = (process.env.JWT_EXPIRES_IN || "1h") as jwt.StringValue;
 
     const token = jwt.sign({ sub: user.id, role: user.role }, secret, {
       expiresIn,
@@ -68,9 +68,9 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    // ✅ Same fix here
+    // ✅ Same fix here for jwt type safety
     const secret = process.env.JWT_SECRET || "default_secret";
-    const expiresIn: string | number = process.env.JWT_EXPIRES_IN || "1h";
+    const expiresIn = (process.env.JWT_EXPIRES_IN || "1h") as jwt.StringValue;
 
     const token = jwt.sign({ sub: user.id, role: user.role }, secret, {
       expiresIn,
