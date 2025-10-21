@@ -1,3 +1,4 @@
+// src/controllers/trainingSessions.controller.ts
 import { Request, Response } from "express";
 import prisma from "../prismaClient";
 import logger from "../logger";
@@ -9,7 +10,6 @@ export const getTrainingSessions = async (_req: Request, res: Response) => {
     const sessions = await prisma.session.findMany({
       include: {
         athletes: { select: { id: true, name: true, sport: true } },
-        coach: { select: { id: true, name: true } }, // ✅ added optional coach details
       },
       orderBy: { date: "desc" },
     });
@@ -28,9 +28,9 @@ export const getTrainingSessionById = async (req: Request, res: Response) => {
     const session = await prisma.session.findUnique({
       where: { id },
       include: {
-        athletes: true,
-        coach: true,
-        feedbacks: true, // ✅ added to match schema
+        athletes: { select: { id: true, name: true, sport: true } },
+        attendance: true,
+        assessments: true,
       },
     });
     if (!session) return res.status(404).json({ success: false, message: "Session not found" });
@@ -91,36 +91,17 @@ export const addAthleteToTrainingSession = async (req: Request, res: Response) =
   try {
     const { id } = req.params;
     const { athleteId } = req.body;
+
     const updated = await prisma.session.update({
       where: { id },
       data: {
         athletes: { connect: { id: athleteId } },
       },
     });
+
     res.json({ success: true, data: updated });
   } catch (err) {
     logger.error("Failed to add athlete: " + err);
     res.status(400).json({ success: false, message: "Failed to add athlete" });
-  }
-};
-
-// ───────────────────────────────
-// Add feedback to session (NEW ✅)
-export const addFeedbackToTrainingSession = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { coachId, comment, rating } = req.body;
-    const feedback = await prisma.trainingFeedback.create({
-      data: {
-        sessionId: id,
-        coachId,
-        comment,
-        rating,
-      },
-    });
-    res.status(201).json({ success: true, data: feedback });
-  } catch (err) {
-    logger.error("Failed to add feedback: " + err);
-    res.status(400).json({ success: false, message: "Failed to add feedback" });
   }
 };
