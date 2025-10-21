@@ -1,7 +1,8 @@
 // src/utils/jwt.ts
-import jwt, { Secret, JwtPayload, SignOptions } from "jsonwebtoken";
+import jwt, { Secret, JwtPayload, SignOptions, StringValue } from "jsonwebtoken";
 import logger from "../logger";
 
+// ✅ Fallback secrets for safety
 const JWT_SECRET: Secret = process.env.JWT_SECRET || "default_secret";
 const REFRESH_SECRET: Secret = process.env.REFRESH_TOKEN_SECRET || "default_refresh_secret";
 
@@ -9,9 +10,8 @@ const REFRESH_SECRET: Secret = process.env.REFRESH_TOKEN_SECRET || "default_refr
 // Generate Access Token
 export function generateAccessToken(payload: Record<string, any>): string {
   try {
-    const options: SignOptions = {
-      expiresIn: (process.env.JWT_EXPIRES_IN as string) || "1h",
-    };
+    const expiresIn = (process.env.JWT_EXPIRES_IN as StringValue) || "1h";
+    const options: SignOptions = { expiresIn };
     return jwt.sign(payload, JWT_SECRET, options);
   } catch (err) {
     logger.error("Error generating access token: " + err);
@@ -23,7 +23,7 @@ export function generateAccessToken(payload: Record<string, any>): string {
 // Generate Refresh Token
 export function generateRefreshToken(payload: Record<string, any>): string {
   try {
-    const options: SignOptions = { expiresIn: "7d" };
+    const options: SignOptions = { expiresIn: "7d" as StringValue };
     return jwt.sign(payload, REFRESH_SECRET, options);
   } catch (err) {
     logger.error("Error generating refresh token: " + err);
