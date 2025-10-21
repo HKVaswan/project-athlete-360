@@ -14,7 +14,7 @@ export const getPerformanceSummary = async (athleteId: string) => {
     const records = await prisma.performance.findMany({ where: { athleteId } });
     if (!records.length) return { averageScore: 0, bestScore: 0, trend: "stable" };
 
-    const scores = records.map(r => r.metric_value);
+    const scores = records.map(r => r.score); // ✅ corrected field name
     const averageScore = scores.reduce((a, b) => a + b, 0) / scores.length;
     const bestScore = Math.max(...scores);
 
