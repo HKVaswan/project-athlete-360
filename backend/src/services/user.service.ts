@@ -17,7 +17,7 @@ export async function getUserProfile(id: string) {
       athlete: {
         select: {
           id: true,
-          athleteId: true,
+          athleteCode: true, // ✅ replaced athleteId → athleteCode
           sport: true,
           gender: true,
         },
