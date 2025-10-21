@@ -9,7 +9,6 @@ import {
   updateTrainingSession,
   deleteTrainingSession,
   addAthleteToTrainingSession,
-  addFeedbackToTrainingSession,
 } from "../controllers/trainingSessions.controller";
 
 const router = Router();
@@ -31,8 +30,5 @@ router.delete("/:id", requireAuth, requireRole(["coach", "admin"]), deleteTraini
 
 // Add athlete to a training session
 router.post("/:id/athletes", requireAuth, requireRole(["coach", "admin"]), addAthleteToTrainingSession);
-
-// Add feedback or notes
-router.post("/:id/feedback", requireAuth, requireRole(["coach", "admin"]), addFeedbackToTrainingSession);
 
 export default router;
