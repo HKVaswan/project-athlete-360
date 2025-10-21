@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import bcrypt from "bcrypt";
-import jwt, { Secret } from "jsonwebtoken";
+import jwt from "jsonwebtoken";
 import prisma from "../prismaClient";
 import logger from "../logger";
 
@@ -30,14 +30,13 @@ export const register = async (req: Request, res: Response) => {
       },
     });
 
-    const secret = process.env.JWT_SECRET as Secret;
-    const expiresIn = process.env.JWT_EXPIRES_IN || "1h";
+    // ✅ Use plain string fallback for safety
+    const secret = process.env.JWT_SECRET || "default_secret";
+    const expiresIn: string | number = process.env.JWT_EXPIRES_IN || "1h";
 
-    const token = jwt.sign(
-      { sub: user.id, role: user.role },
-      secret,
-      { expiresIn }
-    );
+    const token = jwt.sign({ sub: user.id, role: user.role }, secret, {
+      expiresIn,
+    });
 
     return res.status(201).json({
       access_token: token,
@@ -69,14 +68,13 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    const secret = process.env.JWT_SECRET as Secret;
-    const expiresIn = process.env.JWT_EXPIRES_IN || "1h";
+    // ✅ Same fix here
+    const secret = process.env.JWT_SECRET || "default_secret";
+    const expiresIn: string | number = process.env.JWT_EXPIRES_IN || "1h";
 
-    const token = jwt.sign(
-      { sub: user.id, role: user.role },
-      secret,
-      { expiresIn }
-    );
+    const token = jwt.sign({ sub: user.id, role: user.role }, secret, {
+      expiresIn,
+    });
 
     return res.json({
       access_token: token,
