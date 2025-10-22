@@ -18,8 +18,9 @@ model User {
   updatedAt    DateTime        @updatedAt
   settings     Json?
   tokens       RefreshToken[]
-  // ✅ Relation: User ↔ Athlete (no fields/references here)
-  athlete      Athlete?        @relation("UserAthlete")
+
+  // Relation: User ↔ Athlete
+  athlete      Athlete?        @relation("UserAthlete", onDelete: Cascade)
 }
 
 model RefreshToken {
@@ -34,10 +35,8 @@ model RefreshToken {
 
 model Athlete {
   id           String          @id @default(uuid())
-  userId       String?         @unique
-  // ✅ Relation: Athlete ↔ User (this side defines the fields)
-  user         User?           @relation("UserAthlete", fields: [userId], references: [id])
-  athleteCode  String?         @unique
+  userId       String          @unique
+  athleteCode  String          @unique
   name         String
   dob          DateTime?
   sport        String?
@@ -46,7 +45,10 @@ model Athlete {
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
 
-  // ✅ Back-relations
+  // Relation: Athlete ↔ User
+  user         User            @relation("UserAthlete", fields: [userId], references: [id])
+
+  // Back-relations
   sessions     Session[]       @relation("AthleteSessions")
   assessments  Assessment[]
   injuries     Injury[]
@@ -65,7 +67,7 @@ model Session {
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
-  // ✅ Back-relations
+  // Back-relations
   assessments   Assessment[]
   attendance    Attendance[]
   athletes      Athlete[]       @relation("AthleteSessions")
@@ -105,7 +107,7 @@ model Injury {
   date        DateTime
   severity    Severity
   createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  updatedAt   DateTime  @default(now()) @updatedAt
 }
 
 model Attendance {
