@@ -8,8 +8,7 @@ const REFRESH_SECRET: Secret = process.env.REFRESH_TOKEN_SECRET || "default_refr
 // Generate Access Token
 export function generateAccessToken(payload: Record<string, any>): string {
   try {
-    const expiresIn: string | number = process.env.JWT_EXPIRES_IN || "1h";
-    const options: SignOptions = { expiresIn };
+    const options: SignOptions = { expiresIn: (process.env.JWT_EXPIRES_IN as any) || "1h" };
     return jwt.sign(payload, JWT_SECRET, options);
   } catch (err) {
     logger.error("Error generating access token: " + err);
