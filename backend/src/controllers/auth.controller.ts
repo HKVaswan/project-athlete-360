@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
+import jwt, { Secret } from "jsonwebtoken";
 import prisma from "../prismaClient";
 import logger from "../logger";
 
@@ -30,9 +30,8 @@ export const register = async (req: Request, res: Response) => {
       },
     });
 
-    // ✅ Fix: Proper jwt.StringValue casting for expiresIn
-    const secret = process.env.JWT_SECRET || "default_secret";
-    const expiresIn = (process.env.JWT_EXPIRES_IN || "1h") as jwt.StringValue;
+    const secret: Secret = process.env.JWT_SECRET || "default_secret";
+    const expiresIn: string | number = process.env.JWT_EXPIRES_IN || "1h";
 
     const token = jwt.sign({ sub: user.id, role: user.role }, secret, {
       expiresIn,
@@ -68,9 +67,8 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    // ✅ Same fix here for jwt type safety
-    const secret = process.env.JWT_SECRET || "default_secret";
-    const expiresIn = (process.env.JWT_EXPIRES_IN || "1h") as jwt.StringValue;
+    const secret: Secret = process.env.JWT_SECRET || "default_secret";
+    const expiresIn: string | number = process.env.JWT_EXPIRES_IN || "1h";
 
     const token = jwt.sign({ sub: user.id, role: user.role }, secret, {
       expiresIn,
