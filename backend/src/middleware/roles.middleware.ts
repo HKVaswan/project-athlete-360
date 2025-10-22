@@ -1,19 +1,15 @@
 import { Request, Response, NextFunction } from "express";
 
-// ✅ Define a compatible type for user payload
 interface AuthenticatedUser {
-  id: string;
-  role: string;
+  id?: string;
   username?: string;
-  [key: string]: any;
+  role?: string;
 }
 
-// ✅ Extend Express Request safely
-export interface AuthRequest extends Request {
+interface AuthRequest extends Request {
   user?: AuthenticatedUser;
 }
 
-// ✅ Role-based access control middleware
 export const requireRole = (roles: string | string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
@@ -21,10 +17,9 @@ export const requireRole = (roles: string | string[]) => {
     }
 
     const allowedRoles = Array.isArray(roles) ? roles : [roles];
-    const userRole = req.user.role;
+    const userRole = req.user.role || "";
 
-    // ✅ Ensure role exists before checking
-    if (!userRole || !allowedRoles.includes(userRole)) {
+    if (!allowedRoles.includes(userRole)) {
       return res.status(403).json({ message: "Forbidden: insufficient role" });
     }
 
