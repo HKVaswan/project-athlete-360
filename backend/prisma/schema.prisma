@@ -19,8 +19,8 @@ model User {
   settings     Json?
   tokens       RefreshToken[]
 
-  // Relation: User ↔ Athlete
-  athlete      Athlete?        @relation("UserAthlete", onDelete: Cascade)
+  // Relation: User ↔ Athlete (no onDelete here)
+  athlete      Athlete?        @relation("UserAthlete")
 }
 
 model RefreshToken {
@@ -45,8 +45,8 @@ model Athlete {
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
 
-  // Relation: Athlete ↔ User
-  user         User            @relation("UserAthlete", fields: [userId], references: [id])
+  // Relation: Athlete ↔ User (this side defines foreign key, cascade is applied here)
+  user         User            @relation("UserAthlete", fields: [userId], references: [id], onDelete: Cascade)
 
   // Back-relations
   sessions     Session[]       @relation("AthleteSessions")
@@ -107,7 +107,7 @@ model Injury {
   date        DateTime
   severity    Severity
   createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @default(now()) @updatedAt
+  updatedAt   DateTime  @updatedAt
 }
 
 model Attendance {
