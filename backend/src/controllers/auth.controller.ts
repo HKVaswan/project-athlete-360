@@ -31,11 +31,9 @@ export const register = async (req: Request, res: Response) => {
     });
 
     const secret: Secret = process.env.JWT_SECRET || "default_secret";
-    const expiresIn: string | number = process.env.JWT_EXPIRES_IN || "1h";
+    const expiresIn: any = process.env.JWT_EXPIRES_IN || "1h";
 
-    const token = jwt.sign({ sub: user.id, role: user.role }, secret, {
-      expiresIn,
-    });
+    const token = jwt.sign({ sub: user.id, role: user.role }, secret, { expiresIn });
 
     return res.status(201).json({
       access_token: token,
@@ -68,11 +66,9 @@ export const login = async (req: Request, res: Response) => {
     }
 
     const secret: Secret = process.env.JWT_SECRET || "default_secret";
-    const expiresIn: string | number = process.env.JWT_EXPIRES_IN || "1h";
+    const expiresIn: any = process.env.JWT_EXPIRES_IN || "1h";
 
-    const token = jwt.sign({ sub: user.id, role: user.role }, secret, {
-      expiresIn,
-    });
+    const token = jwt.sign({ sub: user.id, role: user.role }, secret, { expiresIn });
 
     return res.json({
       access_token: token,
