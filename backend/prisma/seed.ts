@@ -53,7 +53,7 @@ async function main() {
     update: {},
     create: {
       userId: athleteUser.id,
-      athleteId: "ATH-0001",
+      athleteCode: "ATH-0001", // ✅ updated from athleteId
       name: "Sample Athlete",
       dob: new Date("2002-01-01"),
       sport: "Athletics",
