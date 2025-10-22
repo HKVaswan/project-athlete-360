@@ -10,7 +10,7 @@ async function main() {
   const pw = "password123";
   const hash = await bcrypt.hash(pw, 10);
 
-  // create users
+  // ---------- Create Users ----------
   const admin = await prisma.user.upsert({
     where: { username: "admin" },
     update: {},
@@ -19,7 +19,7 @@ async function main() {
       email: "admin@example.com",
       passwordHash: hash,
       name: "Platform Admin",
-      role: "admin"
+      role: Role.admin
     }
   });
 
@@ -31,7 +31,7 @@ async function main() {
       email: "coach1@example.com",
       passwordHash: hash,
       name: "Head Coach",
-      role: "coach"
+      role: Role.coach
     }
   });
 
@@ -43,17 +43,17 @@ async function main() {
       email: "athlete1@example.com",
       passwordHash: hash,
       name: "Sample Athlete",
-      role: "athlete"
+      role: Role.athlete
     }
   });
 
-  // create athlete profile
+  // ---------- Create Athlete Profile ----------
   const athlete = await prisma.athlete.upsert({
     where: { userId: athleteUser.id },
     update: {},
     create: {
-      userId: athleteUser.id,
-      athleteCode: "ATH-0001", // ✅ updated from athleteId
+      user: { connect: { id: athleteUser.id } }, // Link User relation
+      athleteCode: "ATH-0001",                  // Required unique code
       name: "Sample Athlete",
       dob: new Date("2002-01-01"),
       sport: "Athletics",
@@ -62,7 +62,7 @@ async function main() {
     }
   });
 
-  // a couple of sessions
+  // ---------- Create Sessions ----------
   const session1 = await prisma.session.create({
     data: {
       name: "Speed Training - Day 1",
@@ -73,7 +73,7 @@ async function main() {
     }
   });
 
-  // assessments
+  // ---------- Create Assessments ----------
   await prisma.assessment.createMany({
     data: [
       {
@@ -95,7 +95,7 @@ async function main() {
     ]
   });
 
-  // performance (aggregated)
+  // ---------- Create Performance Records ----------
   await prisma.performance.createMany({
     data: [
       { athleteId: athlete.id, assessmentType: "100m_time", score: 12.4, date: new Date("2025-01-01") },
@@ -106,13 +106,13 @@ async function main() {
     ]
   });
 
-  // an injury
+  // ---------- Create Injury ----------
   await prisma.injury.create({
     data: {
       athleteId: athlete.id,
       description: "Ankle sprain during practice",
       date: new Date("2025-03-15"),
-      severity: "moderate"
+      severity: Severity.moderate
     }
   });
 
