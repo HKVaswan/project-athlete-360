@@ -3,6 +3,10 @@ import prisma from "../prismaClient";
 import logger from "../logger";
 
 // ───────────────────────────────
+// Helper: generate unique athlete code
+const generateAthleteCode = () => `ATH-${Math.floor(1000 + Math.random() * 9000)}`;
+
+// ───────────────────────────────
 // Get all athletes
 export const getAthletes = async (_req: Request, res: Response) => {
   try {
@@ -25,8 +29,8 @@ export const getAthleteById = async (req: Request, res: Response) => {
     const athlete = await prisma.athlete.findUnique({
       where: { id },
       include: {
-        sessions: true, // ✅ updated
-        performances: true, // ✅ updated
+        sessions: true,
+        performances: true,
         assessments: true,
         injuries: true,
         attendance: true,
@@ -44,10 +48,24 @@ export const getAthleteById = async (req: Request, res: Response) => {
 // Create athlete
 export const createAthlete = async (req: Request, res: Response) => {
   try {
-    const { name, sport, dob, gender, contactInfo } = req.body; // ✅ fixed field names
+    const { name, sport, dob, gender, contactInfo, userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "userId is required to link athlete" });
+    }
+
     const newAthlete = await prisma.athlete.create({
-      data: { name, sport, dob, gender, contactInfo },
+      data: {
+        name,
+        sport,
+        dob: dob ? new Date(dob) : undefined,
+        gender,
+        contactInfo,
+        athleteCode: generateAthleteCode(),
+        user: { connect: { id: userId } }, // mandatory relation
+      },
     });
+
     res.status(201).json({ success: true, data: newAthlete });
   } catch (err) {
     logger.error("Failed to create athlete: " + err);
