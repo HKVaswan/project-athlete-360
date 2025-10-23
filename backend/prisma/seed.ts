@@ -10,7 +10,7 @@ async function main() {
   const pw = "password123";
   const hash = await bcrypt.hash(pw, 10);
 
-  // ---------- Create Users ----------
+  // create users
   const admin = await prisma.user.upsert({
     where: { username: "admin" },
     update: {},
@@ -47,13 +47,13 @@ async function main() {
     }
   });
 
-  // ---------- Create Athlete Profile ----------
+  // create athlete profile (connect to user)
   const athlete = await prisma.athlete.upsert({
     where: { userId: athleteUser.id },
     update: {},
     create: {
-      user: { connect: { id: athleteUser.id } }, // Link User relation
-      athleteCode: "ATH-0001",                  // Required unique code
+      user: { connect: { id: athleteUser.id } },
+      athleteCode: "ATH-0001",
       name: "Sample Athlete",
       dob: new Date("2002-01-01"),
       sport: "Athletics",
@@ -62,7 +62,7 @@ async function main() {
     }
   });
 
-  // ---------- Create Sessions ----------
+  // a session
   const session1 = await prisma.session.create({
     data: {
       name: "Speed Training - Day 1",
@@ -73,7 +73,7 @@ async function main() {
     }
   });
 
-  // ---------- Create Assessments ----------
+  // assessments
   await prisma.assessment.createMany({
     data: [
       {
@@ -95,18 +95,16 @@ async function main() {
     ]
   });
 
-  // ---------- Create Performance Records ----------
+  // performance
   await prisma.performance.createMany({
     data: [
       { athleteId: athlete.id, assessmentType: "100m_time", score: 12.4, date: new Date("2025-01-01") },
       { athleteId: athlete.id, assessmentType: "100m_time", score: 12.2, date: new Date("2025-02-01") },
-      { athleteId: athlete.id, assessmentType: "100m_time", score: 12.0, date: new Date("2025-03-01") },
-      { athleteId: athlete.id, assessmentType: "100m_time", score: 11.9, date: new Date("2025-04-01") },
-      { athleteId: athlete.id, assessmentType: "100m_time", score: 11.8, date: new Date("2025-05-01") }
+      { athleteId: athlete.id, assessmentType: "100m_time", score: 12.0, date: new Date("2025-03-01") }
     ]
   });
 
-  // ---------- Create Injury ----------
+  // injury
   await prisma.injury.create({
     data: {
       athleteId: athlete.id,
