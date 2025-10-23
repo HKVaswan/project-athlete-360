@@ -3,7 +3,6 @@ import { Request, Response } from "express";
 import bcrypt from "bcrypt";
 import prisma from "../prismaClient";
 import logger from "../logger";
-import { generateToken } from "../utils/jwt"; // if you have this; otherwise remove token generation
 
 export const register = async (req: Request, res: Response) => {
   try {
@@ -31,7 +30,8 @@ export const register = async (req: Request, res: Response) => {
       },
     });
 
-    let athlete = null;
+    let athlete: any = null; // <-- explicitly typed
+
     if (role === "athlete") {
       athlete = await prisma.athlete.create({
         data: {
@@ -46,18 +46,15 @@ export const register = async (req: Request, res: Response) => {
       });
     }
 
-    // optional: create token if you use JWT utils
-    let token = null;
-    try {
-      if (typeof generateToken === "function") token = generateToken({ userId: user.id, role: user.role });
-    } catch (e) {
-      // ignore token generation errors
-    }
-
-    return res.status(201).json({ success: true, message: "Registration successful", data: { user, athlete }, token });
+    return res.status(201).json({
+      success: true,
+      message: "Registration successful",
+      data: { user, athlete },
+    });
   } catch (err: any) {
     logger.error("Registration failed: " + err);
-    if (err?.code === "P2002") return res.status(400).json({ success: false, message: "Username or email already exists" });
+    if (err?.code === "P2002")
+      return res.status(400).json({ success: false, message: "Username or email already exists" });
     return res.status(500).json({ success: false, message: "Server error during registration" });
   }
 };
@@ -65,7 +62,8 @@ export const register = async (req: Request, res: Response) => {
 export const login = async (req: Request, res: Response) => {
   try {
     const { username, password } = req.body;
-    if (!username || !password) return res.status(400).json({ success: false, message: "Username and password required" });
+    if (!username || !password)
+      return res.status(400).json({ success: false, message: "Username and password required" });
 
     const user = await prisma.user.findUnique({ where: { username } });
     if (!user) return res.status(400).json({ success: false, message: "Invalid credentials" });
@@ -73,12 +71,7 @@ export const login = async (req: Request, res: Response) => {
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) return res.status(400).json({ success: false, message: "Invalid credentials" });
 
-    let token = null;
-    try {
-      if (typeof generateToken === "function") token = generateToken({ userId: user.id, role: user.role });
-    } catch {}
-
-    return res.json({ success: true, data: user, token });
+    return res.json({ success: true, data: user });
   } catch (err) {
     logger.error("Login failed: " + err);
     return res.status(500).json({ success: false, message: "Server error during login" });
