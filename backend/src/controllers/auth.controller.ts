@@ -23,7 +23,7 @@ export const register = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: "Username already exists" });
     }
 
-    // ✅ Check if email already exists only if provided
+    // ✅ Check if email already exists
     if (contact_info) {
       const existingEmail = await prisma.user.findUnique({ where: { email: contact_info } });
       if (existingEmail) {
@@ -86,7 +86,10 @@ export const login = async (req: Request, res: Response) => {
 
     const identifier = username || email;
     if (!identifier || !password) {
-      return res.status(400).json({ success: false, message: "Username/Email and password required" });
+      return res.status(400).json({
+        success: false,
+        message: "Username/Email and password required",
+      });
     }
 
     // ✅ Allow login via username OR email
@@ -100,12 +103,18 @@ export const login = async (req: Request, res: Response) => {
     });
 
     if (!user) {
-      return res.status(400).json({ success: false, message: "Invalid username/email or password" });
+      return res.status(400).json({
+        success: false,
+        message: "Invalid username/email or password",
+      });
     }
 
     const isValid = await bcrypt.compare(password, user.passwordHash);
     if (!isValid) {
-      return res.status(400).json({ success: false, message: "Invalid username/email or password" });
+      return res.status(400).json({
+        success: false,
+        message: "Invalid username/email or password",
+      });
     }
 
     // ✅ Generate JWT token
@@ -123,7 +132,10 @@ export const login = async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error("❌ Login failed:", err);
     logger.error("Login failed: " + err.message);
-    return res.status(500).json({ success: false, message: "Server error during login" });
+    return res.status(500).json({
+      success: false,
+      message: "Server error during login",
+    });
   }
 };
 
@@ -133,8 +145,12 @@ export const login = async (req: Request, res: Response) => {
 export const me = async (req: Request, res: Response) => {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader)
-      return res.status(401).json({ success: false, message: "No token provided" });
+    if (!authHeader) {
+      return res.status(401).json({
+        success: false,
+        message: "No token provided",
+      });
+    }
 
     const token = authHeader.split(" ")[1];
     const decoded: any = jwt.verify(token, JWT_SECRET);
@@ -144,9 +160,23 @@ export const me = async (req: Request, res: Response) => {
       include: { athlete: true },
     });
 
-    if (!user)
-      return res.status(404).json({ success: false, message: "User not found" });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
 
-    return res.json({ success: true, user });
+    return res.json({
+      success: true,
+      user,
+    });
   } catch (err: any) {
     console.error("❌ Fetching user failed:", err);
+    logger.error("Fetching user failed: " + err.message);
+    return res.status(500).json({
+      success: false,
+      message: "Invalid or expired token",
+    });
+  }
+};
