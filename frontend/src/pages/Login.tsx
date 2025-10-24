@@ -1,4 +1,3 @@
-// src/pages/Login.tsx
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -58,11 +57,11 @@ const Login: React.FC = () => {
     }
 
     try {
-      // Step 1: Login to get token
+      // ✅ Step 1: Send correct login payload
       const response = await fetch(`${API_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: username.trim(), password }),
+        body: JSON.stringify({ username: username.trim(), password }),
       });
 
       if (!response.ok) {
@@ -78,24 +77,24 @@ const Login: React.FC = () => {
         return;
       }
 
-      // Step 2: Fetch user info
-      const meResponse = await fetch(`${API_URL}/api/me`, {
+      // ✅ Step 2: Fetch user info (your backend uses /api/auth/me)
+      const meResponse = await fetch(`${API_URL}/api/auth/me`, {
         headers: { Authorization: `Bearer ${data.access_token}` },
       });
       const meData = await meResponse.json();
 
-      if (!meResponse.ok || !meData.user) {
+      if (!meResponse.ok || !meData.data) {
         setError("Login failed. Could not fetch user info.");
         setLoading(false);
         return;
       }
 
-      // Step 3: Store token & user in context
-      login?.(data.access_token, meData.user);
+      // ✅ Step 3: Store token & user in context
+      login?.(data.access_token, meData.data);
 
-      // Step 4: Redirect based on role
+      // ✅ Step 4: Redirect based on role
       const dashboardRoute = (() => {
-        switch (meData.user.role) {
+        switch (meData.data.role) {
           case "admin": return "/admin-dashboard";
           case "coach": return "/coach-dashboard";
           case "athlete": return "/athlete-dashboard";
