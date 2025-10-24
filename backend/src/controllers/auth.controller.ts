@@ -1,51 +1,61 @@
-// src/controllers/auth.controller.ts
 import { Request, Response } from "express";
 import bcrypt from "bcrypt";
 import prisma from "../prismaClient";
 import logger from "../logger";
 
-// ───────────────────────────────
-// REGISTER
-// ───────────────────────────────
+/**
+ * Register new user
+ */
 export const register = async (req: Request, res: Response) => {
   try {
     const { username, password, name, dob, sport, gender, contact_info, role } = req.body;
 
-    if (!username || !password || !name || !dob || !gender || !contact_info || !role) {
+    // ✅ Basic validation
+    if (!username || !password || !name || !dob || !gender || !contact_info) {
       return res.status(400).json({ success: false, message: "Missing required fields" });
     }
 
-    const existing = await prisma.user.findFirst({
-      where: { OR: [{ username }, { email: contact_info }] },
-    });
-    if (existing) {
-      return res.status(400).json({ success: false, message: "Username or email already exists" });
+    // ✅ Check if username already exists
+    const existingUser = await prisma.user.findUnique({ where: { username } });
+    if (existingUser) {
+      return res.status(400).json({ success: false, message: "Username already exists" });
     }
 
+    // ✅ Check if email already exists only if provided
+    if (contact_info) {
+      const existingEmail = await prisma.user.findUnique({ where: { email: contact_info } });
+      if (existingEmail) {
+        return res.status(400).json({ success: false, message: "Email already exists" });
+      }
+    }
+
+    // ✅ Hash password
     const passwordHash = await bcrypt.hash(password, 10);
+
+    // ✅ Create user
     const user = await prisma.user.create({
       data: {
         username,
         email: contact_info,
         passwordHash,
         name,
-        role,
+        role: role || "athlete",
       },
     });
 
-    // Create athlete record only if role is "athlete"
-    let athlete: Record<string, any> | null = null;
+    // ✅ Create athlete profile if role = athlete
+    let athlete = null;
     if (role === "athlete") {
       const athleteCode = `ATH-${Math.floor(1000 + Math.random() * 9000)}`;
       athlete = await prisma.athlete.create({
         data: {
+          userId: user.id,
           athleteCode,
           name,
           sport,
           dob: new Date(dob),
           gender,
           contactInfo: contact_info,
-          user: { connect: { id: user.id } },
         },
       });
     }
@@ -56,68 +66,47 @@ export const register = async (req: Request, res: Response) => {
       data: { user, athlete },
     });
   } catch (err: any) {
-    logger.error("Registration failed: " + err);
-
-    if (err?.code === "P2002") {
-      return res.status(400).json({ success: false, message: "Username or email already exists" });
+    console.error("❌ Registration failed:", err);
+    logger.error("Registration failed: " + err.message);
+    if (err.code === "P2002") {
+      return res.status(400).json({ success: false, message: "Duplicate field value" });
     }
-
-    if (err?.message?.includes("does not exist")) {
-      return res.status(500).json({
-        success: false,
-        message: "Database table missing. Run `prisma db push` to sync schema.",
-      });
-    }
-
-    return res.status(500).json({
-      success: false,
-      message: "Server error during registration",
-    });
+    return res.status(500).json({ success: false, message: "Server error during registration" });
   }
 };
 
-// ───────────────────────────────
-// LOGIN
-// ───────────────────────────────
+/**
+ * Login existing user
+ */
 export const login = async (req: Request, res: Response) => {
   try {
     const { username, password } = req.body;
     if (!username || !password)
       return res.status(400).json({ success: false, message: "Username and password required" });
 
-    const user = await prisma.user.findFirst({
-      where: { OR: [{ username }, { email: username }] },
-    });
+    const user = await prisma.user.findUnique({ where: { username } });
+    if (!user)
+      return res.status(400).json({ success: false, message: "Invalid username or password" });
 
-    if (!user) {
-      return res.status(400).json({ success: false, message: "Invalid credentials" });
-    }
-
-    const valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid) {
-      return res.status(400).json({ success: false, message: "Invalid credentials" });
-    }
+    const isValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isValid)
+      return res.status(400).json({ success: false, message: "Invalid username or password" });
 
     return res.json({
       success: true,
       message: "Login successful",
-      data: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-      },
+      data: user,
     });
-  } catch (err) {
-    logger.error("Login failed: " + err);
+  } catch (err: any) {
+    console.error("❌ Login failed:", err);
+    logger.error("Login failed: " + err.message);
     return res.status(500).json({ success: false, message: "Server error during login" });
   }
 };
 
-// ───────────────────────────────
-// ME
-// ───────────────────────────────
+/**
+ * Get user details
+ */
 export const me = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).userId;
@@ -127,8 +116,9 @@ export const me = async (req: Request, res: Response) => {
     });
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
     return res.json({ success: true, data: user });
-  } catch (err) {
-    logger.error("Fetching user failed: " + err);
+  } catch (err: any) {
+    console.error("❌ Fetching user failed:", err);
+    logger.error("Fetching user failed: " + err.message);
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
