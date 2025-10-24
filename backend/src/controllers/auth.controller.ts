@@ -1,30 +1,10 @@
 import { Request, Response } from "express";
 import bcrypt from "bcrypt";
-import jwt, { SignOptions } from "jsonwebtoken";
+import jwt from "jsonwebtoken";
 import prisma from "../prismaClient";
 import logger from "../logger";
 
-/**
- * Utility: create JWT
- */
-const createToken = (payload: object) => {
-  const secret: jwt.Secret = process.env.JWT_SECRET || "CHANGE_THIS_SECRET";
-  const opts: SignOptions = { expiresIn: "7d" }; // valid for TS
-  return jwt.sign(payload, secret, opts);
-};
-
-/**
- * Build safe user object
- */
-const safeUserPayload = (user: any) => ({
-  id: user.id,
-  username: user.username,
-  email: user.email,
-  name: user.name,
-  role: user.role,
-  createdAt: user.createdAt,
-  updatedAt: user.updatedAt,
-});
+const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey"; // Make sure you have this in your .env
 
 /**
  * Register new user
@@ -32,140 +12,126 @@ const safeUserPayload = (user: any) => ({
 export const register = async (req: Request, res: Response) => {
   try {
     const { username, password, name, dob, sport, gender, contact_info, role } = req.body;
-    if (!username || !password || !name || !dob || !gender || !contact_info)
+
+    if (!username || !password || !name || !dob || !gender || !contact_info) {
       return res.status(400).json({ success: false, message: "Missing required fields" });
-
-    const cleanUsername = String(username).trim();
-    const cleanContact = String(contact_info).trim();
-
-    const existingUser = await prisma.user.findUnique({ where: { username: cleanUsername } });
-    if (existingUser) return res.status(400).json({ success: false, message: "Username already exists" });
-
-    if (cleanContact) {
-      const existingEmail = await prisma.user.findUnique({ where: { email: cleanContact } });
-      if (existingEmail) return res.status(400).json({ success: false, message: "Email already exists" });
     }
 
-    const passwordHash = await bcrypt.hash(String(password), 10);
+    const existingUser = await prisma.user.findUnique({ where: { username } });
+    if (existingUser) {
+      return res.status(400).json({ success: false, message: "Username already exists" });
+    }
+
+    if (contact_info) {
+      const existingEmail = await prisma.user.findUnique({ where: { email: contact_info } });
+      if (existingEmail) {
+        return res.status(400).json({ success: false, message: "Email already exists" });
+      }
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
 
     const user = await prisma.user.create({
       data: {
-        username: cleanUsername,
-        email: cleanContact || null,
+        username,
+        email: contact_info,
         passwordHash,
         name,
-        role: (role as any) || "athlete",
+        role: role || "athlete",
       },
     });
 
-    let athlete: any = null;
-    if ((role as string) === "athlete") {
+    let athlete = null;
+    if (role === "athlete") {
       const athleteCode = `ATH-${Math.floor(1000 + Math.random() * 9000)}`;
       athlete = await prisma.athlete.create({
         data: {
           userId: user.id,
           athleteCode,
           name,
-          sport: sport || null,
-          dob: dob ? new Date(dob) : null,
-          gender: gender || null,
-          contactInfo: cleanContact || null,
+          sport,
+          dob: new Date(dob),
+          gender,
+          contactInfo: contact_info,
         },
       });
     }
 
-    const userSafe = safeUserPayload(user);
-    logger.info(`Registration success username=${user.username}`);
-
     return res.status(201).json({
       success: true,
       message: "Registration successful",
-      user: userSafe,
-      athlete,
+      data: { user, athlete },
     });
   } catch (err: any) {
     console.error("❌ Registration failed:", err);
-    logger.error("Registration failed: " + (err?.message ?? err));
-    if (err?.code === "P2002")
+    logger.error("Registration failed: " + err.message);
+    if (err.code === "P2002") {
       return res.status(400).json({ success: false, message: "Duplicate field value" });
+    }
     return res.status(500).json({ success: false, message: "Server error during registration" });
   }
 };
 
 /**
- * Login
+ * Login existing user
  */
 export const login = async (req: Request, res: Response) => {
   try {
-    const rawIdentifier = (req.body.username || req.body.email || req.body.identifier || "").toString();
-    const password = (req.body.password || "").toString();
-
-    const identifier = rawIdentifier.trim();
-    if (!identifier || !password)
+    const { username, password } = req.body;
+    if (!username || !password)
       return res.status(400).json({ success: false, message: "Username and password required" });
 
-    logger.info(`[LOGIN] Attempt for identifier="${identifier}"`);
-
-    const user = await prisma.user.findFirst({
-      where: {
-        OR: [{ username: identifier }, { email: identifier }],
-      },
-    });
-
-    if (!user) {
-      logger.warn(`[LOGIN] No user found for identifier="${identifier}"`);
-      return res.status(400).json({ success: false, message: "Incorrect username or password." });
-    }
-
-    if (!user.passwordHash) {
-      logger.error(`[LOGIN] User ${user.id} has no passwordHash`);
-      return res.status(500).json({ success: false, message: "Server error during login" });
-    }
+    const user = await prisma.user.findUnique({ where: { username } });
+    if (!user)
+      return res.status(400).json({ success: false, message: "Invalid username or password" });
 
     const isValid = await bcrypt.compare(password, user.passwordHash);
-    if (!isValid) {
-      logger.warn(`[LOGIN] Invalid password for userId=${user.id}`);
-      return res.status(400).json({ success: false, message: "Incorrect username or password." });
-    }
+    if (!isValid)
+      return res.status(400).json({ success: false, message: "Invalid username or password" });
 
-    const token = createToken({ sub: user.id, role: user.role });
-    const userSafe = safeUserPayload(user);
-
-    logger.info(`[LOGIN] Success for userId=${user.id}`);
+    // ✅ Create JWT token
+    const token = jwt.sign(
+      { userId: user.id, username: user.username, role: user.role },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
 
     return res.json({
       success: true,
       message: "Login successful",
       access_token: token,
-      user: userSafe,
     });
   } catch (err: any) {
     console.error("❌ Login failed:", err);
-    logger.error("Login failed: " + (err?.message ?? err));
+    logger.error("Login failed: " + err.message);
     return res.status(500).json({ success: false, message: "Server error during login" });
   }
 };
 
 /**
- * Get user info
+ * Get user details
  */
 export const me = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).userId;
-    if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ success: false, message: "No token provided" });
+    }
+
+    const token = authHeader.split(" ")[1];
+    const decoded: any = jwt.verify(token, JWT_SECRET);
 
     const user = await prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: decoded.userId },
       include: { athlete: true },
     });
 
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
-    const userSafe = { ...safeUserPayload(user), athlete: user.athlete || null };
-    return res.json({ success: true, user: userSafe });
+    return res.json({ success: true, user });
   } catch (err: any) {
     console.error("❌ Fetching user failed:", err);
-    logger.error("Fetching user failed: " + (err?.message ?? err));
-    return res.status(500).json({ success: false, message: "Server error" });
+    logger.error("Fetching user failed: " + err.message);
+    return res.status(500).json({ success: false, message: "Invalid or expired token" });
   }
 };
