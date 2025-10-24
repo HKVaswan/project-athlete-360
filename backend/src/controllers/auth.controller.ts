@@ -17,11 +17,13 @@ export const register = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: "Missing required fields" });
     }
 
+    // ✅ Check if username already exists
     const existingUser = await prisma.user.findUnique({ where: { username } });
     if (existingUser) {
       return res.status(400).json({ success: false, message: "Username already exists" });
     }
 
+    // ✅ Check if email already exists only if provided
     if (contact_info) {
       const existingEmail = await prisma.user.findUnique({ where: { email: contact_info } });
       if (existingEmail) {
@@ -29,8 +31,10 @@ export const register = async (req: Request, res: Response) => {
       }
     }
 
+    // ✅ Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
+    // ✅ Create user
     const user = await prisma.user.create({
       data: {
         username,
@@ -41,7 +45,7 @@ export const register = async (req: Request, res: Response) => {
       },
     });
 
-    // ✅ Fix: allow athlete to be object OR null without TS error
+    // ✅ Create athlete profile if role = athlete
     let athlete: any = null;
     if (role === "athlete") {
       const athleteCode = `ATH-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -78,19 +82,33 @@ export const register = async (req: Request, res: Response) => {
  */
 export const login = async (req: Request, res: Response) => {
   try {
-    const { username, password } = req.body;
-    if (!username || !password)
-      return res.status(400).json({ success: false, message: "Username and password required" });
+    const { username, email, password } = req.body;
 
-    const user = await prisma.user.findUnique({ where: { username } });
-    if (!user)
-      return res.status(400).json({ success: false, message: "Invalid username or password" });
+    const identifier = username || email;
+    if (!identifier || !password) {
+      return res.status(400).json({ success: false, message: "Username/Email and password required" });
+    }
+
+    // ✅ Allow login via username OR email
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { username: identifier },
+          { email: identifier },
+        ],
+      },
+    });
+
+    if (!user) {
+      return res.status(400).json({ success: false, message: "Invalid username/email or password" });
+    }
 
     const isValid = await bcrypt.compare(password, user.passwordHash);
-    if (!isValid)
-      return res.status(400).json({ success: false, message: "Invalid username or password" });
+    if (!isValid) {
+      return res.status(400).json({ success: false, message: "Invalid username/email or password" });
+    }
 
-    // ✅ JWT token
+    // ✅ Generate JWT token
     const token = jwt.sign(
       { userId: user.id, username: user.username, role: user.role },
       JWT_SECRET,
@@ -132,7 +150,3 @@ export const me = async (req: Request, res: Response) => {
     return res.json({ success: true, user });
   } catch (err: any) {
     console.error("❌ Fetching user failed:", err);
-    logger.error("Fetching user failed: " + err.message);
-    return res.status(500).json({ success: false, message: "Invalid or expired token" });
-  }
-};
