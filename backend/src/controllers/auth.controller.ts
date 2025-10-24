@@ -44,7 +44,7 @@ export const register = async (req: Request, res: Response) => {
     });
 
     // ✅ Create athlete profile if role = athlete
-    let athlete = null;
+    let athlete: any = null;
     if (role === "athlete") {
       const athleteCode = `ATH-${Math.floor(1000 + Math.random() * 9000)}`;
       athlete = await prisma.athlete.create({
