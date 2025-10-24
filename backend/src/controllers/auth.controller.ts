@@ -33,7 +33,8 @@ export const register = async (req: Request, res: Response) => {
       },
     });
 
-    let athlete = null;
+    // Create athlete record only if role is "athlete"
+    let athlete: Record<string, any> | null = null;
     if (role === "athlete") {
       const athleteCode = `ATH-${Math.floor(1000 + Math.random() * 9000)}`;
       athlete = await prisma.athlete.create({
