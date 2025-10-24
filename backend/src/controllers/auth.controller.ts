@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 import prisma from "../prismaClient";
 import logger from "../logger";
 
-const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey"; // Make sure you have this in your .env
+const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
 
 /**
  * Register new user
@@ -41,7 +41,8 @@ export const register = async (req: Request, res: Response) => {
       },
     });
 
-    let athlete = null;
+    // ✅ Fix: allow athlete to be object OR null without TS error
+    let athlete: any = null;
     if (role === "athlete") {
       const athleteCode = `ATH-${Math.floor(1000 + Math.random() * 9000)}`;
       athlete = await prisma.athlete.create({
@@ -89,7 +90,7 @@ export const login = async (req: Request, res: Response) => {
     if (!isValid)
       return res.status(400).json({ success: false, message: "Invalid username or password" });
 
-    // ✅ Create JWT token
+    // ✅ JWT token
     const token = jwt.sign(
       { userId: user.id, username: user.username, role: user.role },
       JWT_SECRET,
@@ -109,14 +110,13 @@ export const login = async (req: Request, res: Response) => {
 };
 
 /**
- * Get user details
+ * Get current user info
  */
 export const me = async (req: Request, res: Response) => {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader) {
+    if (!authHeader)
       return res.status(401).json({ success: false, message: "No token provided" });
-    }
 
     const token = authHeader.split(" ")[1];
     const decoded: any = jwt.verify(token, JWT_SECRET);
@@ -126,7 +126,8 @@ export const me = async (req: Request, res: Response) => {
       include: { athlete: true },
     });
 
-    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+    if (!user)
+      return res.status(404).json({ success: false, message: "User not found" });
 
     return res.json({ success: true, user });
   } catch (err: any) {
