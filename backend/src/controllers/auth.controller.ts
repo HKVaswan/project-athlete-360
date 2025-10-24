@@ -1,7 +1,6 @@
-// src/controllers/auth.controller.ts
 import { Request, Response } from "express";
 import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
+import jwt, { SignOptions } from "jsonwebtoken";
 import prisma from "../prismaClient";
 import logger from "../logger";
 
@@ -9,13 +8,13 @@ import logger from "../logger";
  * Utility: create JWT
  */
 const createToken = (payload: object) => {
-  const secret = process.env.JWT_SECRET || "CHANGE_THIS_SECRET";
-  const opts = { expiresIn: "7d" };
+  const secret: jwt.Secret = process.env.JWT_SECRET || "CHANGE_THIS_SECRET";
+  const opts: SignOptions = { expiresIn: "7d" }; // valid for TS
   return jwt.sign(payload, secret, opts);
 };
 
 /**
- * Build safe user object (no passwordHash, minimal fields)
+ * Build safe user object
  */
 const safeUserPayload = (user: any) => ({
   id: user.id,
@@ -33,29 +32,22 @@ const safeUserPayload = (user: any) => ({
 export const register = async (req: Request, res: Response) => {
   try {
     const { username, password, name, dob, sport, gender, contact_info, role } = req.body;
-
-    // Basic validation
-    if (!username || !password || !name || !dob || !gender || !contact_info) {
+    if (!username || !password || !name || !dob || !gender || !contact_info)
       return res.status(400).json({ success: false, message: "Missing required fields" });
-    }
 
     const cleanUsername = String(username).trim();
     const cleanContact = String(contact_info).trim();
 
-    // Check username uniqueness
     const existingUser = await prisma.user.findUnique({ where: { username: cleanUsername } });
     if (existingUser) return res.status(400).json({ success: false, message: "Username already exists" });
 
-    // Check email uniqueness (if any)
     if (cleanContact) {
       const existingEmail = await prisma.user.findUnique({ where: { email: cleanContact } });
       if (existingEmail) return res.status(400).json({ success: false, message: "Email already exists" });
     }
 
-    // Hash password
     const passwordHash = await bcrypt.hash(String(password), 10);
 
-    // Create user
     const user = await prisma.user.create({
       data: {
         username: cleanUsername,
@@ -66,7 +58,6 @@ export const register = async (req: Request, res: Response) => {
       },
     });
 
-    // Create athlete if role = athlete
     let athlete: any = null;
     if ((role as string) === "athlete") {
       const athleteCode = `ATH-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -95,17 +86,14 @@ export const register = async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error("❌ Registration failed:", err);
     logger.error("Registration failed: " + (err?.message ?? err));
-    if (err?.code === "P2002") {
+    if (err?.code === "P2002")
       return res.status(400).json({ success: false, message: "Duplicate field value" });
-    }
     return res.status(500).json({ success: false, message: "Server error during registration" });
   }
 };
 
 /**
- * LOGIN
- * Accepts { username } or { email } or { identifier } + password
- * Returns: { access_token, user }
+ * Login
  */
 export const login = async (req: Request, res: Response) => {
   try {
@@ -113,13 +101,11 @@ export const login = async (req: Request, res: Response) => {
     const password = (req.body.password || "").toString();
 
     const identifier = rawIdentifier.trim();
-    if (!identifier || !password) {
+    if (!identifier || !password)
       return res.status(400).json({ success: false, message: "Username and password required" });
-    }
 
     logger.info(`[LOGIN] Attempt for identifier="${identifier}"`);
 
-    // Find user by username OR email
     const user = await prisma.user.findFirst({
       where: {
         OR: [{ username: identifier }, { email: identifier }],
@@ -142,14 +128,11 @@ export const login = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: "Incorrect username or password." });
     }
 
-    // Create JWT token with minimal claims
     const token = createToken({ sub: user.id, role: user.role });
-
     const userSafe = safeUserPayload(user);
 
-    logger.info(`[LOGIN] Success for userId=${user.id} username="${user.username}"`);
+    logger.info(`[LOGIN] Success for userId=${user.id}`);
 
-    // Return token and safe user so frontend can use either/or
     return res.json({
       success: true,
       message: "Login successful",
@@ -164,9 +147,7 @@ export const login = async (req: Request, res: Response) => {
 };
 
 /**
- * ME
- * Returns current user as { user: { ... } }
- * Requires middleware that sets (req as any).userId
+ * Get user info
  */
 export const me = async (req: Request, res: Response) => {
   try {
@@ -181,7 +162,6 @@ export const me = async (req: Request, res: Response) => {
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
     const userSafe = { ...safeUserPayload(user), athlete: user.athlete || null };
-
     return res.json({ success: true, user: userSafe });
   } catch (err: any) {
     console.error("❌ Fetching user failed:", err);
