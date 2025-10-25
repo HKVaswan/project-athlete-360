@@ -1,10 +1,10 @@
 // src/pages/AthleteDashboard.tsx
-import React, { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { format } from 'date-fns';
-import { FaSpinner } from 'react-icons/fa';
+import React, { useState, useEffect, useCallback } from "react";
+import { useAuth } from "../context/AuthContext";
+import { format } from "date-fns";
+import { FaSpinner } from "react-icons/fa";
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = (import.meta.env.VITE_API_URL || "https://project-athlete-360.onrender.com").replace(/\/+$/, "");
 
 interface TrainingSession {
   session_date: string;
@@ -18,12 +18,12 @@ interface PerformanceMetric {
 }
 
 interface Athlete {
-  id: number;
+  id: string;
   name: string;
-  sport: string;
-  dob: string;
-  gender: string;
-  contact_info: string;
+  sport?: string | null;
+  dob?: string | null;
+  gender?: string | null;
+  contactInfo?: string | null; // backend uses camelCase
   training_sessions: TrainingSession[];
   performance_metrics: PerformanceMetric[];
 }
@@ -39,23 +39,29 @@ const AthleteDashboard: React.FC = () => {
     setError(null);
 
     try {
-      if (!user) throw new Error('User not authenticated.');
+      if (!user) throw new Error("User not authenticated.");
 
-      // Fetch athlete profile by user ID
-      const athleteRes = await fetch(`${API_URL}/api/athletes?userId=${user.id}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
+      // Note: use /api/athletes?userId=<uuid>
+      const athleteRes = await fetch(`${API_URL}/api/athletes?userId=${encodeURIComponent(user.id)}`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!athleteRes.ok) throw new Error('Failed to find your athlete profile.');
+      if (!athleteRes.ok) {
+        // give more context to client
+        const errBody = await athleteRes.json().catch(() => ({}));
+        throw new Error(errBody.message || "Failed to find your athlete profile.");
+      }
 
       const athleteData = await athleteRes.json();
-      if (!athleteData.success || athleteData.data.length === 0)
-        throw new Error('No athlete profile found for this user.');
+      const arr = athleteData.data || athleteData; // be tolerant
 
-      const athleteId = athleteData.data[0].id;
+      if (!arr || arr.length === 0) throw new Error("No athlete profile found for this user.");
 
-      const profileRes = await fetch(`${API_URL}/api/athletes/${athleteId}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
+      const raw = arr[0];
+
+      // Fetch full profile (optional) but backend /api/athletes/:id returns fields under "data"
+      const profileRes = await fetch(`${API_URL}/api/athletes/${raw.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (profileRes.status === 401) {
@@ -64,15 +70,28 @@ const AthleteDashboard: React.FC = () => {
       }
 
       if (!profileRes.ok) {
-        const errData = await profileRes.json();
-        throw new Error(errData.message || 'Failed to fetch profile data.');
+        const errData = await profileRes.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to fetch profile data.");
       }
 
-      const { data } = await profileRes.json();
-      setAthlete(data);
+      const profileBody = await profileRes.json();
+      const profileRaw = profileBody.data || profileBody.user || profileBody; // tolerant
 
+      // Normalize to frontend shape
+      const normalized: Athlete = {
+        id: String(profileRaw.id),
+        name: profileRaw.name,
+        sport: profileRaw.sport,
+        dob: profileRaw.dob,
+        gender: profileRaw.gender,
+        contactInfo: profileRaw.contactInfo ?? profileRaw.contact_info ?? profileRaw.contact, // be tolerant
+        training_sessions: profileRaw.sessions || profileRaw.training_sessions || [],
+        performance_metrics: profileRaw.performances || profileRaw.performance_metrics || [],
+      };
+
+      setAthlete(normalized);
     } catch (err: any) {
-      setError(err.message || 'An error occurred while fetching your dashboard.');
+      setError(err.message || "An error occurred while fetching your dashboard.");
     } finally {
       setLoading(false);
     }
@@ -95,10 +114,7 @@ const AthleteDashboard: React.FC = () => {
     return (
       <div className="p-4 text-red-500 text-center">
         {error}
-        <button
-          onClick={fetchAthleteProfile}
-          className="ml-2 underline text-blue-600"
-        >
+        <button onClick={fetchAthleteProfile} className="ml-2 underline text-blue-600">
           Retry
         </button>
       </div>
@@ -111,18 +127,25 @@ const AthleteDashboard: React.FC = () => {
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <h1 className="text-3xl font-bold text-gray-800 dark:text-white">
-        Welcome, {athlete.name}!
-      </h1>
+      <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Welcome, {athlete.name}!</h1>
 
       {/* Personal Details */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md md:col-span-1">
           <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">Personal Details</h2>
-          <p><strong>Sport:</strong> {athlete.sport || 'Not provided'}</p>
-          <p><strong>Date of Birth:</strong> {athlete.dob ? format(new Date(athlete.dob), 'MMMM d, yyyy') : 'Not provided'}</p>
-          <p><strong>Gender:</strong> {athlete.gender || 'Not provided'}</p>
-          <p><strong>Contact Info:</strong> {athlete.contact_info || 'Not provided'}</p>
+          <p>
+            <strong>Sport:</strong> {athlete.sport || "Not provided"}
+          </p>
+          <p>
+            <strong>Date of Birth:</strong>{" "}
+            {athlete.dob ? format(new Date(athlete.dob), "MMMM d, yyyy") : "Not provided"}
+          </p>
+          <p>
+            <strong>Gender:</strong> {athlete.gender || "Not provided"}
+          </p>
+          <p>
+            <strong>Contact Info:</strong> {athlete.contactInfo || "Not provided"}
+          </p>
         </div>
 
         {/* Training Sessions */}
@@ -132,8 +155,10 @@ const AthleteDashboard: React.FC = () => {
             <ul className="space-y-4">
               {athlete.training_sessions.map((session, idx) => (
                 <li key={idx} className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border">
-                  <p className="font-semibold">{format(new Date(session.session_date), 'MMMM d, yyyy h:mm a')}</p>
-                  <p>{session.notes}</p>
+                  <p className="font-semibold">
+                    {format(new Date(session.session_date || session.date || Date.now()), "MMMM d, yyyy h:mm a")}
+                  </p>
+                  <p>{session.notes || session.description || "No notes"}</p>
                 </li>
               ))}
             </ul>
@@ -150,9 +175,11 @@ const AthleteDashboard: React.FC = () => {
           <ul className="space-y-4">
             {athlete.performance_metrics.map((metric, idx) => (
               <li key={idx} className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border">
-                <p><strong>{metric.metric_name}:</strong> {metric.metric_value}</p>
+                <p>
+                  <strong>{metric.metric_name || metric.metric || "Metric"}:</strong> {metric.metric_value}
+                </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {format(new Date(metric.entry_date), 'MMMM d, yyyy')}
+                  {format(new Date(metric.entry_date || metric.date || Date.now()), "MMMM d, yyyy")}
                 </p>
               </li>
             ))}
