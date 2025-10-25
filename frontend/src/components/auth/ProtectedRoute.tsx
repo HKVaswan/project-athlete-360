@@ -1,36 +1,37 @@
 // src/components/auth/ProtectedRoute.tsx
-import React from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import React from "react";
+import { Navigate, Outlet } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext"; // ✅ fixed relative path
 
 interface ProtectedRouteProps {
   allowedRoles?: string[];
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles }) => {
-  const { isAuthenticated, user, checkingAuth } = useAuth();
+  const { isAuthenticated, user } = useAuth();
 
-  // Show loading while auth state is being verified
-  if (checkingAuth) {
+  // While restoring auth state from localStorage, show a small loader
+  if (user === null && !isAuthenticated) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <p>Checking authentication...</p>
+        <p>Restoring session...</p>
       </div>
     );
   }
 
-  // Redirect if not logged in
+  // Redirect to login if not logged in
   if (!isAuthenticated) {
+    console.warn("🔒 Redirecting to /login - not authenticated");
     return <Navigate to="/login" replace />;
   }
 
-  // Redirect if role is not allowed
+  // Redirect if user role isn’t in allowedRoles
   if (allowedRoles && user?.role && !allowedRoles.includes(user.role)) {
-    console.warn(`Unauthorized access attempt for role: ${user.role}`);
+    console.warn(`🚫 Unauthorized access attempt by role: ${user.role}`);
     return <Navigate to="/unauthorized" replace />;
   }
 
-  // Render child routes if authorized
+  // All checks passed → render child routes
   return <Outlet />;
 };
 
