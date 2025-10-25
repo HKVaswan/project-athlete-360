@@ -1,3 +1,4 @@
+// src/pages/Login.tsx
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -57,7 +58,7 @@ const Login: React.FC = () => {
     }
 
     try {
-      // ✅ Step 1: Send correct login payload
+      // Step 1: Login request (backend accepts username OR email)
       const response = await fetch(`${API_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -65,48 +66,92 @@ const Login: React.FC = () => {
       });
 
       if (!response.ok) {
+        // try to show backend message if available
+        let bodyText = "";
+        try { bodyText = await response.text(); } catch {}
+        console.warn("Login failed, server response:", response.status, bodyText);
         setError("Incorrect username or password.");
         setLoading(false);
         return;
       }
 
-      const data = await response.json();
-      if (!data.access_token) {
-        setError("Login failed. Invalid server response.");
+      const data: any = await response.json();
+
+      // ensure token present
+      if (!data || (!data.access_token && !data.token && !data.token?.access_token)) {
+        // If backend returned user without token, still try /me approach but warn:
+        console.warn("Login response missing token:", data);
+        setError("Login failed. Invalid server response (no token).");
         setLoading(false);
         return;
       }
 
-      // ✅ Step 2: Fetch user info (your backend uses /api/auth/me)
-      const meResponse = await fetch(`${API_URL}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${data.access_token}` },
-      });
-      const meData = await meResponse.json();
+      // prefer access_token location: data.access_token || data.token.access_token || data.token
+      const accessToken: string | undefined =
+        data.access_token || (data.token && (typeof data.token === "string" ? data.token : data.token.access_token)) || undefined;
 
-      if (!meResponse.ok || !meData.data) {
-        setError("Login failed. Could not fetch user info.");
+      if (!accessToken) {
+        setError("Login failed. No access token returned.");
         setLoading(false);
         return;
       }
 
-      // ✅ Step 3: Store token & user in context
-      login?.(data.access_token, meData.data);
+      // Step 2: Use any user returned in login response if present (avoid extra /me call)
+      let finalUser: any = null;
+      if (data.user) {
+        finalUser = data.user;
+      } else if (data.data) {
+        finalUser = data.data;
+      } else {
+        // fallback: call /api/auth/me
+        const meResponse = await fetch(`${API_URL}/api/auth/me`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
 
-      // ✅ Step 4: Redirect based on role
+        if (!meResponse.ok) {
+          // read text for debugging if possible
+          let txt = "";
+          try { txt = await meResponse.text(); } catch {}
+          console.warn("me fetch failed:", meResponse.status, txt);
+          setError("Login failed. Could not fetch user info.");
+          setLoading(false);
+          return;
+        }
+
+        const meData: any = await meResponse.json();
+        // accept meData.user, meData.data or meData (tolerant)
+        finalUser = meData.user ?? meData.data ?? meData;
+      }
+
+      // final sanity check
+      if (!finalUser) {
+        setError("Login failed. Could not determine user.");
+        setLoading(false);
+        return;
+      }
+
+      // Step 3: store token & user in auth context
+      login?.(accessToken, finalUser);
+
+      // Step 4: redirect based on role (tolerant for different shapes)
+      const role = finalUser.role ?? (finalUser?.data && finalUser.data.role) ?? null;
       const dashboardRoute = (() => {
-        switch (meData.data.role) {
-          case "admin": return "/admin-dashboard";
-          case "coach": return "/coach-dashboard";
-          case "athlete": return "/athlete-dashboard";
-          default: return "/login";
+        switch (role) {
+          case "admin":
+            return "/admin-dashboard";
+          case "coach":
+            return "/coach-dashboard";
+          case "athlete":
+            return "/athlete-dashboard";
+          default:
+            return "/login";
         }
       })();
 
       setSuccess(true);
-      setTimeout(() => navigate(dashboardRoute), 1200);
-
+      setTimeout(() => navigate(dashboardRoute), 900);
     } catch (err) {
-      console.error(err);
+      console.error("Login network/error:", err);
       setError("Network error. Please try again later.");
     } finally {
       setLoading(false);
