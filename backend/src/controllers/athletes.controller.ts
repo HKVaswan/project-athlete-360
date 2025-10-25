@@ -12,50 +12,6 @@ export const getAthletes = async (req: Request, res: Response) => {
   try {
     const { userId } = req.query;
 
-    // If userId is provided → return that athlete only
-    if (userId) {
-      const athlete = await prisma.athlete.findMany({
-        where: { userId: String(userId) },
-        select: {
-          id: true,
-          name: true,
-          sport: true,
-          dob: true,
-          gender: true,
-          contactInfo: true,
-          userId: true,
-        },
-      });
-
-      if (!athlete || athlete.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: "No athlete found for this user.",
-        });
-      }
-
-      return res.json({ success: true, data: athlete });
-    }
-
-    // Default: return all athletes
-    const athletes = await prisma.athlete.findMany({
-      select: { id: true, name: true, sport: true, dob: true, gender: true },
-      orderBy: { createdAt: "desc" },
-    });
-
-    res.json({ success: true, data: athletes });
-  } catch (err) {
-    logger.error("Failed to fetch athletes: " + err);
-    res.status(500).json({ success: false, message: "Failed to fetch athletes" });
-  }
-};
-
-// ───────────────────────────────
-// ✅ Get athletes (supports ?userId=)
-export const getAthletes = async (req: Request, res: Response) => {
-  try {
-    const { userId } = req.query;
-
     if (userId) {
       const athlete = await prisma.athlete.findMany({
         where: { userId: String(userId) },
@@ -93,7 +49,7 @@ export const getAthletes = async (req: Request, res: Response) => {
 };
 
 // ───────────────────────────────
-// ✅ Get athlete by ID (restore for routes)
+// ✅ Get athlete by ID (used in /api/athletes/:id)
 export const getAthleteById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -118,7 +74,6 @@ export const getAthleteById = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: "Failed to fetch athlete" });
   }
 };
-
 
 // ───────────────────────────────
 // Create athlete
