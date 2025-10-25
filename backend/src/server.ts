@@ -7,12 +7,19 @@ dotenv.config();
 
 const app = express();
 
-// ✅ Allow frontend domain explicitly (Render safe CORS setup)
+// ✅ Use FRONTEND_URL from environment or default to your Render frontend
+const allowedOrigins = [
+  process.env.FRONTEND_URL || "https://project-athlete-360-fd.onrender.com",
+  "http://localhost:5173", // local development
+];
+
 app.use(cors({
-  origin: [
-    "https://project-athlete-360-fd.onrender.com", // frontend
-    "http://localhost:5173" // local dev
-  ],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error("CORS policy: This origin is not allowed"));
+  },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
@@ -20,21 +27,22 @@ app.use(cors({
 
 app.use(express.json());
 
-// Health check (Render pings this)
+// ✅ Health check route (Render uptime pings)
 app.get("/", (_, res) => {
   res.status(200).send("✅ Project Athlete 360 Backend is running!");
 });
 
-// API routes
+// ✅ API routes
 app.use("/api/auth", authRoutes);
 
-// 404 fallback
+// ✅ 404 fallback for invalid routes
 app.use((_, res) => {
   res.status(404).json({ success: false, message: "Route not found" });
 });
 
-// ✅ Convert PORT to number safely and listen on 0.0.0.0
+// ✅ Use numeric PORT and bind to 0.0.0.0 for Render
 const PORT = Number(process.env.PORT) || 10000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running and listening on port ${PORT}`);
+  console.log(`✅ Allowed origins: ${allowedOrigins.join(", ")}`);
 });
