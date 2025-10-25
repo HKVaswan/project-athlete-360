@@ -9,23 +9,24 @@ import React, {
 } from "react";
 import { useNavigate } from "react-router-dom";
 
-const API_URL =
-  import.meta.env.VITE_API_URL || "https://project-athlete-360.onrender.com";
+const API_URL = (import.meta.env.VITE_API_URL || "https://project-athlete-360.onrender.com").replace(/\/+$/, "");
 
 interface UserInfo {
-  id: number | string;
+  id: string; // IMPORTANT: backend uses UUID strings
   username: string;
-  email?: string;
-  name?: string;
-  role?: string;
+  role: string;
+  exp?: number;
 }
 
 interface AuthContextType {
   token: string | null;
   user: UserInfo | null;
+  authError: string | null;
   login: (token: string, user: UserInfo) => void;
   logout: () => void;
   isAuthenticated: boolean;
+  checkingAuth: boolean;
+  checkAuth: () => Promise<boolean>;
   loginUser: (username: string, password: string) => Promise<boolean>;
   registerUser: (
     username: string,
@@ -41,58 +42,142 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const navigate = useNavigate();
-
-  const [token, setToken] = useState<string | null>(
-    localStorage.getItem("auth_token")
-  );
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem("token") || sessionStorage.getItem("token"));
   const [user, setUser] = useState<UserInfo | null>(() => {
-    const stored = localStorage.getItem("auth_user");
+    const stored = localStorage.getItem("user") || sessionStorage.getItem("user");
     return stored ? JSON.parse(stored) : null;
   });
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [checkingAuth, setCheckingAuth] = useState(false);
 
-  const login = (newToken: string, userInfo: UserInfo) => {
-    setToken(newToken);
-    setUser(userInfo);
-    localStorage.setItem("auth_token", newToken);
-    localStorage.setItem("auth_user", JSON.stringify(userInfo));
+  const navigate = useNavigate();
 
-    // Redirect based on role
-    if (userInfo.role === "admin") navigate("/admin-dashboard");
-    else if (userInfo.role === "coach") navigate("/coach-dashboard");
-    else navigate("/athlete-dashboard");
-  };
+  const clearStorage = useCallback(() => {
+    try {
+      sessionStorage.removeItem("token");
+      sessionStorage.removeItem("user");
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+    } catch (e) {
+      // ignore
+    }
+  }, []);
 
   const logout = useCallback(() => {
     setToken(null);
     setUser(null);
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("auth_user");
+    clearStorage();
+    setAuthError("Session expired. Please log in again.");
     navigate("/login");
-  }, [navigate]);
+  }, [clearStorage, navigate]);
 
-  const loginUser = async (username: string, password: string) => {
+  const login = (newToken: string, userInfo: UserInfo) => {
+    setToken(newToken);
+    setUser(userInfo);
+    setAuthError(null);
+
     try {
-      const response = await fetch(`${API_URL}/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+      // persist in localStorage (so app remains logged in on refresh)
+      localStorage.setItem("token", newToken);
+      localStorage.setItem("user", JSON.stringify(userInfo));
+    } catch (err) {
+      console.warn("Could not persist auth in localStorage", err);
+    }
+
+    // Redirect to role dashboard
+    if (userInfo.role === "athlete") navigate("/athlete-dashboard");
+    else if (userInfo.role === "coach") navigate("/coach-dashboard");
+    else if (userInfo.role === "admin") navigate("/admin-dashboard");
+    else navigate("/login");
+  };
+
+  const checkAuth = useCallback(async (): Promise<boolean> => {
+    const storedToken = localStorage.getItem("token") || sessionStorage.getItem("token");
+    const storedUser = localStorage.getItem("user") || sessionStorage.getItem("user");
+
+    if (!storedToken || !storedUser) {
+      logout();
+      return false;
+    }
+
+    setCheckingAuth(true);
+    try {
+      const response = await fetch(`${API_URL}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${storedToken}` },
       });
 
-      const data = await response.json();
-
-      if (!response.ok || !data.access_token) {
-        console.error("Login error:", data);
+      if (!response.ok) {
+        logout();
         return false;
       }
 
-      const token = data.access_token;
-      const userData = data.user || data.data;
+      const body = await response.json();
+      // backend returns either `user` or `data` -> be tolerant
+      const apiUser = body.user || body.data || body.data?.user || null;
 
-      login(token, userData);
+      if (!apiUser) {
+        logout();
+        return false;
+      }
+
+      // ensure id is string (backend uses UUID)
+      const normalizedUser: UserInfo = {
+        id: String(apiUser.id),
+        username: apiUser.username,
+        role: apiUser.role || "athlete",
+        exp: apiUser.exp, // optional
+      };
+
+      setToken(storedToken);
+      setUser(normalizedUser);
+      setAuthError(null);
       return true;
     } catch (err) {
-      console.error("❌ Login failed:", err);
+      console.error("❌ checkAuth failed:", err);
+      logout();
+      return false;
+    } finally {
+      setCheckingAuth(false);
+    }
+  }, [logout]);
+
+  useEffect(() => {
+    // on app start, validate token if present
+    if (!user || !token) return;
+    checkAuth();
+  }, []); // run once
+
+  // loginUser: used by non-React login flows — calls backend and stores token/user
+  const loginUser = async (usernameOrEmail: string, password: string): Promise<boolean> => {
+    try {
+      const resp = await fetch(`${API_URL}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: usernameOrEmail.trim(), password }),
+      });
+
+      if (!resp.ok) {
+        const errBody = await resp.json().catch(() => ({}));
+        console.warn("Login failed:", resp.status, errBody);
+        setAuthError(errBody.message || "Login failed");
+        return false;
+      }
+
+      const body = await resp.json();
+      const access_token = body.access_token || body.data?.access_token || body.data?.token || body.token;
+      const apiUser = body.user || body.data?.user || body.data || null;
+
+      if (!access_token || !apiUser) {
+        setAuthError("Invalid server response during login.");
+        return false;
+      }
+
+      const userInfo: UserInfo = { id: String(apiUser.id), username: apiUser.username, role: apiUser.role || "athlete" };
+      login(access_token, userInfo);
+      return true;
+    } catch (err) {
+      console.error("❌ loginUser failed:", err);
+      setAuthError("Network error during login.");
       return false;
     }
   };
@@ -105,61 +190,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     sport: string,
     gender: string,
     contact_info: string
-  ) => {
+  ): Promise<boolean> => {
     try {
-      const response = await fetch(`${API_URL}/api/auth/register`, {
+      const resp = await fetch(`${API_URL}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username,
-          password,
-          name,
-          dob,
-          sport,
-          gender,
-          contact_info,
-        }),
+        body: JSON.stringify({ username, password, name, dob, sport, gender, contact_info, role: "athlete" }),
       });
 
-      const data = await response.json();
-      if (!response.ok || !data.success) {
-        console.error("Registration error:", data);
+      if (!resp.ok) {
+        const errBody = await resp.json().catch(() => ({}));
+        setAuthError(errBody.message || "Registration failed");
         return false;
       }
 
-      // Automatically log in user if backend sends token
-      if (data.access_token) {
-        login(data.access_token, data.user || data.data.user);
-      }
-
-      return true;
+      // Optionally auto-login after register:
+      // try to login immediately with the provided credentials
+      return await loginUser(username, password);
     } catch (err) {
-      console.error("❌ Registration failed:", err);
+      console.error("❌ registerUser failed:", err);
+      setAuthError("Network error during registration.");
       return false;
     }
   };
 
   const isAuthenticated = !!token && !!user;
 
-  // Auto restore session from localStorage
-  useEffect(() => {
-    const storedToken = localStorage.getItem("auth_token");
-    const storedUser = localStorage.getItem("auth_user");
-
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
-    }
-  }, []);
-
   return (
     <AuthContext.Provider
       value={{
         token,
         user,
+        authError,
         login,
         logout,
         isAuthenticated,
+        checkingAuth,
+        checkAuth,
         loginUser,
         registerUser,
       }}
@@ -170,7 +237,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 };
 
 export const useAuth = () => {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
-  return ctx;
+  const context = useContext(AuthContext);
+  if (!context) throw new Error("useAuth must be used within AuthProvider");
+  return context;
 };
