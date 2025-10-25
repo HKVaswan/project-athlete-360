@@ -6,7 +6,18 @@ import authRoutes from "./routes/auth";
 dotenv.config();
 
 const app = express();
-app.use(cors());
+
+// ✅ Allow frontend domain explicitly (Render safe CORS setup)
+app.use(cors({
+  origin: [
+    "https://project-athlete-360-fd.onrender.com", // frontend
+    "http://localhost:5173" // local dev
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+}));
+
 app.use(express.json());
 
 // Health check (Render pings this)
@@ -22,10 +33,8 @@ app.use((_, res) => {
   res.status(404).json({ success: false, message: "Route not found" });
 });
 
-// Convert PORT to number safely
+// ✅ Convert PORT to number safely and listen on 0.0.0.0
 const PORT = Number(process.env.PORT) || 10000;
-
-// Listen on 0.0.0.0 (important for Render)
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running and listening on port ${PORT}`);
 });
