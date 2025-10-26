@@ -85,6 +85,12 @@ export const createAthlete = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: "userId is required to link athlete" });
     }
 
+    // If an athlete already exists for this user, return it (idempotent)
+    const existing = await prisma.athlete.findUnique({ where: { userId: String(userId) } });
+    if (existing) {
+      return res.status(200).json({ success: true, message: "Athlete already exists for this user", data: existing });
+    }
+
     const newAthlete = await prisma.athlete.create({
       data: {
         name,
@@ -93,13 +99,16 @@ export const createAthlete = async (req: Request, res: Response) => {
         gender,
         contactInfo,
         athleteCode: generateAthleteCode(),
-        user: { connect: { id: userId } },
+        user: { connect: { id: userId } }, // mandatory relation
       },
     });
 
     res.status(201).json({ success: true, data: newAthlete });
-  } catch (err) {
+  } catch (err: any) {
     logger.error("Failed to create athlete: " + err);
+    if (err?.code === "P2002") {
+      return res.status(400).json({ success: false, message: "Duplicate athlete or unique constraint violation" });
+    }
     res.status(400).json({ success: false, message: "Failed to create athlete" });
   }
 };
