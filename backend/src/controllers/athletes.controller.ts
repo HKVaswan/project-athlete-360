@@ -7,14 +7,25 @@ import logger from "../logger";
 const generateAthleteCode = () => `ATH-${Math.floor(1000 + Math.random() * 9000)}`;
 
 // ───────────────────────────────
-// ✅ Get athletes (supports ?userId=)
+// ✅ Get athletes (supports ?userId=, ?limit=, ?page=)
 export const getAthletes = async (req: Request, res: Response) => {
   try {
-    const { userId } = req.query;
+    const { userId, limit, page } = req.query;
+    const take = Number(limit) || 10; // default limit = 10
+    const skip = page ? (Number(page) - 1) * take : 0;
 
+    let whereClause: any = {};
+
+    // Filter by userId (used by Athlete Dashboard)
     if (userId) {
-      const athlete = await prisma.athlete.findMany({
-        where: { userId: String(userId) },
+      whereClause.userId = String(userId);
+    }
+
+    // TODO (future): filter by coachId once implemented
+
+    const [athletes, total] = await Promise.all([
+      prisma.athlete.findMany({
+        where: whereClause,
         select: {
           id: true,
           name: true,
@@ -24,24 +35,32 @@ export const getAthletes = async (req: Request, res: Response) => {
           contactInfo: true,
           userId: true,
         },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take,
+      }),
+      prisma.athlete.count({ where: whereClause }),
+    ]);
+
+    if (!athletes || athletes.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No athlete found.",
+        data: [],
+        meta: { total, page: Number(page) || 1, limit: take },
       });
-
-      if (!athlete || athlete.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: "No athlete found for this user.",
-        });
-      }
-
-      return res.json({ success: true, data: athlete });
     }
 
-    const athletes = await prisma.athlete.findMany({
-      select: { id: true, name: true, sport: true, dob: true, gender: true },
-      orderBy: { createdAt: "desc" },
+    res.json({
+      success: true,
+      data: athletes,
+      meta: {
+        total,
+        page: Number(page) || 1,
+        limit: take,
+        totalPages: Math.ceil(total / take),
+      },
     });
-
-    res.json({ success: true, data: athletes });
   } catch (err) {
     logger.error("Failed to fetch athletes: " + err);
     res.status(500).json({ success: false, message: "Failed to fetch athletes" });
@@ -49,7 +68,7 @@ export const getAthletes = async (req: Request, res: Response) => {
 };
 
 // ───────────────────────────────
-// ✅ Get athlete by ID (used in /api/athletes/:id)
+// ✅ Get athlete by ID
 export const getAthleteById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -76,19 +95,13 @@ export const getAthleteById = async (req: Request, res: Response) => {
 };
 
 // ───────────────────────────────
-// Create athlete
+// ✅ Create athlete
 export const createAthlete = async (req: Request, res: Response) => {
   try {
     const { name, sport, dob, gender, contactInfo, userId } = req.body;
 
     if (!userId) {
       return res.status(400).json({ success: false, message: "userId is required to link athlete" });
-    }
-
-    // If an athlete already exists for this user, return it (idempotent)
-    const existing = await prisma.athlete.findUnique({ where: { userId: String(userId) } });
-    if (existing) {
-      return res.status(200).json({ success: true, message: "Athlete already exists for this user", data: existing });
     }
 
     const newAthlete = await prisma.athlete.create({
@@ -99,22 +112,19 @@ export const createAthlete = async (req: Request, res: Response) => {
         gender,
         contactInfo,
         athleteCode: generateAthleteCode(),
-        user: { connect: { id: userId } }, // mandatory relation
+        user: { connect: { id: userId } },
       },
     });
 
     res.status(201).json({ success: true, data: newAthlete });
-  } catch (err: any) {
+  } catch (err) {
     logger.error("Failed to create athlete: " + err);
-    if (err?.code === "P2002") {
-      return res.status(400).json({ success: false, message: "Duplicate athlete or unique constraint violation" });
-    }
     res.status(400).json({ success: false, message: "Failed to create athlete" });
   }
 };
 
 // ───────────────────────────────
-// Update athlete
+// ✅ Update athlete
 export const updateAthlete = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -127,7 +137,7 @@ export const updateAthlete = async (req: Request, res: Response) => {
 };
 
 // ───────────────────────────────
-// Delete athlete
+// ✅ Delete athlete
 export const deleteAthlete = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -140,7 +150,7 @@ export const deleteAthlete = async (req: Request, res: Response) => {
 };
 
 // ───────────────────────────────
-// Add session to athlete
+// Add training session
 export const addTrainingSession = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
