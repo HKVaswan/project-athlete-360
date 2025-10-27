@@ -83,8 +83,16 @@ app.use("/api/messages", messageRoutes);
 app.use("/api/resources", resourceRoutes);
 
 // Future (optional)
-// app.use("/api/sessions", sessionRoutes);
-// app.use("/api/invitations", invitationRoutes);
+ // app.use("/api/sessions", sessionRoutes);
+ // app.use("/api/invitations", invitationRoutes);
+
+// ───────────────────────────────
+// ❗ Error Handling (MUST come after all routes)
+// ───────────────────────────────
+import { notFoundHandler, errorHandler } from "./middleware/error.middleware";
+
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 // ───────────────────────────────
 // ❌ 404 Fallback
