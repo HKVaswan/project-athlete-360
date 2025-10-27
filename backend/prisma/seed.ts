@@ -1,61 +1,73 @@
 // prisma/seed.ts
-import { PrismaClient, Role, Severity, AttendanceStatus, InviteStatus, ResourceVisibility } from "@prisma/client";
+import {
+  PrismaClient,
+  Role,
+  Severity,
+  AttendanceStatus,
+  InviteStatus,
+  ResourceVisibility,
+} from "@prisma/client";
 import bcrypt from "bcrypt";
 
 const prisma = new PrismaClient();
 
-const generateCoachCode = () => `COACH-${Math.floor(1000 + Math.random() * 9000)}`;
-const generateAthleteCode = () => `ATH-${Math.floor(1000 + Math.random() * 9000)}`;
-const generateInvitationCode = () => `INV-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+// ───────────────────────────────
+// 🔧 Helpers
+const generateCode = (prefix: string) =>
+  `${prefix}-${Math.floor(1000 + Math.random() * 9000)}`;
+const generateInvitationCode = () =>
+  `INV-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
 async function main() {
-  console.log("\n🌱 Starting Project Athlete 360 database seed...");
+  console.log("\n🌱 Starting Project Athlete 360 Database Seed...");
   console.log("───────────────────────────────────────────────");
 
   const password = "password123";
   const hash = await bcrypt.hash(password, 10);
 
   // ───────────────────────────────
-  // 1️⃣ Create Admin, Coach, and Athlete Users
-  const admin = await prisma.user.upsert({
-    where: { username: "admin" },
-    update: {},
-    create: {
-      username: "admin",
-      email: "admin@example.com",
-      passwordHash: hash,
-      name: "Platform Admin",
-      role: Role.admin,
-    },
-  });
+  // 1️⃣ Create Users: Admin, Coach, Athlete
+  const [admin, coach, athleteUser] = await Promise.all([
+    prisma.user.upsert({
+      where: { username: "admin" },
+      update: {},
+      create: {
+        username: "admin",
+        email: "admin@example.com",
+        passwordHash: hash,
+        name: "Platform Admin",
+        role: Role.admin,
+      },
+    }),
+    prisma.user.upsert({
+      where: { username: "coach1" },
+      update: {},
+      create: {
+        username: "coach1",
+        email: "coach1@example.com",
+        passwordHash: hash,
+        name: "Head Coach",
+        role: Role.coach,
+        coachCode: generateCode("COACH"),
+      },
+    }),
+    prisma.user.upsert({
+      where: { username: "athlete1" },
+      update: {},
+      create: {
+        username: "athlete1",
+        email: "athlete1@example.com",
+        passwordHash: hash,
+        name: "Sample Athlete",
+        role: Role.athlete,
+      },
+    }),
+  ]);
 
-  const coach = await prisma.user.upsert({
-    where: { username: "coach1" },
-    update: {},
-    create: {
-      username: "coach1",
-      email: "coach1@example.com",
-      passwordHash: hash,
-      name: "Head Coach",
-      role: Role.coach,
-      coachCode: generateCoachCode(),
-    },
-  });
-
-  const athleteUser = await prisma.user.upsert({
-    where: { username: "athlete1" },
-    update: {},
-    create: {
-      username: "athlete1",
-      email: "athlete1@example.com",
-      passwordHash: hash,
-      name: "Sample Athlete",
-      role: Role.athlete,
-    },
-  });
+  console.log("✅ Users created:", { admin: admin.username, coach: coach.username });
 
   // ───────────────────────────────
-  // 2️⃣ Institution Creation
+  // 2️⃣ Create Institution
   const institution = await prisma.institution.upsert({
     where: { code: "INST-001" },
     update: {},
@@ -68,6 +80,8 @@ async function main() {
       admin: { connect: { id: admin.id } },
     },
   });
+
+  console.log("🏫 Institution created:", institution.name);
 
   // ───────────────────────────────
   // 3️⃣ Link Coach to Institution
@@ -85,6 +99,8 @@ async function main() {
     },
   });
 
+  console.log("👨‍🏫 Coach linked to institution");
+
   // ───────────────────────────────
   // 4️⃣ Create Athlete Profile
   const athlete = await prisma.athlete.upsert({
@@ -92,7 +108,7 @@ async function main() {
     update: {},
     create: {
       user: { connect: { id: athleteUser.id } },
-      athleteCode: generateAthleteCode(),
+      athleteCode: generateCode("ATH"),
       name: "Sample Athlete",
       dob: new Date("2002-01-01"),
       sport: "Athletics",
@@ -103,6 +119,8 @@ async function main() {
       approvedBy: coach.id,
     },
   });
+
+  console.log("🏃 Athlete profile created and approved");
 
   // ───────────────────────────────
   // 5️⃣ Training Session & Attendance
@@ -126,6 +144,8 @@ async function main() {
       remarks: "On time and fully engaged",
     },
   });
+
+  console.log("🗓️ Session & attendance data seeded");
 
   // ───────────────────────────────
   // 6️⃣ Assessments & Performance Metrics
@@ -158,6 +178,8 @@ async function main() {
     ],
   });
 
+  console.log("📊 Assessments & performance metrics seeded");
+
   // ───────────────────────────────
   // 7️⃣ Injury Record
   await prisma.injury.create({
@@ -169,8 +191,10 @@ async function main() {
     },
   });
 
+  console.log("🩹 Injury record added");
+
   // ───────────────────────────────
-  // 8️⃣ Competition Records
+  // 8️⃣ Competition Data
   const competition = await prisma.competition.create({
     data: {
       name: "National Sprint Championship",
@@ -187,9 +211,11 @@ async function main() {
       competitionId: competition.id,
       result: "Gold",
       position: 1,
-      performanceNotes: "Excellent start and acceleration",
+      performanceNotes: "Excellent start and top speed consistency",
     },
   });
+
+  console.log("🏆 Competition data seeded");
 
   // ───────────────────────────────
   // 9️⃣ Message System
@@ -199,7 +225,8 @@ async function main() {
         senderId: admin.id,
         receiverId: coach.id,
         title: "Welcome Coach!",
-        content: "Welcome to National Sports Academy’s digital system. Start managing your athletes today.",
+        content:
+          "Welcome to National Sports Academy’s digital platform. Start managing your athletes efficiently!",
       },
       {
         senderId: coach.id,
@@ -210,6 +237,8 @@ async function main() {
     ],
   });
 
+  console.log("💬 Messages seeded");
+
   // ───────────────────────────────
   // 🔟 Resource Sharing
   const resource = await prisma.resource.create({
@@ -217,7 +246,7 @@ async function main() {
       uploaderId: coach.id,
       institutionId: institution.id,
       title: "Sprint Techniques PDF",
-      description: "Guide to improve sprint mechanics and acceleration.",
+      description: "Comprehensive guide to sprint mechanics and form correction.",
       type: "pdf",
       fileUrl: "https://example.com/sprint_guide.pdf",
       visibility: ResourceVisibility.institution,
@@ -231,8 +260,10 @@ async function main() {
     },
   });
 
+  console.log("📂 Resource sharing setup complete");
+
   // ───────────────────────────────
-  // 1️⃣1️⃣ Invitation Example
+  // 1️⃣1️⃣ Invitation System Example
   await prisma.invitation.create({
     data: {
       code: generateInvitationCode(),
@@ -241,18 +272,19 @@ async function main() {
       role: Role.athlete,
       institutionId: institution.id,
       status: InviteStatus.pending,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // expires in 7 days
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     },
   });
 
+  console.log("✉️  Invitation seeded successfully");
+
   // ───────────────────────────────
-  console.log("✅ Seed completed successfully!");
+  console.log("\n✅ Seed completed successfully!");
   console.log("───────────────────────────────────────────────");
-  console.log("🎟️  Institution:", institution.name, `(Code: ${institution.code})`);
-  console.log("👨‍💼  Admin → admin / password123");
-  console.log("👨‍🏫  Coach → coach1 / password123");
-  console.log("🏃  Athlete → athlete1 / password123");
-  console.log("💬  Sample data: sessions, injuries, messages, resources seeded successfully.");
+  console.log(`🏫 Institution: ${institution.name} (Code: ${institution.code})`);
+  console.log(`👨‍💼 Admin → admin / ${password}`);
+  console.log(`👨‍🏫 Coach → coach1 / ${password}`);
+  console.log(`🏃 Athlete → athlete1 / ${password}`);
   console.log("───────────────────────────────────────────────\n");
 }
 
