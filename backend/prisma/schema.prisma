@@ -17,17 +17,11 @@ model User {
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
   settings     Json?
-
-  // Relationships
   tokens       RefreshToken[]
   athlete      Athlete?        @relation("UserAthlete")
-  approvedAthletes Athlete[]   @relation("ApprovedByUser")
-  messagesSent  Message[]      @relation("SenderMessages")
-  messagesReceived Message[]   @relation("ReceiverMessages")
-  institution   Institution?   @relation("InstitutionAdmin", fields: [institutionId], references: [id])
-  institutionId String?        // if this user belongs to an institution (coach or athlete)
 
-  @@index([role])
+  // 👇 ADD THIS new relation for coaches linked to institutions
+  coachInstitutions CoachInstitution[] @relation("UserCoachInstitution")
 }
 
 model RefreshToken {
@@ -63,14 +57,16 @@ model Institution {
 // ───────────────────────────────
 // 👨‍🏫 CoachInstitution (connects coaches to institutions)
 model CoachInstitution {
-  id             String     @id @default(uuid())
+  id             String       @id @default(uuid())
   coachId        String
   institutionId  String
-  coach          User       @relation(fields: [coachId], references: [id], onDelete: Cascade)
-  institution    Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
-  assignedSince  DateTime   @default(now())
 
-  @@unique([coachId, institutionId])
+  // 👇 Match relation name exactly
+  coach          User         @relation("UserCoachInstitution", fields: [coachId], references: [id], onDelete: Cascade)
+  institution    Institution  @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 }
 
 // ───────────────────────────────
