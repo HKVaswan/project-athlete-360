@@ -1,17 +1,22 @@
 // prisma/seed.ts
-import { PrismaClient, Role, Severity, AttendanceStatus } from "@prisma/client";
+import { PrismaClient, Role, Severity, AttendanceStatus, InviteStatus, ResourceVisibility } from "@prisma/client";
 import bcrypt from "bcrypt";
 
 const prisma = new PrismaClient();
 
+const generateCoachCode = () => `COACH-${Math.floor(1000 + Math.random() * 9000)}`;
+const generateAthleteCode = () => `ATH-${Math.floor(1000 + Math.random() * 9000)}`;
+const generateInvitationCode = () => `INV-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
 async function main() {
-  console.log("🌱 Running Project Athlete 360 seed...");
+  console.log("\n🌱 Starting Project Athlete 360 database seed...");
+  console.log("───────────────────────────────────────────────");
 
   const password = "password123";
   const hash = await bcrypt.hash(password, 10);
 
   // ───────────────────────────────
-  // 1️⃣ Create Users
+  // 1️⃣ Create Admin, Coach, and Athlete Users
   const admin = await prisma.user.upsert({
     where: { username: "admin" },
     update: {},
@@ -33,6 +38,7 @@ async function main() {
       passwordHash: hash,
       name: "Head Coach",
       role: Role.coach,
+      coachCode: generateCoachCode(),
     },
   });
 
@@ -49,7 +55,7 @@ async function main() {
   });
 
   // ───────────────────────────────
-  // 2️⃣ Create Institution
+  // 2️⃣ Institution Creation
   const institution = await prisma.institution.upsert({
     where: { code: "INST-001" },
     update: {},
@@ -65,7 +71,7 @@ async function main() {
 
   // ───────────────────────────────
   // 3️⃣ Link Coach to Institution
-  const coachInstitution = await prisma.coachInstitution.upsert({
+  await prisma.coachInstitution.upsert({
     where: {
       coachId_institutionId: {
         coachId: coach.id,
@@ -80,13 +86,13 @@ async function main() {
   });
 
   // ───────────────────────────────
-  // 4️⃣ Create Athlete Profile (pending approval)
+  // 4️⃣ Create Athlete Profile
   const athlete = await prisma.athlete.upsert({
     where: { userId: athleteUser.id },
     update: {},
     create: {
       user: { connect: { id: athleteUser.id } },
-      athleteCode: "ATH-0001",
+      athleteCode: generateAthleteCode(),
       name: "Sample Athlete",
       dob: new Date("2002-01-01"),
       sport: "Athletics",
@@ -99,7 +105,7 @@ async function main() {
   });
 
   // ───────────────────────────────
-  // 5️⃣ Create Session & Attendance
+  // 5️⃣ Training Session & Attendance
   const session = await prisma.session.create({
     data: {
       name: "Speed Training - Day 1",
@@ -117,12 +123,12 @@ async function main() {
       sessionId: session.id,
       athleteId: athlete.id,
       status: AttendanceStatus.present,
-      remarks: "On time and active participation",
+      remarks: "On time and fully engaged",
     },
   });
 
   // ───────────────────────────────
-  // 6️⃣ Add Assessments & Performance
+  // 6️⃣ Assessments & Performance Metrics
   await prisma.assessment.createMany({
     data: [
       {
@@ -131,7 +137,7 @@ async function main() {
         metric: "100m_time",
         valueNumber: 12.4,
         valueText: "12.4s",
-        notes: "Good form",
+        notes: "Good form and drive phase",
       },
       {
         athleteId: athlete.id,
@@ -139,36 +145,21 @@ async function main() {
         metric: "vertical_jump_cm",
         valueNumber: 45,
         valueText: "45 cm",
-        notes: "Decent",
+        notes: "Strong lower body",
       },
     ],
   });
 
   await prisma.performance.createMany({
     data: [
-      {
-        athleteId: athlete.id,
-        assessmentType: "100m_time",
-        score: 12.4,
-        date: new Date("2025-01-01"),
-      },
-      {
-        athleteId: athlete.id,
-        assessmentType: "100m_time",
-        score: 12.2,
-        date: new Date("2025-02-01"),
-      },
-      {
-        athleteId: athlete.id,
-        assessmentType: "100m_time",
-        score: 12.0,
-        date: new Date("2025-03-01"),
-      },
+      { athleteId: athlete.id, assessmentType: "100m_time", score: 12.4, date: new Date("2025-01-01") },
+      { athleteId: athlete.id, assessmentType: "100m_time", score: 12.2, date: new Date("2025-02-01") },
+      { athleteId: athlete.id, assessmentType: "100m_time", score: 12.0, date: new Date("2025-03-01") },
     ],
   });
 
   // ───────────────────────────────
-  // 7️⃣ Add Injury Record
+  // 7️⃣ Injury Record
   await prisma.injury.create({
     data: {
       athleteId: athlete.id,
@@ -179,7 +170,7 @@ async function main() {
   });
 
   // ───────────────────────────────
-  // 8️⃣ Competition Setup
+  // 8️⃣ Competition Records
   const competition = await prisma.competition.create({
     data: {
       name: "National Sprint Championship",
@@ -196,25 +187,25 @@ async function main() {
       competitionId: competition.id,
       result: "Gold",
       position: 1,
-      performanceNotes: "Excellent acceleration",
+      performanceNotes: "Excellent start and acceleration",
     },
   });
 
   // ───────────────────────────────
-  // 9️⃣ Message System (Admin → Coach & Coach → Athlete)
+  // 9️⃣ Message System
   await prisma.message.createMany({
     data: [
       {
         senderId: admin.id,
         receiverId: coach.id,
         title: "Welcome Coach!",
-        content: "Welcome to National Sports Academy’s digital platform.",
+        content: "Welcome to National Sports Academy’s digital system. Start managing your athletes today.",
       },
       {
         senderId: coach.id,
         receiverId: athleteUser.id,
-        title: "Your First Training Session",
-        content: "Report to ground at 7 AM sharp for sprint training.",
+        title: "Your First Session",
+        content: "Report to the main ground at 7 AM sharp for sprint training.",
       },
     ],
   });
@@ -226,9 +217,10 @@ async function main() {
       uploaderId: coach.id,
       institutionId: institution.id,
       title: "Sprint Techniques PDF",
-      description: "Guide for improving 100m sprint time.",
+      description: "Guide to improve sprint mechanics and acceleration.",
       type: "pdf",
       fileUrl: "https://example.com/sprint_guide.pdf",
+      visibility: ResourceVisibility.institution,
     },
   });
 
@@ -239,12 +231,29 @@ async function main() {
     },
   });
 
-  console.log("✅ Seed finished successfully!");
-  console.log("Login Credentials:");
-  console.log("🔹 Admin → admin / password123");
-  console.log("🔹 Coach → coach1 / password123");
-  console.log("🔹 Athlete → athlete1 / password123");
-  console.log("🏫 Institution: National Sports Academy (Code: INST-001)");
+  // ───────────────────────────────
+  // 1️⃣1️⃣ Invitation Example
+  await prisma.invitation.create({
+    data: {
+      code: generateInvitationCode(),
+      senderId: coach.id,
+      receiverEmail: "newathlete@example.com",
+      role: Role.athlete,
+      institutionId: institution.id,
+      status: InviteStatus.pending,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // expires in 7 days
+    },
+  });
+
+  // ───────────────────────────────
+  console.log("✅ Seed completed successfully!");
+  console.log("───────────────────────────────────────────────");
+  console.log("🎟️  Institution:", institution.name, `(Code: ${institution.code})`);
+  console.log("👨‍💼  Admin → admin / password123");
+  console.log("👨‍🏫  Coach → coach1 / password123");
+  console.log("🏃  Athlete → athlete1 / password123");
+  console.log("💬  Sample data: sessions, injuries, messages, resources seeded successfully.");
+  console.log("───────────────────────────────────────────────\n");
 }
 
 main()
