@@ -1,5 +1,5 @@
 // ───────────────────────────────
-// ⚙️ Prisma Setup
+// ⚙️ PRISMA SETUP
 generator client {
   provider = "prisma-client-js"
 }
@@ -24,33 +24,29 @@ model User {
   updatedAt       DateTime            @updatedAt
   settings        Json?
 
-  // Relations
+  // ── Relations
   institution     Institution?        @relation("UserInstitution", fields: [institutionId], references: [id], onDelete: SetNull)
   tokens          RefreshToken[]
   athlete         Athlete?            @relation("UserAthlete")
   coachInstitutions CoachInstitution[] @relation("UserCoachInstitution")
 
-  // Messages
+  // ── Communication & Resources
   sentMessages     Message[]          @relation("SenderMessages")
   receivedMessages Message[]          @relation("ReceiverMessages")
-
-  // Resources
   uploadedResources Resource[]        @relation("UploadedResources")
   receivedResources ResourceShare[]   @relation("ReceivedResources")
 
-  // Approvals
+  // ── Approvals & Admin
   approvedAthletes Athlete[]          @relation("ApprovedByUser")
-
-  // Institution admin
   adminInstitutions Institution[]     @relation("InstitutionAdmin")
 
-  // Invitations (sent or received)
+  // ── Invitations
   sentInvitations     Invitation[]    @relation("SentInvitations")
   receivedInvitations Invitation[]    @relation("ReceivedInvitations")
 }
 
 // ───────────────────────────────
-// 🔑 AUTH TOKENS
+// 🔑 REFRESH TOKENS
 model RefreshToken {
   id        String   @id @default(uuid())
   userId    String
@@ -59,6 +55,7 @@ model RefreshToken {
   revoked   Boolean  @default(false)
   issuedAt  DateTime @default(now())
   expiresAt DateTime
+  @@index([userId])
 }
 
 // ───────────────────────────────
@@ -92,6 +89,8 @@ model CoachInstitution {
 
   coach          User         @relation("UserCoachInstitution", fields: [coachId], references: [id], onDelete: Cascade)
   institution    Institution  @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+
+  @@unique([coachId, institutionId])
 }
 
 // ───────────────────────────────
@@ -121,26 +120,32 @@ model Athlete {
   performances  Performance[]
   attendance    Attendance[]
   competitions  AthleteCompetition[]
+
+  @@index([institutionId])
+  @@index([approved])
 }
 
 // ───────────────────────────────
 // 📨 INVITATION SYSTEM
 model Invitation {
-  id             String     @id @default(uuid())
-  code           String     @unique
+  id             String        @id @default(uuid())
+  code           String        @unique
   senderId       String
   receiverEmail  String
-  role           Role       @default(athlete)
+  role           Role          @default(athlete)
   institutionId  String?
-  status         InviteStatus @default(pending)
+  status         InviteStatus  @default(pending)
   expiresAt      DateTime
-  createdAt      DateTime   @default(now())
+  createdAt      DateTime      @default(now())
   acceptedAt     DateTime?
   revokedAt      DateTime?
 
-  sender         User        @relation("SentInvitations", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver       User?       @relation("ReceivedInvitations", fields: [receiverEmail], references: [email], onDelete: SetNull)
-  institution    Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+  sender         User          @relation("SentInvitations", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver       User?         @relation("ReceivedInvitations", fields: [receiverEmail], references: [email], onDelete: SetNull)
+  institution    Institution?  @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+
+  @@index([institutionId])
+  @@index([status])
 }
 
 // ───────────────────────────────
@@ -157,6 +162,8 @@ model Competition {
 
   institution    Institution?          @relation(fields: [institutionId], references: [id])
   participants   AthleteCompetition[]
+
+  @@index([institutionId])
 }
 
 model AthleteCompetition {
@@ -189,6 +196,8 @@ model Message {
 
   sender      User     @relation("SenderMessages", fields: [senderId], references: [id], onDelete: Cascade)
   receiver    User     @relation("ReceiverMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([receiverId, read])
 }
 
 // ───────────────────────────────
@@ -208,6 +217,9 @@ model Resource {
   uploader       User           @relation("UploadedResources", fields: [uploaderId], references: [id], onDelete: Cascade)
   institution    Institution?   @relation(fields: [institutionId], references: [id], onDelete: SetNull)
   sharedWith     ResourceShare[]
+
+  @@index([institutionId])
+  @@index([visibility])
 }
 
 model ResourceShare {
