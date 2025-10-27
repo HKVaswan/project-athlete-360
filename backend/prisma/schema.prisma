@@ -1,5 +1,5 @@
 // ───────────────────────────────
-// Prisma Setup
+// ⚙️ Prisma Setup
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,39 +10,47 @@ datasource db {
 }
 
 // ───────────────────────────────
-// 👤 User (Base Model)
+// 👤 USER MODEL
 model User {
-  id           String              @id @default(uuid())
-  username     String              @unique
-  email        String?             @unique
-  passwordHash String
-  name         String?
-  role         Role                @default(athlete)
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
-  settings     Json?
+  id              String              @id @default(uuid())
+  username        String              @unique
+  email           String?             @unique
+  passwordHash    String
+  name            String?
+  role            Role                @default(athlete)
+  coachCode       String?             @unique
+  institutionId   String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  settings        Json?
 
-  tokens       RefreshToken[]
-  athlete      Athlete?            @relation("UserAthlete")
+  // Relations
+  institution     Institution?        @relation("UserInstitution", fields: [institutionId], references: [id], onDelete: SetNull)
+  tokens          RefreshToken[]
+  athlete         Athlete?            @relation("UserAthlete")
   coachInstitutions CoachInstitution[] @relation("UserCoachInstitution")
 
-  // For messages
-  sentMessages     Message[]       @relation("SenderMessages")
-  receivedMessages Message[]       @relation("ReceiverMessages")
+  // Messages
+  sentMessages     Message[]          @relation("SenderMessages")
+  receivedMessages Message[]          @relation("ReceiverMessages")
 
-  // For resource sharing
-  uploadedResources Resource[]     @relation("UploadedResources")
-  receivedResources ResourceShare[] @relation("ReceivedResources")
+  // Resources
+  uploadedResources Resource[]        @relation("UploadedResources")
+  receivedResources ResourceShare[]   @relation("ReceivedResources")
 
-  // For approvals
-  approvedAthletes Athlete[]       @relation("ApprovedByUser")
+  // Approvals
+  approvedAthletes Athlete[]          @relation("ApprovedByUser")
 
-  // Admin of institutions
-  adminInstitutions Institution[]  @relation("InstitutionAdmin")
+  // Institution admin
+  adminInstitutions Institution[]     @relation("InstitutionAdmin")
+
+  // Invitations (sent or received)
+  sentInvitations     Invitation[]    @relation("SentInvitations")
+  receivedInvitations Invitation[]    @relation("ReceivedInvitations")
 }
 
 // ───────────────────────────────
-// 🔑 Tokens
+// 🔑 AUTH TOKENS
 model RefreshToken {
   id        String   @id @default(uuid())
   userId    String
@@ -54,7 +62,7 @@ model RefreshToken {
 }
 
 // ───────────────────────────────
-// 🏫 Institution
+// 🏫 INSTITUTION MODEL
 model Institution {
   id            String             @id @default(uuid())
   name          String
@@ -68,13 +76,13 @@ model Institution {
   athletes      Athlete[]
   coaches       CoachInstitution[]
   admin         User[]             @relation("InstitutionAdmin")
-
   competitions  Competition[]
   resources     Resource[]
+  users         User[]             @relation("UserInstitution")
 }
 
 // ───────────────────────────────
-// 👨‍🏫 CoachInstitution
+// 👨‍🏫 COACH-INSTITUTION LINK
 model CoachInstitution {
   id             String       @id @default(uuid())
   coachId        String
@@ -87,7 +95,7 @@ model CoachInstitution {
 }
 
 // ───────────────────────────────
-// 🧍 Athlete
+// 🧍 ATHLETE MODEL
 model Athlete {
   id            String          @id @default(uuid())
   userId        String          @unique
@@ -116,7 +124,27 @@ model Athlete {
 }
 
 // ───────────────────────────────
-// 🏟️ Competition System
+// 📨 INVITATION SYSTEM
+model Invitation {
+  id             String     @id @default(uuid())
+  code           String     @unique
+  senderId       String
+  receiverEmail  String
+  role           Role       @default(athlete)
+  institutionId  String?
+  status         InviteStatus @default(pending)
+  expiresAt      DateTime
+  createdAt      DateTime   @default(now())
+  acceptedAt     DateTime?
+  revokedAt      DateTime?
+
+  sender         User        @relation("SentInvitations", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver       User?       @relation("ReceivedInvitations", fields: [receiverEmail], references: [email], onDelete: SetNull)
+  institution    Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+}
+
+// ───────────────────────────────
+// 🏟️ COMPETITION SYSTEM
 model Competition {
   id             String                @id @default(uuid())
   name           String
@@ -148,7 +176,7 @@ model AthleteCompetition {
 }
 
 // ───────────────────────────────
-// 💬 Message/Notice System
+// 💬 MESSAGING SYSTEM
 model Message {
   id          String   @id @default(uuid())
   senderId    String
@@ -164,15 +192,16 @@ model Message {
 }
 
 // ───────────────────────────────
-// 📂 Resource Sharing System
+// 📂 RESOURCE SHARING SYSTEM
 model Resource {
   id             String         @id @default(uuid())
   uploaderId     String
   institutionId  String?
   title          String
   description    String?
-  type           String?        // pdf, image, link, etc.
+  type           String?
   fileUrl        String?
+  visibility     ResourceVisibility @default(private)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
@@ -181,7 +210,6 @@ model Resource {
   sharedWith     ResourceShare[]
 }
 
-// Junction for shared resources
 model ResourceShare {
   id           String     @id @default(uuid())
   resourceId   String
@@ -195,7 +223,7 @@ model ResourceShare {
 }
 
 // ───────────────────────────────
-// 📊 Existing Models
+// 📊 TRAINING & PERFORMANCE MODELS
 model Session {
   id            String          @id @default(uuid())
   name          String
@@ -246,7 +274,7 @@ model Injury {
   date        DateTime
   severity    Severity
   createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @default(now()) @updatedAt
+  updatedAt   DateTime  @updatedAt
 }
 
 model Attendance {
@@ -281,4 +309,17 @@ enum AttendanceStatus {
   present
   absent
   late
+}
+
+enum InviteStatus {
+  pending
+  accepted
+  revoked
+  expired
+}
+
+enum ResourceVisibility {
+  private
+  institution
+  public
 }
