@@ -1,3 +1,5 @@
+// ───────────────────────────────
+// Prisma Setup
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,23 +9,40 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ───────────────────────────────
+// 👤 User (Base Model)
 model User {
-  id           String          @id @default(uuid())
-  username     String          @unique
-  email        String?         @unique
+  id           String              @id @default(uuid())
+  username     String              @unique
+  email        String?             @unique
   passwordHash String
   name         String?
-  role         Role            @default(athlete)
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  role         Role                @default(athlete)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
   settings     Json?
-  tokens       RefreshToken[]
-  athlete      Athlete?        @relation("UserAthlete")
 
-  // 👇 ADD THIS new relation for coaches linked to institutions
+  tokens       RefreshToken[]
+  athlete      Athlete?            @relation("UserAthlete")
   coachInstitutions CoachInstitution[] @relation("UserCoachInstitution")
+
+  // For messages
+  sentMessages     Message[]       @relation("SenderMessages")
+  receivedMessages Message[]       @relation("ReceiverMessages")
+
+  // For resource sharing
+  uploadedResources Resource[]     @relation("UploadedResources")
+  receivedResources ResourceShare[] @relation("ReceivedResources")
+
+  // For approvals
+  approvedAthletes Athlete[]       @relation("ApprovedByUser")
+
+  // Admin of institutions
+  adminInstitutions Institution[]  @relation("InstitutionAdmin")
 }
 
+// ───────────────────────────────
+// 🔑 Tokens
 model RefreshToken {
   id        String   @id @default(uuid())
   userId    String
@@ -35,7 +54,7 @@ model RefreshToken {
 }
 
 // ───────────────────────────────
-// 🏫 Institution (e.g. school, academy, university)
+// 🏫 Institution
 model Institution {
   id            String             @id @default(uuid())
   name          String
@@ -46,31 +65,29 @@ model Institution {
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
 
-  // Relations
   athletes      Athlete[]
   coaches       CoachInstitution[]
   admin         User[]             @relation("InstitutionAdmin")
 
   competitions  Competition[]
+  resources     Resource[]
 }
 
 // ───────────────────────────────
-// 👨‍🏫 CoachInstitution (connects coaches to institutions)
+// 👨‍🏫 CoachInstitution
 model CoachInstitution {
   id             String       @id @default(uuid())
   coachId        String
   institutionId  String
-
-  // 👇 Match relation name exactly
-  coach          User         @relation("UserCoachInstitution", fields: [coachId], references: [id], onDelete: Cascade)
-  institution    Institution  @relation(fields: [institutionId], references: [id], onDelete: Cascade)
-
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+
+  coach          User         @relation("UserCoachInstitution", fields: [coachId], references: [id], onDelete: Cascade)
+  institution    Institution  @relation(fields: [institutionId], references: [id], onDelete: Cascade)
 }
 
 // ───────────────────────────────
-// 🧍 Athlete (linked to user)
+// 🧍 Athlete
 model Athlete {
   id            String          @id @default(uuid())
   userId        String          @unique
@@ -81,8 +98,8 @@ model Athlete {
   gender        String?
   contactInfo   String?
   approved      Boolean         @default(false)
-  approvedBy    String?         // userId of coach/admin who approved
-  institutionId String?         // institution the athlete belongs to
+  approvedBy    String?
+  institutionId String?
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
@@ -99,7 +116,7 @@ model Athlete {
 }
 
 // ───────────────────────────────
-// 🏟️ Competition & Participation Records
+// 🏟️ Competition System
 model Competition {
   id             String                @id @default(uuid())
   name           String
@@ -114,19 +131,18 @@ model Competition {
   participants   AthleteCompetition[]
 }
 
-// Junction table linking athletes to competitions
 model AthleteCompetition {
-  id             String       @id @default(uuid())
-  athleteId      String
-  competitionId  String
-  result         String?      // e.g. "Gold", "Silver", "Participant"
-  position       Int?
-  performanceNotes String?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id                String       @id @default(uuid())
+  athleteId         String
+  competitionId     String
+  result            String?
+  position          Int?
+  performanceNotes  String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 
-  athlete        Athlete      @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  competition    Competition  @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  athlete           Athlete      @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  competition       Competition  @relation(fields: [competitionId], references: [id], onDelete: Cascade)
 
   @@unique([athleteId, competitionId])
 }
@@ -148,7 +164,38 @@ model Message {
 }
 
 // ───────────────────────────────
-// Existing Models (unchanged core logic)
+// 📂 Resource Sharing System
+model Resource {
+  id             String         @id @default(uuid())
+  uploaderId     String
+  institutionId  String?
+  title          String
+  description    String?
+  type           String?        // pdf, image, link, etc.
+  fileUrl        String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  uploader       User           @relation("UploadedResources", fields: [uploaderId], references: [id], onDelete: Cascade)
+  institution    Institution?   @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+  sharedWith     ResourceShare[]
+}
+
+// Junction for shared resources
+model ResourceShare {
+  id           String     @id @default(uuid())
+  resourceId   String
+  receiverId   String
+  createdAt    DateTime   @default(now())
+
+  resource     Resource   @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  receiver     User       @relation("ReceivedResources", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([resourceId, receiverId])
+}
+
+// ───────────────────────────────
+// 📊 Existing Models
 model Session {
   id            String          @id @default(uuid())
   name          String
@@ -217,7 +264,7 @@ model Attendance {
 }
 
 // ───────────────────────────────
-// Enums
+// ENUMS
 enum Role {
   admin
   coach
