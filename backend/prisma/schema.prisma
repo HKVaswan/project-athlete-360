@@ -17,8 +17,17 @@ model User {
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
   settings     Json?
+
+  // Relationships
   tokens       RefreshToken[]
   athlete      Athlete?        @relation("UserAthlete")
+  approvedAthletes Athlete[]   @relation("ApprovedByUser")
+  messagesSent  Message[]      @relation("SenderMessages")
+  messagesReceived Message[]   @relation("ReceiverMessages")
+  institution   Institution?   @relation("InstitutionAdmin", fields: [institutionId], references: [id])
+  institutionId String?        // if this user belongs to an institution (coach or athlete)
+
+  @@index([role])
 }
 
 model RefreshToken {
@@ -31,26 +40,119 @@ model RefreshToken {
   expiresAt DateTime
 }
 
-model Athlete {
-  id           String          @id @default(uuid())
-  userId       String          @unique
-  athleteCode  String          @unique
-  name         String
-  dob          DateTime?
-  sport        String?
-  gender       String?
-  contactInfo  String?
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+// ───────────────────────────────
+// 🏫 Institution (e.g. school, academy, university)
+model Institution {
+  id            String             @id @default(uuid())
+  name          String
+  code          String             @unique
+  address       String?
+  contactEmail  String?
+  contactNumber String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
 
-  user         User            @relation("UserAthlete", fields: [userId], references: [id], onDelete: Cascade)
-  sessions     Session[]       @relation("AthleteSessions")
-  assessments  Assessment[]
-  injuries     Injury[]
-  performances Performance[]
-  attendance   Attendance[]
+  // Relations
+  athletes      Athlete[]
+  coaches       CoachInstitution[]
+  admin         User[]             @relation("InstitutionAdmin")
+
+  competitions  Competition[]
 }
 
+// ───────────────────────────────
+// 👨‍🏫 CoachInstitution (connects coaches to institutions)
+model CoachInstitution {
+  id             String     @id @default(uuid())
+  coachId        String
+  institutionId  String
+  coach          User       @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  institution    Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  assignedSince  DateTime   @default(now())
+
+  @@unique([coachId, institutionId])
+}
+
+// ───────────────────────────────
+// 🧍 Athlete (linked to user)
+model Athlete {
+  id            String          @id @default(uuid())
+  userId        String          @unique
+  athleteCode   String          @unique
+  name          String
+  dob           DateTime?
+  sport         String?
+  gender        String?
+  contactInfo   String?
+  approved      Boolean         @default(false)
+  approvedBy    String?         // userId of coach/admin who approved
+  institutionId String?         // institution the athlete belongs to
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  user          User            @relation("UserAthlete", fields: [userId], references: [id], onDelete: Cascade)
+  approver      User?           @relation("ApprovedByUser", fields: [approvedBy], references: [id])
+  institution   Institution?    @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+
+  sessions      Session[]       @relation("AthleteSessions")
+  assessments   Assessment[]
+  injuries      Injury[]
+  performances  Performance[]
+  attendance    Attendance[]
+  competitions  AthleteCompetition[]
+}
+
+// ───────────────────────────────
+// 🏟️ Competition & Participation Records
+model Competition {
+  id             String                @id @default(uuid())
+  name           String
+  location       String?
+  startDate      DateTime
+  endDate        DateTime?
+  institutionId  String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  institution    Institution?          @relation(fields: [institutionId], references: [id])
+  participants   AthleteCompetition[]
+}
+
+// Junction table linking athletes to competitions
+model AthleteCompetition {
+  id             String       @id @default(uuid())
+  athleteId      String
+  competitionId  String
+  result         String?      // e.g. "Gold", "Silver", "Participant"
+  position       Int?
+  performanceNotes String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  athlete        Athlete      @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  competition    Competition  @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+
+  @@unique([athleteId, competitionId])
+}
+
+// ───────────────────────────────
+// 💬 Message/Notice System
+model Message {
+  id          String   @id @default(uuid())
+  senderId    String
+  receiverId  String
+  title       String
+  content     String
+  attachments Json?
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  sender      User     @relation("SenderMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver    User     @relation("ReceiverMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+}
+
+// ───────────────────────────────
+// Existing Models (unchanged core logic)
 model Session {
   id            String          @id @default(uuid())
   name          String
@@ -118,6 +220,8 @@ model Attendance {
   @@unique([sessionId, athleteId])
 }
 
+// ───────────────────────────────
+// Enums
 enum Role {
   admin
   coach
