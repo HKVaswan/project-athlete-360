@@ -1,0 +1,215 @@
+// src/services/athlete.service.ts
+/**
+ * Athlete Service
+ * ------------------------------------------------------------
+ * Responsible for all athlete-specific operations:
+ *  - Athlete creation & linking with user accounts
+ *  - Profile updates (bio, sport, training data, etc.)
+ *  - Integration with sessions, performance, and assessments
+ *  - Institution and coach assignment
+ *  - Paginated search with filters
+ *  - Scalable structure ready for analytics & AI insights
+ */
+
+import prisma from "../prismaClient";
+import logger from "../logger";
+import { Errors } from "../utils/errors";
+import { paginate } from "../utils/pagination";
+import { computeNextCursor } from "../utils/pagination";
+
+/**
+ * Create new athlete (linked to existing user)
+ */
+export const createAthlete = async (data: {
+  userId: string;
+  sport: string;
+  position?: string;
+  dateOfBirth?: Date;
+  gender?: string;
+  bio?: string;
+  heightCm?: number;
+  weightKg?: number;
+  institutionId?: string;
+  coachId?: string | null;
+}) => {
+  const user = await prisma.user.findUnique({ where: { id: data.userId } });
+  if (!user) throw Errors.NotFound("User not found for athlete creation");
+
+  const existingAthlete = await prisma.athlete.findUnique({ where: { userId: data.userId } });
+  if (existingAthlete) throw Errors.Duplicate("Athlete already exists for this user");
+
+  const athlete = await prisma.athlete.create({
+    data: {
+      ...data,
+      joinedAt: new Date(),
+    },
+    include: {
+      user: true,
+      institution: true,
+    },
+  });
+
+  logger.info(`Athlete created for user ${data.userId}`);
+  return sanitizeAthlete(athlete);
+};
+
+/**
+ * Get athlete by ID (includes related entities)
+ */
+export const getAthleteById = async (id: string) => {
+  const athlete = await prisma.athlete.findUnique({
+    where: { id },
+    include: {
+      user: {
+        select: { id: true, name: true, email: true, username: true, role: true },
+      },
+      institution: { select: { id: true, name: true } },
+      coach: { select: { id: true, name: true, username: true } },
+      performances: true,
+    },
+  });
+  if (!athlete) throw Errors.NotFound("Athlete not found");
+  return sanitizeAthlete(athlete);
+};
+
+/**
+ * Get athletes with filters + pagination
+ * Supports: search, sport, institution, coach, gender, etc.
+ */
+export const getAthletes = async (query: any) => {
+  const where: any = {};
+
+  if (query.search) {
+    const s = String(query.search).trim();
+    where.OR = [
+      { user: { name: { contains: s, mode: "insensitive" } } },
+      { user: { username: { contains: s, mode: "insensitive" } } },
+    ];
+  }
+
+  if (query.sport) where.sport = { equals: query.sport, mode: "insensitive" };
+  if (query.gender) where.gender = { equals: query.gender, mode: "insensitive" };
+  if (query.institutionId) where.institutionId = query.institutionId;
+  if (query.coachId) where.coachId = query.coachId;
+
+  const { prismaArgs, meta } = await paginate(query, "offset", {
+    countFn: (where) => prisma.athlete.count({ where }),
+    where,
+    includeTotal: true,
+  });
+
+  const athletes = await prisma.athlete.findMany({
+    ...prismaArgs,
+    where,
+    include: {
+      user: {
+        select: { id: true, name: true, email: true, username: true },
+      },
+      institution: { select: { id: true, name: true } },
+      coach: { select: { id: true, name: true } },
+    },
+  });
+
+  if (query.cursor) meta.nextCursor = computeNextCursor(athletes);
+
+  return { data: athletes.map(sanitizeAthlete), meta };
+};
+
+/**
+ * Update athlete profile
+ */
+export const updateAthlete = async (
+  athleteId: string,
+  updates: {
+    sport?: string;
+    position?: string;
+    bio?: string;
+    heightCm?: number;
+    weightKg?: number;
+    coachId?: string | null;
+    institutionId?: string;
+  },
+  actorId?: string
+) => {
+  const existing = await prisma.athlete.findUnique({ where: { id: athleteId } });
+  if (!existing) throw Errors.NotFound("Athlete not found");
+
+  const athlete = await prisma.athlete.update({
+    where: { id: athleteId },
+    data: { ...updates },
+    include: { user: true, institution: true, coach: true },
+  });
+
+  logger.info(`Athlete ${athleteId} updated by ${actorId || "system"}`);
+  return sanitizeAthlete(athlete);
+};
+
+/**
+ * Assign coach to athlete
+ */
+export const assignCoach = async (athleteId: string, coachId: string) => {
+  const athlete = await prisma.athlete.findUnique({ where: { id: athleteId } });
+  if (!athlete) throw Errors.NotFound("Athlete not found");
+
+  const coach = await prisma.user.findUnique({ where: { id: coachId } });
+  if (!coach || coach.role !== "coach") throw Errors.BadRequest("Invalid coach");
+
+  const updated = await prisma.athlete.update({
+    where: { id: athleteId },
+    data: { coachId },
+  });
+
+  logger.info(`Coach ${coachId} assigned to athlete ${athleteId}`);
+  return sanitizeAthlete(updated);
+};
+
+/**
+ * Remove athlete (soft delete for audit safety)
+ */
+export const deleteAthlete = async (athleteId: string) => {
+  const athlete = await prisma.athlete.findUnique({ where: { id: athleteId } });
+  if (!athlete) throw Errors.NotFound("Athlete not found");
+
+  await prisma.athlete.update({
+    where: { id: athleteId },
+    data: { deleted: true, deletedAt: new Date() },
+  });
+
+  logger.warn(`Athlete ${athleteId} soft-deleted`);
+  return { success: true };
+};
+
+/**
+ * Analytics: get performance summary (future AI integration)
+ */
+export const getPerformanceSummary = async (athleteId: string) => {
+  const athlete = await prisma.athlete.findUnique({
+    where: { id: athleteId },
+    include: { performances: true },
+  });
+  if (!athlete) throw Errors.NotFound("Athlete not found");
+
+  const totalSessions = athlete.performances.length;
+  const avgScore =
+    totalSessions > 0
+      ? athlete.performances.reduce((sum, p) => sum + (p.score || 0), 0) / totalSessions
+      : 0;
+
+  return {
+    totalSessions,
+    avgScore,
+  };
+};
+
+/**
+ * Sanitizer: removes sensitive user info if linked
+ */
+const sanitizeAthlete = (athlete: any) => {
+  if (!athlete) return null;
+  const sanitized = { ...athlete };
+  if (athlete.user) {
+    const { passwordHash, ...safeUser } = athlete.user;
+    sanitized.user = safeUser;
+  }
+  return sanitized;
+};
