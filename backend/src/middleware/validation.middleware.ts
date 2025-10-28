@@ -1,50 +1,59 @@
 import { Request, Response, NextFunction } from "express";
 import { ObjectSchema } from "joi";
+import { ZodSchema, ZodError } from "zod";
 import logger from "../logger";
 
-/**
- * ✅ Universal validation middleware
- * Works with Joi or any schema validation library.
- *
- * Usage:
- *   router.post("/register", validateRequest(authRegisterSchema), controller.register);
- */
+// ───────────────────────────────
+// 🧠 Generic Request Validator
+// Supports both Joi and Zod schemas seamlessly
+// ───────────────────────────────
+
 export const validateRequest =
-  (schema: ObjectSchema, property: "body" | "query" | "params" = "body") =>
-  (req: Request, res: Response, next: NextFunction): void => {
-    const { error, value } = schema.validate(req[property], {
-      abortEarly: false, // collect all errors
-      allowUnknown: false, // reject unknown fields
-      stripUnknown: true, // remove unexpected keys
-    });
+  (schema: ObjectSchema | ZodSchema, property: "body" | "query" | "params" = "body") =>
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = req[property];
 
-    if (error) {
-      const details = error.details.map((d) => d.message.replace(/["]/g, ""));
-      logger.warn(
-        `⚠️ Validation failed for ${req.method} ${req.originalUrl}: ${details.join(", ")}`
-      );
-      res.status(400).json({
+      // Joi schema validation
+      if ("validate" in schema) {
+        const { error, value } = (schema as ObjectSchema).validate(data, {
+          abortEarly: false,
+          allowUnknown: true,
+          stripUnknown: true,
+        });
+        if (error) {
+          const details = error.details.map((d) => d.message);
+          logger.warn(`[VALIDATION] ${property} failed: ${details.join(", ")}`);
+          return res.status(400).json({
+            success: false,
+            message: "Validation failed",
+            errors: details,
+          });
+        }
+        req[property] = value;
+      }
+
+      // Zod schema validation
+      else if ("safeParse" in schema) {
+        const result = (schema as ZodSchema).safeParse(data);
+        if (!result.success) {
+          const details = result.error.errors.map((e) => e.message);
+          logger.warn(`[VALIDATION] ${property} failed: ${details.join(", ")}`);
+          return res.status(400).json({
+            success: false,
+            message: "Validation failed",
+            errors: details,
+          });
+        }
+        req[property] = result.data;
+      }
+
+      next();
+    } catch (err: any) {
+      logger.error(`[VALIDATION ERROR] ${err.message || err}`);
+      return res.status(500).json({
         success: false,
-        message: "Validation error",
-        errors: details,
+        message: "Server error during validation",
       });
-      return;
     }
-
-    // Attach sanitized data back to request
-    req[property] = value;
-    next();
   };
-
-/**
- * 🧩 Example:
- *
- * import Joi from "joi";
- * const registerSchema = Joi.object({
- *   username: Joi.string().min(3).max(30).required(),
- *   password: Joi.string().min(6).required(),
- *   email: Joi.string().email().required()
- * });
- *
- * router.post("/register", validateRequest(registerSchema), registerController);
- */
