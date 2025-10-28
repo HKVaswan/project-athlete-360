@@ -1,90 +1,82 @@
 import multer from "multer";
 import path from "path";
-import crypto from "crypto";
 import { Request } from "express";
+import { S3Client } from "@aws-sdk/client-s3";
+import multerS3 from "multer-s3";
 import logger from "../logger";
 
 // ───────────────────────────────
-// 🧠 Configuration
+// 🧠 Environment Config
 // ───────────────────────────────
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-
-// Allowed file types for uploads (expand if needed)
-const allowedMimeTypes = [
-  "image/jpeg",
-  "image/png",
-  "application/pdf",
-  "video/mp4",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-];
+const isProd = process.env.NODE_ENV === "production";
+const bucketName = process.env.AWS_S3_BUCKET || "";
+const region = process.env.AWS_REGION || "us-east-1";
 
 // ───────────────────────────────
-// 🗂 Local disk storage (fallback or dev mode)
+// ☁️ S3 Client (for production)
 // ───────────────────────────────
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, path.join(process.cwd(), "uploads/"));
-  },
-  filename: (_req, file, cb) => {
-    const uniqueSuffix = crypto.randomBytes(8).toString("hex");
-    const ext = path.extname(file.originalname);
-    const safeName = file.originalname
-      .replace(/\s+/g, "_")
-      .replace(/[^a-zA-Z0-9._-]/g, "");
-    cb(null, `${Date.now()}-${uniqueSuffix}-${safeName}${ext}`);
+const s3 = new S3Client({
+  region,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID || "",
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "",
   },
 });
 
 // ───────────────────────────────
-// 🧰 File filter for safety
+// 🗂 Local Storage Config (Dev)
 // ───────────────────────────────
-function fileFilter(req: Request, file: Express.Multer.File, cb: any) {
-  if (!allowedMimeTypes.includes(file.mimetype)) {
-    logger.warn(`❌ Blocked upload: Invalid file type (${file.mimetype})`);
-    return cb(new Error("Invalid file type. Upload JPG, PNG, PDF, or MP4 only."));
+const localStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, "../../uploads/"));
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + "-" + file.originalname);
+  },
+});
+
+// ───────────────────────────────
+// ☁️ S3 Storage Config (Prod)
+// ───────────────────────────────
+const s3Storage = multerS3({
+  s3,
+  bucket: bucketName,
+  acl: "private",
+  key: function (req: Request, file, cb) {
+    const uniqueName = `${Date.now()}_${file.originalname}`;
+    cb(null, `uploads/${uniqueName}`);
+  },
+});
+
+// ───────────────────────────────
+// 🧩 File Filter — Security Layer
+// ───────────────────────────────
+const fileFilter = (req: Request, file: any, cb: any) => {
+  const allowedTypes = [
+    "image/jpeg",
+    "image/png",
+    "application/pdf",
+    "video/mp4",
+    "text/plain",
+  ];
+
+  if (!allowedTypes.includes(file.mimetype)) {
+    logger.warn(`❌ File type not allowed: ${file.mimetype}`);
+    return cb(new Error("Invalid file type"), false);
   }
   cb(null, true);
-}
+};
 
 // ───────────────────────────────
-// ⚙️ Multer instance
+// 📦 Final Upload Middleware
 // ───────────────────────────────
-export const upload = multer({
-  storage,
-  limits: { fileSize: MAX_FILE_SIZE },
+const upload = multer({
+  storage: isProd ? s3Storage : localStorage,
   fileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10 MB max
+  },
 });
 
-// ───────────────────────────────
-// 🚀 Single file upload middleware
-// Example usage: upload.single("document")
-// ───────────────────────────────
-export const singleUpload = (fieldName: string) => upload.single(fieldName);
-
-// ───────────────────────────────
-// 📦 Multi-file upload middleware
-// Example usage: upload.array("files", 5)
-// ───────────────────────────────
-export const multiUpload = (fieldName: string, maxCount = 5) =>
-  upload.array(fieldName, maxCount);
-
-// ───────────────────────────────
-// 🧹 Safe error handler
-// ───────────────────────────────
-export function handleUploadError(err: any, _req: Request, res: any, _next: any) {
-  if (err instanceof multer.MulterError) {
-    logger.error("❌ Multer Error: " + err.message);
-    return res.status(400).json({
-      success: false,
-      message: "File upload error: " + err.message,
-    });
-  } else if (err) {
-    logger.error("❌ Upload Error: " + err.message);
-    return res.status(400).json({
-      success: false,
-      message: err.message || "Unexpected upload error.",
-    });
-  }
-  return _next();
-}
+export default upload;
