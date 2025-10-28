@@ -1,41 +1,50 @@
 import { Request, Response, NextFunction } from "express";
-import { AnyZodObject, ZodError } from "zod";
+import { ObjectSchema } from "joi";
 import logger from "../logger";
 
-// ───────────────────────────────
-// 🧩 Zod Validation Middleware
-// ───────────────────────────────
-export const validate =
-  (schema: AnyZodObject, source: "body" | "query" | "params" = "body") =>
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      // Parse & validate input
-      await schema.parseAsync(req[source]);
-      next();
-    } catch (error) {
-      if (error instanceof ZodError) {
-        const formatted = error.errors.map((err) => ({
-          path: err.path.join("."),
-          message: err.message,
-        }));
+/**
+ * ✅ Universal validation middleware
+ * Works with Joi or any schema validation library.
+ *
+ * Usage:
+ *   router.post("/register", validateRequest(authRegisterSchema), controller.register);
+ */
+export const validateRequest =
+  (schema: ObjectSchema, property: "body" | "query" | "params" = "body") =>
+  (req: Request, res: Response, next: NextFunction): void => {
+    const { error, value } = schema.validate(req[property], {
+      abortEarly: false, // collect all errors
+      allowUnknown: false, // reject unknown fields
+      stripUnknown: true, // remove unexpected keys
+    });
 
-        logger.warn("Validation failed", {
-          source,
-          endpoint: req.originalUrl,
-          errors: formatted,
-        });
-
-        return res.status(400).json({
-          success: false,
-          message: "Validation error",
-          errors: formatted,
-        });
-      }
-
-      logger.error("Unexpected validation middleware error", { error });
-      res.status(500).json({
+    if (error) {
+      const details = error.details.map((d) => d.message.replace(/["]/g, ""));
+      logger.warn(
+        `⚠️ Validation failed for ${req.method} ${req.originalUrl}: ${details.join(", ")}`
+      );
+      res.status(400).json({
         success: false,
-        message: "Server error during validation",
+        message: "Validation error",
+        errors: details,
       });
+      return;
     }
+
+    // Attach sanitized data back to request
+    req[property] = value;
+    next();
   };
+
+/**
+ * 🧩 Example:
+ *
+ * import Joi from "joi";
+ * const registerSchema = Joi.object({
+ *   username: Joi.string().min(3).max(30).required(),
+ *   password: Joi.string().min(6).required(),
+ *   email: Joi.string().email().required()
+ * });
+ *
+ * router.post("/register", validateRequest(registerSchema), registerController);
+ */
