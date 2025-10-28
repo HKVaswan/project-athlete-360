@@ -1,53 +1,51 @@
 import rateLimit from "express-rate-limit";
-import { Request, Response } from "express";
 import logger from "../logger";
 
-/**
- * 🛡️ Global API Rate Limiter
- * Protects public endpoints like /auth, /register, /login, etc.
- *
- * You can attach this middleware globally or per route.
- */
-export const globalRateLimiter = rateLimit({
+// ───────────────────────────────
+// 🛡️ Global & Route-Specific Rate Limiters
+// ───────────────────────────────
+
+// 🔹 Generic limiter for most endpoints (safe default)
+export const apiRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200, // Limit each IP to 200 requests per windowMs
+  max: 200, // limit each IP to 200 requests per window
   standardHeaders: true, // Return rate limit info in headers
-  legacyHeaders: false,
-  handler: (req: Request, res: Response) => {
-    logger.warn(`🚫 Rate limit exceeded for IP: ${req.ip}`);
-    res.status(429).json({
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  handler: (req, res) => {
+    logger.warn(`[RATE LIMIT] Too many requests from ${req.ip}`);
+    return res.status(429).json({
       success: false,
-      message:
-        "Too many requests from this IP. Please try again after 15 minutes.",
+      message: "Too many requests. Please try again later.",
     });
   },
 });
 
-/**
- * 🔐 Stricter limiter for authentication endpoints
- * Helps prevent brute-force login or registration spam.
- */
+// 🔹 Stricter limiter for sensitive routes (e.g. login/register)
 export const authRateLimiter = rateLimit({
   windowMs: 10 * 60 * 1000, // 10 minutes
-  max: 10, // Limit each IP to 10 login/register attempts
+  max: 10, // 10 attempts per 10 minutes
   standardHeaders: true,
   legacyHeaders: false,
-  handler: (req: Request, res: Response) => {
-    logger.warn(`🚫 Auth rate limit exceeded for IP: ${req.ip}`);
-    res.status(429).json({
+  handler: (req, res) => {
+    logger.warn(`[RATE LIMIT - AUTH] Too many login/signup attempts from ${req.ip}`);
+    return res.status(429).json({
       success: false,
-      message:
-        "Too many authentication attempts. Please wait before trying again.",
+      message: "Too many authentication attempts. Try again later.",
     });
   },
 });
 
-/**
- * 🧩 Example Usage:
- *
- * import { authRateLimiter } from "../middleware/rateLimit.middleware";
- * router.post("/login", authRateLimiter, loginController);
- *
- * // or globally in app.ts:
- * app.use(globalRateLimiter);
- */
+// 🔹 Aggressive limiter for critical endpoints (optional)
+export const adminRateLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 50,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    logger.warn(`[RATE LIMIT - ADMIN] Excessive admin requests from ${req.ip}`);
+    return res.status(429).json({
+      success: false,
+      message: "Rate limit exceeded for admin endpoint.",
+    });
+  },
+});
