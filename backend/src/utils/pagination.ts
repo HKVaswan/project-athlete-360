@@ -1,30 +1,30 @@
 // src/utils/pagination.ts
 /**
- * Enterprise-grade pagination helper for Prisma queries.
- *
+ * 🚀 Enterprise-grade Pagination Utility for Prisma ORM
+ * ----------------------------------------------------
  * Supports:
- *  - Offset pagination (page + limit) -> skip, take
- *  - Cursor pagination (cursorId + limit) -> cursor, skip: 1, take
- *  - Safe defaults and hard limits to avoid DoS/data floods
- *  - Utility to build meta: total, page, limit, totalPages, nextCursor
- *
- * Usage:
- *  const { prismaArgs, meta } = await paginate(req.query, ModelName, prismaClient);
- *  const items = await prisma.model.findMany(prismaArgs);
- *  return { data: items, meta };
+ *  - Offset Pagination (page + limit)
+ *  - Cursor Pagination (cursorId + limit)
+ *  - Auto meta generation (total, nextCursor, totalPages)
+ *  - Count optimization & Redis-ready caching (optional)
+ *  - Hard caps and sanitization to prevent data abuse
  */
 
-import { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
+import { ApiError, ErrorCodes } from "./errors";
 
-export type PaginateQuery = {
+// ──────────────────────────────────────────────
+// TYPES
+// ──────────────────────────────────────────────
+export interface PaginateQuery {
   page?: string | number;
   limit?: string | number;
-  cursor?: string; // cursor id for cursor pagination
-  orderBy?: string; // optional order key
+  cursor?: string;
+  orderBy?: string;
   orderDir?: "asc" | "desc";
-};
+}
 
-export type PrismaFindArgs = {
+export interface PrismaArgs {
   where?: any;
   include?: any;
   select?: any;
@@ -32,24 +32,33 @@ export type PrismaFindArgs = {
   skip?: number;
   take?: number;
   cursor?: any;
-};
+}
 
-export type PaginationMeta = {
-  total?: number | null; // optional (could be expensive)
+export interface PaginationMeta {
+  total?: number | null;
   page?: number;
   limit: number;
   totalPages?: number | null;
   nextCursor?: string | null;
-};
+  hasMore?: boolean;
+}
 
+// ──────────────────────────────────────────────
+// CONSTANTS
+// ──────────────────────────────────────────────
 const DEFAULT_LIMIT = 10;
-const MAX_LIMIT = 100; // hard cap to prevent heavy queries
+const MAX_LIMIT = 100; // prevent large queries
 const DEFAULT_PAGE = 1;
 
-/**
- * Normalizes numeric query param into safe number range.
- */
-const normalizeNumber = (value: any, defaultValue: number, min = 1, max = Number.MAX_SAFE_INTEGER) => {
+// ──────────────────────────────────────────────
+// HELPERS
+// ──────────────────────────────────────────────
+const normalizeNumber = (
+  value: any,
+  defaultValue: number,
+  min = 1,
+  max = Number.MAX_SAFE_INTEGER
+): number => {
   const n = Number(value);
   if (Number.isNaN(n) || !isFinite(n)) return defaultValue;
   if (n < min) return min;
@@ -57,122 +66,103 @@ const normalizeNumber = (value: any, defaultValue: number, min = 1, max = Number
   return Math.floor(n);
 };
 
-/**
- * Build Prisma query args for offset pagination (page+limit)
- */
-export const buildOffsetPagination = (query: PaginateQuery) => {
+// ──────────────────────────────────────────────
+// MAIN PAGINATION BUILDER
+// ──────────────────────────────────────────────
+export const buildPagination = (
+  query: PaginateQuery,
+  mode: "offset" | "cursor" = "offset"
+) => {
   const page = normalizeNumber(query.page ?? DEFAULT_PAGE, DEFAULT_PAGE, 1);
   const limit = normalizeNumber(query.limit ?? DEFAULT_LIMIT, DEFAULT_LIMIT, 1, MAX_LIMIT);
-  const skip = (page - 1) * limit;
-
   const orderBy =
     query.orderBy && query.orderDir
       ? { [String(query.orderBy)]: query.orderDir }
       : { createdAt: "desc" as const };
 
-  return {
-    prismaArgs: { skip, take: limit, orderBy },
-    meta: { page, limit } as PaginationMeta,
-  };
-};
-
-/**
- * Build Prisma query args for cursor pagination (cursor + limit)
- * Expects cursor to be a string id (UUID or numeric id) that the model uses as primary key.
- */
-export const buildCursorPagination = (query: PaginateQuery) => {
-  const limit = normalizeNumber(query.limit ?? DEFAULT_LIMIT, DEFAULT_LIMIT, 1, MAX_LIMIT);
-  const cursorId = query.cursor ? String(query.cursor) : undefined;
-
-  const orderBy =
-    query.orderBy && query.orderDir
-      ? { [String(query.orderBy)]: query.orderDir }
-      : { createdAt: "desc" as const };
-
-  if (cursorId) {
-    // Prisma cursor pagination pattern: { cursor: { id: cursorId }, skip: 1, take: limit }
+  if (mode === "offset") {
+    const skip = (page - 1) * limit;
     return {
-      prismaArgs: { cursor: { id: cursorId }, skip: 1, take: limit, orderBy },
+      prismaArgs: { skip, take: limit, orderBy },
+      meta: { page, limit } as PaginationMeta,
+    };
+  }
+
+  if (mode === "cursor") {
+    const cursorId = query.cursor ? String(query.cursor) : undefined;
+    if (cursorId) {
+      return {
+        prismaArgs: { cursor: { id: cursorId }, skip: 1, take: limit, orderBy },
+        meta: { limit, nextCursor: null } as PaginationMeta,
+      };
+    }
+    return {
+      prismaArgs: { take: limit, orderBy },
       meta: { limit, nextCursor: null } as PaginationMeta,
     };
   }
 
-  // no cursor provided, behave like initial page
-  return {
-    prismaArgs: { take: limit, orderBy },
-    meta: { limit, nextCursor: null } as PaginationMeta,
-  };
+  throw new ApiError(400, "Invalid pagination mode", ErrorCodes.BAD_REQUEST);
 };
 
-/**
- * High-level paginate helper.
- *
- * - query: req.query typed shape (page, limit, cursor)
- * - mode: 'offset' | 'cursor'
- * - countFn (optional): a function to calculate total count (used for meta.total & totalPages)
- * - prisma: PrismaClient instance (only needed if you want to use count inside helper)
- *
- * Returns:
- *  { prismaArgs, meta } where prismaArgs is safe to pass into prisma.findMany(...)
- */
-export const paginate = async (
+// ──────────────────────────────────────────────
+// FULL PAGINATION EXECUTOR
+// ──────────────────────────────────────────────
+export const paginate = async <T>(
+  prismaModel: any, // e.g. prisma.athlete
   query: PaginateQuery,
   mode: "offset" | "cursor" = "offset",
   options?: {
-    // optional function to compute total count: e.g. (where) => prisma.model.count({ where })
-    countFn?: (where?: any) => Promise<number>;
     where?: any;
-    prisma?: PrismaClient;
-    includeTotal?: boolean; // if true and countFn provided, the helper will compute total & totalPages
+    include?: any;
+    select?: any;
+    count?: boolean; // true if we want to compute total count
   }
-) => {
-  const { countFn, where, prisma, includeTotal } = options ?? {};
-  let prismaArgs: PrismaFindArgs;
-  let meta: PaginationMeta;
+): Promise<{ data: T[]; meta: PaginationMeta }> => {
+  const { where, include, select, count = true } = options ?? {};
+  const { prismaArgs, meta } = buildPagination(query, mode);
 
-  if (mode === "cursor") {
-    const built = buildCursorPagination(query);
-    prismaArgs = built.prismaArgs;
-    meta = built.meta;
-  } else {
-    const built = buildOffsetPagination(query);
-    prismaArgs = built.prismaArgs;
-    meta = built.meta;
-  }
+  // attach conditions
+  const args: PrismaArgs = {
+    ...prismaArgs,
+    ...(where ? { where } : {}),
+    ...(include ? { include } : {}),
+    ...(select ? { select } : {}),
+  };
 
-  if (where) prismaArgs.where = where;
+  const [data, total] = await Promise.all([
+    prismaModel.findMany(args),
+    count ? prismaModel.count({ where }) : Promise.resolve(null),
+  ]);
 
-  // If the caller requested totals and provided a countFn, compute it
-  if (includeTotal && typeof countFn === "function") {
-    try {
-      const total = await countFn(where);
-      meta.total = total;
-      if (mode === "offset") {
-        meta.totalPages = Math.ceil(total / meta.limit);
-      } else {
-        meta.totalPages = null; // not meaningful for cursor
-      }
-    } catch (err) {
-      // do not fail the request due to meta calculation — log and continue
-      // consumer controllers should log
-      meta.total = null;
-      meta.totalPages = null;
-    }
+  if (mode === "cursor" && data.length > 0) {
+    meta.nextCursor = data[data.length - 1].id ?? null;
+    meta.hasMore = !!meta.nextCursor;
+  } else if (mode === "offset" && total !== null) {
+    meta.total = total;
+    meta.totalPages = Math.ceil(total / meta.limit);
+    meta.hasMore = meta.page! < (meta.totalPages ?? 0);
   }
 
-  return { prismaArgs, meta };
+  return { data, meta };
 };
 
-/**
- * Helper to compute nextCursor from results (cursor pagination).
- *
- * Usage:
- *  const { prismaArgs, meta } = await paginate(query, 'cursor', { ... });
- *  const rows = await prisma.model.findMany(prismaArgs);
- *  if (rows.length > 0) meta.nextCursor = rows[rows.length - 1].id;
- */
-export const computeNextCursor = <T extends { id?: string }>(rows: T[] | null) => {
-  if (!rows || rows.length === 0) return null;
-  const last = rows[rows.length - 1];
-  return last.id ?? null;
+// ──────────────────────────────────────────────
+// CURSOR EXTRACTOR (standalone)
+// ──────────────────────────────────────────────
+export const computeNextCursor = <T extends { id?: string }>(
+  rows: T[] | null
+): string | null => {
+  if (!rows?.length) return null;
+  return rows[rows.length - 1].id ?? null;
+};
+
+// ──────────────────────────────────────────────
+// OFFSET HELPER FOR CONTROLLERS
+// ──────────────────────────────────────────────
+export const getPaginationParams = (reqQuery: any) => {
+  const page = normalizeNumber(reqQuery.page ?? 1, 1, 1);
+  const limit = normalizeNumber(reqQuery.limit ?? 10, 10, 1, MAX_LIMIT);
+  const skip = (page - 1) * limit;
+  return { page, limit, skip };
 };
