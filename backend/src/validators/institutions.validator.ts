@@ -1,85 +1,75 @@
 import { z } from "zod";
 
 // ───────────────────────────────
-// 🏫 Institution Creation (Admin Registration Page)
+// 🏫 Create Institution Schema
 // ───────────────────────────────
-export const institutionCreateSchema = z.object({
-  name: z.string().min(3, "Institution name must be at least 3 characters long"),
-  address: z.string().min(10, "A valid address is required"),
-  contactEmail: z.string().email("Valid email required"),
-  contactNumber: z
+export const createInstitutionSchema = z.object({
+  name: z
     .string()
-    .regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit contact number"),
-  adminName: z.string().min(3, "Admin name required"),
-  adminEmail: z.string().email("Valid admin email required"),
-  password: z
+    .min(3, "Institution name must be at least 3 characters long")
+    .max(100, "Institution name too long"),
+  address: z.string().max(200).optional(),
+  contactEmail: z
     .string()
-    .min(8, "Password must be at least 8 characters")
-    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-    .regex(/[0-9]/, "Password must contain at least one number"),
-  planType: z.enum(["basic", "standard", "premium"], {
-    required_error: "Please select a plan type",
-  }),
-  paymentReference: z.string().optional(), // for online payment verification (future use)
-});
-
-// ───────────────────────────────
-// 🧾 Update Institution Details
-// ───────────────────────────────
-export const institutionUpdateSchema = z.object({
-  name: z.string().min(3).optional(),
-  address: z.string().min(10).optional(),
-  contactEmail: z.string().email().optional(),
-  contactNumber: z
-    .string()
-    .regex(/^[6-9]\d{9}$/, "Enter valid number")
+    .email("Invalid email format")
     .optional(),
-  logoUrl: z.string().url().optional(),
-  description: z.string().max(500).optional(),
-  website: z.string().url("Must be a valid URL").optional(),
+  contactNumber: z
+    .string()
+    .regex(/^\+?[0-9]{7,15}$/, "Invalid contact number format")
+    .optional(),
+  adminId: z.string().uuid("Valid admin ID required").optional(),
 });
 
 // ───────────────────────────────
-// 👨‍🏫 Link Coach to Institution
+// 👨‍🏫 Link Coach to Institution Schema
 // ───────────────────────────────
 export const linkCoachSchema = z.object({
   coachId: z.string().uuid("Valid coach ID required"),
-  institutionCode: z.string().min(4, "Valid institution code required"),
+  institutionCode: z
+    .string()
+    .min(6, "Invalid institution code format"),
 });
 
 // ───────────────────────────────
-// 🧍 Athlete Join Request
+// 🧍 Athlete Join Institution Request Schema
 // ───────────────────────────────
-export const athleteJoinSchema = z.object({
+export const requestAthleteJoinSchema = z.object({
   userId: z.string().uuid("Valid user ID required"),
-  institutionCode: z.string().min(4, "Institution code is required"),
+  institutionCode: z
+    .string()
+    .min(6, "Invalid institution code"),
 });
 
 // ───────────────────────────────
-// ✅ Approve or Reject Athlete
+// ✅ Update Athlete Approval Schema
 // ───────────────────────────────
-export const athleteApprovalSchema = z.object({
+export const updateAthleteApprovalSchema = z.object({
   athleteId: z.string().uuid("Valid athlete ID required"),
-  approverId: z.string().uuid("Approver ID required"),
+  approverId: z.string().uuid("Valid approver ID required").optional(),
   approved: z.boolean(),
 });
 
 // ───────────────────────────────
-// 🔍 Institution Query Filters
+// 🔍 Get Institution Query Schema (optional filters)
 // ───────────────────────────────
 export const institutionQuerySchema = z.object({
-  search: z.string().optional(),
-  planType: z.enum(["basic", "standard", "premium"]).optional(),
-  page: z.string().regex(/^\d+$/).optional(),
   limit: z.string().regex(/^\d+$/).optional(),
+  page: z.string().regex(/^\d+$/).optional(),
 });
 
 // ───────────────────────────────
-// 🧠 Type Inference
+// 🧾 Get Institution by ID Schema
 // ───────────────────────────────
-export type InstitutionCreateInput = z.infer<typeof institutionCreateSchema>;
-export type InstitutionUpdateInput = z.infer<typeof institutionUpdateSchema>;
+export const institutionIdSchema = z.object({
+  id: z.string().uuid("Invalid institution ID"),
+});
+
+// ───────────────────────────────
+// 🧠 Type Exports for Reuse
+// ───────────────────────────────
+export type CreateInstitutionInput = z.infer<typeof createInstitutionSchema>;
 export type LinkCoachInput = z.infer<typeof linkCoachSchema>;
-export type AthleteJoinInput = z.infer<typeof athleteJoinSchema>;
-export type AthleteApprovalInput = z.infer<typeof athleteApprovalSchema>;
+export type RequestAthleteJoinInput = z.infer<typeof requestAthleteJoinSchema>;
+export type UpdateAthleteApprovalInput = z.infer<typeof updateAthleteApprovalSchema>;
 export type InstitutionQueryInput = z.infer<typeof institutionQuerySchema>;
+export type InstitutionIdInput = z.infer<typeof institutionIdSchema>;
