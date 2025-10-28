@@ -1,44 +1,60 @@
-import { PrismaClient } from "@prisma/client";
-import { logger } from "./logger";
+// backend/src/prismaClient.ts
+import { PrismaClient, Prisma } from "@prisma/client";
+import { config } from "./config";
 
-// ───────────────────────────────
-// 🧠 Singleton Prisma Client
-// ───────────────────────────────
+type PrismaLogLevel = Prisma.LogLevel | Prisma.LogLevel[];
 
-// Prevent creating multiple Prisma instances in dev hot-reload environments
-declare global {
-  // eslint-disable-next-line no-var
-  var prisma: PrismaClient | undefined;
-}
+/**
+ * Production-oriented PrismaClient singleton.
+ * - Enables sensible logging in non-production.
+ * - Catches query errors and logs helpful info.
+ * - Graceful shutdown on SIGTERM/SIGINT (useful in container orchestration).
+ */
 
-// Prisma initialization with detailed logging in dev mode
-const prisma =
-  global.prisma ||
-  new PrismaClient({
-    log:
-      process.env.NODE_ENV === "production"
-        ? ["error", "warn"]
-        : ["query", "info", "warn", "error"],
-  });
+const enableQueryLogging = config.env !== "production";
 
-// Attach global prisma to avoid multiple connections in dev
-if (process.env.NODE_ENV !== "production") global.prisma = prisma;
+const prisma = new PrismaClient({
+  log: enableQueryLogging
+    ? [
+        { level: "query", emit: "event" },
+        { level: "info", emit: "event" },
+        { level: "warn", emit: "event" },
+        { level: "error", emit: "event" },
+      ]
+    : [{ level: "error", emit: "event" }],
+});
 
-// ───────────────────────────────
-// 🛡 Graceful Shutdown
-// ───────────────────────────────
-const shutdown = async () => {
-  logger.info("🛑 Shutting down Prisma connection...");
-  await prisma.$disconnect();
-  logger.info("✅ Prisma connection closed gracefully.");
+// Forward Prisma events into console or logger (logger will be added in app)
+prisma.$on("query", (e) => {
+  if (enableQueryLogging) {
+    // Avoid logging potentially huge query params here — use with care in prod
+    // eslint-disable-next-line no-console
+    console.debug(`[PRISMA][Query] ${e.query} (${e.duration}ms)`);
+  }
+});
+
+prisma.$on("error", (e) => {
+  // eslint-disable-next-line no-console
+  console.error("[PRISMA][Error]", e);
+});
+
+// Graceful shutdown helpers
+const shutdown = async (signal: string) => {
+  // eslint-disable-next-line no-console
+  console.info(`[PRISMA] Received ${signal}. Disconnecting Prisma client...`);
+  try {
+    await prisma.$disconnect();
+    // eslint-disable-next-line no-console
+    console.info("[PRISMA] Disconnected.");
+    process.exit(0);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("[PRISMA] Error during disconnect:", err);
+    process.exit(1);
+  }
 };
 
-// Listen for process termination signals
-process.on("beforeExit", shutdown);
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
+process.once("SIGINT", () => shutdown("SIGINT"));
+process.once("SIGTERM", () => shutdown("SIGTERM"));
 
-// ───────────────────────────────
-// 🚀 Export Singleton
-// ───────────────────────────────
-export { prisma };
+export default prisma;
