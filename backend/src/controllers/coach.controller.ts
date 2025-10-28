@@ -1,11 +1,13 @@
 /**
  * src/controllers/coach.controller.ts
  * ---------------------------------------------------------------------
- * Handles all coach-related operations:
- * - Managing assigned athletes
- * - Viewing & filtering session/performance data
- * - Providing athlete feedback
- * - Dashboard insights
+ * Enterprise-grade controller for coach management.
+ * Supports:
+ * - Coach onboarding & admin approval
+ * - Listing and filtering by institution
+ * - Athlete association insights
+ * - Role-safe access and pagination
+ * - Clean deletion and update flows
  */
 
 import { Request, Response } from "express";
@@ -14,161 +16,206 @@ import logger from "../logger";
 import { Errors, sendErrorResponse } from "../utils/errors";
 import { paginate } from "../utils/pagination";
 
-/* -----------------------------------------------------------------------
-   📊 Get Coach Dashboard Overview
-------------------------------------------------------------------------*/
-export const getCoachDashboard = async (req: Request, res: Response) => {
+/* ------------------------------------------------------------------
+   🆕 Register a Coach (requires institution link or invitation)
+-------------------------------------------------------------------*/
+export const registerCoach = async (req: Request, res: Response) => {
   try {
-    const coachId = req.user?.id;
-    if (!coachId) throw Errors.Auth("Unauthorized access");
+    const { name, sport, institutionCode, experienceYears } = req.body;
 
-    const [athleteCount, sessionCount, latestSessions] = await Promise.all([
-      prisma.athlete.count({ where: { coachId } }),
-      prisma.session.count({ where: { coachId } }),
-      prisma.session.findMany({
-        where: { coachId },
-        orderBy: { date: "desc" },
-        take: 5,
-        include: { athlete: { select: { name: true } } },
-      }),
-    ]);
+    if (!name || !sport || !institutionCode)
+      throw Errors.Validation("Name, sport, and institution code are required.");
+
+    const institution = await prisma.institution.findUnique({
+      where: { code: institutionCode },
+    });
+    if (!institution) throw Errors.NotFound("Invalid institution code.");
+
+    // Prevent duplicate coach for same user (if user already a coach)
+    const existing = await prisma.coach.findFirst({
+      where: { userId: req.user?.id },
+    });
+    if (existing)
+      throw Errors.Duplicate("User is already registered as a coach.");
+
+    const coach = await prisma.coach.create({
+      data: {
+        name,
+        sport,
+        experienceYears: Number(experienceYears) || null,
+        userId: req.user?.id,
+        institutionId: institution.id,
+        approved: false, // pending admin approval
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      message:
+        "Coach registration submitted successfully. Awaiting admin approval.",
+      data: coach,
+    });
+  } catch (err) {
+    sendErrorResponse(res, err);
+  }
+};
+
+/* ------------------------------------------------------------------
+   ✅ Approve or Reject Coach (admin only)
+-------------------------------------------------------------------*/
+export const approveCoach = async (req: Request, res: Response) => {
+  try {
+    const { coachId, approved } = req.body;
+    const requester = req.user;
+
+    if (!requester || requester.role !== "admin")
+      throw Errors.Forbidden("Admin privileges required.");
+
+    const coach = await prisma.coach.update({
+      where: { id: coachId },
+      data: { approved },
+    });
 
     res.json({
       success: true,
-      data: {
-        athleteCount,
-        sessionCount,
-        latestSessions,
-      },
+      message: approved
+        ? "Coach approved successfully."
+        : "Coach approval revoked or rejected.",
+      data: coach,
     });
-  } catch (err: any) {
+  } catch (err) {
     sendErrorResponse(res, err);
   }
 };
 
-/* -----------------------------------------------------------------------
-   👥 Get All Athletes Assigned to Coach
-------------------------------------------------------------------------*/
-export const getCoachAthletes = async (req: Request, res: Response) => {
+/* ------------------------------------------------------------------
+   📋 Get All Coaches (admin view)
+-------------------------------------------------------------------*/
+export const getAllCoaches = async (req: Request, res: Response) => {
   try {
-    const coachId = req.user?.id;
-    if (!coachId) throw Errors.Auth("Unauthorized");
+    const requester = req.user;
+    if (!requester || requester.role !== "admin")
+      throw Errors.Forbidden("Admin privileges required.");
 
     const { prismaArgs, meta } = await paginate(req.query, "offset", {
-      where: { coachId },
-      countFn: (where) => prisma.athlete.count({ where }),
+      where: { institutionId: requester.institutionId },
+      countFn: (w) => prisma.coach.count({ where: w }),
       includeTotal: true,
     });
 
-    const athletes = await prisma.athlete.findMany({
+    const coaches = await prisma.coach.findMany({
       ...prismaArgs,
-      where: { coachId },
+      where: { institutionId: requester.institutionId },
       include: {
-        performances: { take: 3, orderBy: { date: "desc" } },
-        attendance: { take: 3, orderBy: { date: "desc" } },
+        athletes: {
+          select: { id: true, name: true, sport: true, approved: true },
+        },
+        institution: { select: { id: true, name: true } },
       },
     });
 
-    res.json({ success: true, data: athletes, meta });
-  } catch (err: any) {
+    res.json({ success: true, data: coaches, meta });
+  } catch (err) {
     sendErrorResponse(res, err);
   }
 };
 
-/* -----------------------------------------------------------------------
-   🗓️ Get All Sessions Conducted by Coach
-------------------------------------------------------------------------*/
-export const getCoachSessions = async (req: Request, res: Response) => {
+/* ------------------------------------------------------------------
+   🔍 Get Coach Profile (self or admin)
+-------------------------------------------------------------------*/
+export const getCoachById = async (req: Request, res: Response) => {
   try {
-    const coachId = req.user?.id;
-    if (!coachId) throw Errors.Auth("Unauthorized");
+    const { id } = req.params;
+    const requester = req.user;
+    if (!requester) throw Errors.Auth("Unauthorized");
 
-    const { prismaArgs, meta } = await paginate(req.query, "offset", {
-      where: { coachId },
-      countFn: (where) => prisma.session.count({ where }),
-      includeTotal: true,
-    });
-
-    const sessions = await prisma.session.findMany({
-      ...prismaArgs,
-      where: { coachId },
+    const coach = await prisma.coach.findUnique({
+      where: { id },
       include: {
-        athlete: { select: { id: true, name: true } },
+        institution: { select: { id: true, name: true, code: true } },
+        athletes: {
+          select: { id: true, name: true, sport: true, approved: true },
+        },
+        sessions: {
+          take: 5,
+          orderBy: { date: "desc" },
+        },
       },
     });
 
-    res.json({ success: true, data: sessions, meta });
-  } catch (err: any) {
+    if (!coach) throw Errors.NotFound("Coach not found.");
+
+    // Access control: coach can only view self, admin can view within institution
+    if (
+      requester.role === "coach" &&
+      requester.id !== coach.userId
+    ) {
+      throw Errors.Forbidden("Access denied.");
+    }
+    if (
+      requester.role === "admin" &&
+      coach.institutionId !== requester.institutionId
+    ) {
+      throw Errors.Forbidden("Cross-institution access denied.");
+    }
+
+    res.json({ success: true, data: coach });
+  } catch (err) {
     sendErrorResponse(res, err);
   }
 };
 
-/* -----------------------------------------------------------------------
-   ✍️ Provide Feedback to an Athlete
-------------------------------------------------------------------------*/
-export const addAthleteFeedback = async (req: Request, res: Response) => {
+/* ------------------------------------------------------------------
+   ✏️ Update Coach (self or admin)
+-------------------------------------------------------------------*/
+export const updateCoach = async (req: Request, res: Response) => {
   try {
-    const coachId = req.user?.id;
-    const { athleteId, feedback, rating } = req.body;
+    const { id } = req.params;
+    const requester = req.user;
 
-    if (!coachId) throw Errors.Auth("Unauthorized");
-    if (!athleteId || !feedback) throw Errors.Validation("Missing fields");
+    if (!requester) throw Errors.Auth("Unauthorized");
+    const coach = await prisma.coach.findUnique({ where: { id } });
+    if (!coach) throw Errors.NotFound("Coach not found.");
 
-    const athlete = await prisma.athlete.findUnique({ where: { id: athleteId } });
-    if (!athlete) throw Errors.NotFound("Athlete not found");
+    // Access control
+    if (requester.role === "coach" && requester.id !== coach.userId)
+      throw Errors.Forbidden("You can only update your own profile.");
+    if (
+      requester.role === "admin" &&
+      coach.institutionId !== requester.institutionId
+    )
+      throw Errors.Forbidden("Access denied.");
 
-    const entry = await prisma.feedback.create({
-      data: {
-        coachId,
-        athleteId,
-        feedback,
-        rating: rating ? Number(rating) : null,
-      },
+    const { name, sport, experienceYears } = req.body;
+
+    const updatedCoach = await prisma.coach.update({
+      where: { id },
+      data: { name, sport, experienceYears },
     });
 
-    logger.info(`🗒️ Feedback added by coach ${coachId} for athlete ${athleteId}`);
-    res.status(201).json({ success: true, data: entry });
-  } catch (err: any) {
+    logger.info(`Coach ${id} updated by ${requester.id}`);
+    res.json({ success: true, data: updatedCoach });
+  } catch (err) {
     sendErrorResponse(res, err);
   }
 };
 
-/* -----------------------------------------------------------------------
-   📈 Get Coach Performance Summary
-------------------------------------------------------------------------*/
-export const getCoachPerformanceSummary = async (req: Request, res: Response) => {
+/* ------------------------------------------------------------------
+   🗑️ Delete Coach (admin only)
+-------------------------------------------------------------------*/
+export const deleteCoach = async (req: Request, res: Response) => {
   try {
-    const coachId = req.user?.id;
-    if (!coachId) throw Errors.Auth("Unauthorized");
+    const { id } = req.params;
+    const requester = req.user;
 
-    const athletes = await prisma.athlete.findMany({
-      where: { coachId },
-      include: { performances: true },
-    });
+    if (!requester || requester.role !== "admin")
+      throw Errors.Forbidden("Admin privileges required.");
 
-    const totalAthletes = athletes.length;
-    const avgPerformance =
-      totalAthletes > 0
-        ? (
-            athletes.reduce((sum, athlete) => {
-              const scores = athlete.performances.map((p) => p.score || 0);
-              const avg =
-                scores.length > 0
-                  ? scores.reduce((a, b) => a + b, 0) / scores.length
-                  : 0;
-              return sum + avg;
-            }, 0) / totalAthletes
-          ).toFixed(2)
-        : 0;
+    await prisma.coach.delete({ where: { id } });
+    logger.warn(`Coach ${id} deleted by admin ${requester.id}`);
 
-    res.json({
-      success: true,
-      data: {
-        totalAthletes,
-        avgPerformance: Number(avgPerformance),
-      },
-    });
-  } catch (err: any) {
+    res.json({ success: true, message: "Coach deleted successfully." });
+  } catch (err) {
     sendErrorResponse(res, err);
   }
 };
