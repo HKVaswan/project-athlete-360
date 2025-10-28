@@ -1,54 +1,68 @@
 import { z } from "zod";
 
 // ───────────────────────────────
-// 🧩 Athlete Validation Schemas
+// 🧍 Athlete Registration & Update
 // ───────────────────────────────
 
-// Athlete registration (used by admins/coaches or self with institution code)
-export const athleteRegistrationSchema = z.object({
+// Basic athlete creation (by institution admin or self-registration via code)
+export const athleteCreateSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
-  email: z.string().email("Valid email is required"),
-  age: z.number().int().min(10, "Age must be at least 10"),
-  gender: z.enum(["male", "female", "other"], { required_error: "Gender required" }),
-  sport: z.string().min(2, "Sport name required"),
-  institutionCode: z.string().min(1, "Institution code is required"),
-  coachCode: z.string().optional(),
-  contactNumber: z
+  email: z.string().email("Valid email address required"),
+  password: z
     .string()
-    .regex(/^[0-9]{10}$/, "Phone must be a valid 10-digit number")
+    .min(8, "Password must be at least 8 characters long")
+    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+    .regex(/[0-9]/, "Password must contain at least one number"),
+  phone: z
+    .string()
+    .regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit Indian phone number")
     .optional(),
-  address: z.string().optional(),
-  medicalConditions: z.string().optional(),
+  sport: z.string().min(2, "Sport name required"),
+  gender: z.enum(["male", "female", "other"], { required_error: "Gender required" }),
+  dateOfBirth: z
+    .string()
+    .refine((d) => !isNaN(Date.parse(d)), "Date of birth must be valid"),
+  institutionCode: z.string().min(4, "Institution code required"),
+  coachCode: z.string().optional(), // optional — can join later via invitation
+  height: z.number().min(50).max(250).optional(),
+  weight: z.number().min(20).max(200).optional(),
+  bloodGroup: z.string().regex(/^(A|B|AB|O)[+-]$/, "Invalid blood group").optional(),
+  profileImage: z.string().url("Must be a valid image URL").optional(),
 });
 
-// Athlete profile update (partial updates allowed)
-export const athleteUpdateSchema = athleteRegistrationSchema.partial();
+// Update schema — partial version
+export const athleteUpdateSchema = athleteCreateSchema.partial();
 
-// Athlete performance filter / search query
+// ───────────────────────────────
+// 🧑‍🏫 Assign Coach / Institution
+// ───────────────────────────────
+export const assignCoachSchema = z.object({
+  athleteId: z.string().uuid("Valid athlete ID required"),
+  coachCode: z.string().min(4, "Valid coach code required"),
+});
+
+export const assignInstitutionSchema = z.object({
+  athleteId: z.string().uuid("Valid athlete ID required"),
+  institutionCode: z.string().min(4, "Valid institution code required"),
+});
+
+// ───────────────────────────────
+// 🔍 Query Filters for Athlete List
+// ───────────────────────────────
 export const athleteQuerySchema = z.object({
-  sport: z.string().optional(),
-  coachId: z.string().uuid().optional(),
   institutionId: z.string().uuid().optional(),
-  minAge: z.string().transform(Number).optional(),
-  maxAge: z.string().transform(Number).optional(),
-  search: z.string().optional(),
-});
-
-// Athlete progress record (used in sessions or assessments)
-export const athleteProgressSchema = z.object({
-  athleteId: z.string().uuid(),
-  sessionId: z.string().uuid().optional(),
-  metric: z.string().min(1, "Metric name required"), // e.g. "Speed", "Endurance"
-  value: z.number().min(0, "Value must be positive"),
-  unit: z.string().optional(), // e.g. "km/h", "seconds"
-  date: z.string().datetime().optional(),
-  notes: z.string().optional(),
+  coachId: z.string().uuid().optional(),
+  sport: z.string().optional(),
+  gender: z.enum(["male", "female", "other"]).optional(),
+  page: z.string().regex(/^\d+$/, "Page must be a number").optional(),
+  limit: z.string().regex(/^\d+$/, "Limit must be a number").optional(),
 });
 
 // ───────────────────────────────
-// ✅ Type Inference
+// 🧠 Type Inference
 // ───────────────────────────────
-export type AthleteRegistrationInput = z.infer<typeof athleteRegistrationSchema>;
+export type AthleteCreateInput = z.infer<typeof athleteCreateSchema>;
 export type AthleteUpdateInput = z.infer<typeof athleteUpdateSchema>;
+export type AssignCoachInput = z.infer<typeof assignCoachSchema>;
+export type AssignInstitutionInput = z.infer<typeof assignInstitutionSchema>;
 export type AthleteQueryInput = z.infer<typeof athleteQuerySchema>;
-export type AthleteProgressInput = z.infer<typeof athleteProgressSchema>;
