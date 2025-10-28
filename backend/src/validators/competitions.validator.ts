@@ -1,31 +1,39 @@
 import { z } from "zod";
 
 // ───────────────────────────────
-// 🏆 Competition Validation Schemas
+// 🏆 Competition Creation
 // ───────────────────────────────
-
-// Create a new competition
 export const competitionCreateSchema = z.object({
-  name: z.string().min(3, "Competition name must be at least 3 characters"),
-  location: z.string().min(2, "Location is required"),
-  startDate: z.string().refine(
-    (date) => !isNaN(Date.parse(date)),
-    "Start date must be a valid date"
-  ),
+  name: z.string().min(3, "Competition name must be at least 3 characters long"),
+  location: z.string().min(3, "Location is required"),
+  startDate: z.string().refine((val) => !isNaN(Date.parse(val)), {
+    message: "Start date must be a valid date",
+  }),
   endDate: z
     .string()
-    .refine(
-      (date) => !isNaN(Date.parse(date)),
-      "End date must be a valid date"
-    )
+    .refine((val) => !isNaN(Date.parse(val)), {
+      message: "End date must be a valid date",
+    })
     .optional(),
   institutionId: z.string().uuid("Valid institution ID required"),
-  description: z.string().max(500, "Description too long").optional(),
-  sportType: z.string().min(2, "Sport type required").optional(),
+  description: z.string().max(500).optional(),
+  type: z
+    .enum(["local", "district", "state", "national", "international"])
+    .default("local"),
+  visibility: z.enum(["private", "public"]).default("private"),
 });
 
-// Update competition (partial update)
-export const competitionUpdateSchema = competitionCreateSchema.partial();
+// ───────────────────────────────
+// 🧾 Competition Update Schema
+// ───────────────────────────────
+export const competitionUpdateSchema = z.object({
+  name: z.string().min(3).optional(),
+  location: z.string().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  description: z.string().optional(),
+  visibility: z.enum(["private", "public"]).optional(),
+});
 
 // ───────────────────────────────
 // 🧍 Add Athlete to Competition
@@ -36,36 +44,37 @@ export const addAthleteSchema = z.object({
 });
 
 // ───────────────────────────────
-// 🥇 Update Result / Performance
+// 🥇 Update Competition Result
 // ───────────────────────────────
 export const updateResultSchema = z.object({
-  athleteId: z.string().uuid("Athlete ID required"),
-  competitionId: z.string().uuid("Competition ID required"),
-  result: z.string().max(100, "Result description too long").optional(),
+  athleteId: z.string().uuid("Athlete ID is required"),
+  competitionId: z.string().uuid("Competition ID is required"),
+  result: z
+    .string()
+    .max(100, "Result must be a short description")
+    .optional(),
   position: z
     .number()
     .int()
-    .positive("Position must be a positive integer")
+    .positive()
+    .max(100, "Position must be within valid range")
     .optional(),
-  performanceNotes: z
-    .string()
-    .max(500, "Performance notes too long")
-    .optional(),
+  performanceNotes: z.string().max(300).optional(),
 });
 
 // ───────────────────────────────
-// 🔍 Query / Filter Competitions
+// 🔍 Query Filter (for listing)
 // ───────────────────────────────
 export const competitionQuerySchema = z.object({
   institutionId: z.string().uuid().optional(),
-  upcoming: z.enum(["true", "false"]).optional(),
-  past: z.enum(["true", "false"]).optional(),
-  page: z.string().regex(/^\d+$/, "Page must be a valid number").optional(),
-  limit: z.string().regex(/^\d+$/, "Limit must be a valid number").optional(),
+  upcoming: z.string().optional(),
+  past: z.string().optional(),
+  page: z.string().regex(/^\d+$/).optional(),
+  limit: z.string().regex(/^\d+$/).optional(),
 });
 
 // ───────────────────────────────
-// ✅ Type Inference
+// 🧠 Type Inference
 // ───────────────────────────────
 export type CompetitionCreateInput = z.infer<typeof competitionCreateSchema>;
 export type CompetitionUpdateInput = z.infer<typeof competitionUpdateSchema>;
