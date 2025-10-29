@@ -1,166 +1,188 @@
 /**
  * athlete.repo.ts
- * ---------------------------------------------------------------------
- * Central data access layer for athlete-related operations.
- * Handles joins, performance summaries, approvals, and coach/institution linkage.
- *
- * ⚙️ Enterprise-grade features:
- *  - Strong TypeScript typing
- *  - Centralized error control via ApiError
- *  - Optimized Prisma queries
- *  - Transaction-safe operations
+ * ------------------------------------------------------------------
+ * Data access layer for Athlete-related operations.
+ * - Handles safe creation, updates, approvals, and associations.
+ * - Optimized for performance, security, and clarity.
+ * - Supports pagination, search, and transaction-safe operations.
  */
 
-import { Prisma, Athlete } from "@prisma/client";
 import prisma from "../prismaClient";
 import { Errors } from "../utils/errors";
+import { buildOffsetPagination } from "../utils/pagination";
+import { Prisma, Athlete } from "@prisma/client";
 
 export class AthleteRepository {
   /**
-   * Create athlete record (linked with user & institution)
+   * Create a new athlete (pending approval if required)
    */
   async createAthlete(data: Prisma.AthleteCreateInput): Promise<Athlete> {
     try {
-      return await prisma.athlete.create({ data });
-    } catch (err: any) {
-      if (err.code === "P2003") {
-        throw Errors.BadRequest("Invalid relation while creating athlete");
-      }
-      throw Errors.Server("Failed to create athlete");
-    }
-  }
-
-  /**
-   * Find athlete by ID
-   */
-  async findById(id: string): Promise<Athlete | null> {
-    return prisma.athlete.findUnique({
-      where: { id },
-      include: {
-        user: { select: { id: true, username: true, email: true, role: true } },
-        institution: { select: { id: true, name: true, code: true } },
-        coach: { select: { id: true, name: true } },
-      },
-    });
-  }
-
-  /**
-   * List all athletes for an institution
-   */
-  async findByInstitution(institutionId: string): Promise<Athlete[]> {
-    return prisma.athlete.findMany({
-      where: { institutionId },
-      include: {
-        user: { select: { id: true, username: true, email: true } },
-        coach: { select: { id: true, name: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-  }
-
-  /**
-   * Find all athletes under a specific coach
-   */
-  async findByCoach(coachId: string): Promise<Athlete[]> {
-    return prisma.athlete.findMany({
-      where: { coachId },
-      include: {
-        user: { select: { id: true, username: true, email: true } },
-        institution: { select: { id: true, name: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-  }
-
-  /**
-   * Update athlete details (performance stats, bio, etc.)
-   */
-  async updateAthlete(id: string, data: Prisma.AthleteUpdateInput): Promise<Athlete> {
-    try {
-      return await prisma.athlete.update({ where: { id }, data });
-    } catch (err: any) {
-      if (err.code === "P2025") throw Errors.NotFound("Athlete not found");
-      throw Errors.Server("Error updating athlete");
-    }
-  }
-
-  /**
-   * Approve or reject athlete registration
-   */
-  async updateApprovalStatus(
-    athleteId: string,
-    approved: boolean,
-    approverId?: string
-  ): Promise<Athlete> {
-    try {
-      return await prisma.athlete.update({
-        where: { id: athleteId },
-        data: {
-          approved,
-          approvedBy: approved ? approverId : null,
-        },
+      // Prevent duplicate athlete for same user
+      const existing = await prisma.athlete.findUnique({
+        where: { userId: data.user.connect?.id },
       });
-    } catch {
-      throw Errors.Server("Failed to update athlete approval status");
+      if (existing) throw Errors.Duplicate("Athlete profile already exists.");
+
+      const athlete = await prisma.athlete.create({ data });
+      return athlete;
+    } catch (err: any) {
+      if (err?.code === "P2002") throw Errors.Duplicate("Duplicate athlete entry.");
+      throw Errors.Server("Failed to create athlete.");
     }
   }
 
   /**
-   * Assign coach to an athlete
+   * Fetch athlete by ID (with optional deep include)
    */
-  async assignCoach(athleteId: string, coachId: string): Promise<Athlete> {
+  async findById(id: string, includeRelations = false) {
     try {
-      return await prisma.athlete.update({
-        where: { id: athleteId },
-        data: { coach: { connect: { id: coachId } } },
-      });
-    } catch {
-      throw Errors.Server("Failed to assign coach to athlete");
-    }
-  }
-
-  /**
-   * Get total number of athletes under an institution
-   */
-  async countByInstitution(institutionId: string): Promise<number> {
-    return prisma.athlete.count({ where: { institutionId } });
-  }
-
-  /**
-   * Search athletes (name or sport)
-   */
-  async searchAthletes(query: string, institutionId?: string): Promise<Athlete[]> {
-    return prisma.athlete.findMany({
-      where: {
-        AND: [
-          institutionId ? { institutionId } : {},
-          {
-            OR: [
-              { name: { contains: query, mode: "insensitive" } },
-              { sport: { contains: query, mode: "insensitive" } },
-            ],
-          },
-        ],
-      },
-      include: {
-        user: { select: { username: true, email: true } },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-    });
-  }
-
-  /**
-   * Delete athlete (soft delete to preserve record integrity)
-   */
-  async deleteAthlete(id: string, softDelete = true): Promise<Athlete> {
-    if (softDelete) {
-      return prisma.athlete.update({
+      const athlete = await prisma.athlete.findUnique({
         where: { id },
-        data: { active: false },
+        include: includeRelations
+          ? {
+              user: { select: { id: true, name: true, email: true, username: true } },
+              institution: { select: { id: true, name: true, code: true } },
+              performances: true,
+              sessions: true,
+              attendance: true,
+              competitions: {
+                include: { competition: { select: { name: true, startDate: true, location: true } } },
+              },
+            }
+          : undefined,
       });
+
+      if (!athlete) throw Errors.NotFound("Athlete not found.");
+      return athlete;
+    } catch (err) {
+      throw Errors.Server("Failed to fetch athlete details.");
     }
-    return prisma.athlete.delete({ where: { id } });
+  }
+
+  /**
+   * Fetch athletes list with pagination and filtering
+   */
+  async listAthletes(options: {
+    page?: number;
+    limit?: number;
+    approved?: boolean;
+    institutionId?: string;
+    search?: string;
+  }) {
+    try {
+      const { page = 1, limit = 20, approved, institutionId, search } = options;
+
+      const where: any = {};
+      if (approved !== undefined) where.approved = approved;
+      if (institutionId) where.institutionId = institutionId;
+      if (search) {
+        where.OR = [
+          { name: { contains: search, mode: "insensitive" } },
+          { athleteCode: { contains: search, mode: "insensitive" } },
+        ];
+      }
+
+      const { prismaArgs, meta } = buildOffsetPagination({ page, limit } as any);
+      prismaArgs.where = where;
+      prismaArgs.include = {
+        user: { select: { username: true, email: true } },
+        institution: { select: { name: true, code: true } },
+      };
+
+      const [rows, total] = await Promise.all([
+        prisma.athlete.findMany(prismaArgs as any),
+        prisma.athlete.count({ where }),
+      ]);
+
+      return {
+        data: rows,
+        meta: { ...meta, total, totalPages: Math.ceil(total / meta.limit) },
+      };
+    } catch (err) {
+      throw Errors.Server("Failed to list athletes.");
+    }
+  }
+
+  /**
+   * Approve athlete (admin/coach)
+   */
+  async approveAthlete(athleteId: string, approverId: string) {
+    try {
+      const athlete = await prisma.athlete.findUnique({ where: { id: athleteId } });
+      if (!athlete) throw Errors.NotFound("Athlete not found.");
+      if (athlete.approved) throw Errors.BadRequest("Athlete already approved.");
+
+      return await prisma.athlete.update({
+        where: { id: athleteId },
+        data: { approved: true, approvedBy: approverId },
+      });
+    } catch (err) {
+      throw Errors.Server("Failed to approve athlete.");
+    }
+  }
+
+  /**
+   * Update athlete details
+   */
+  async updateAthlete(id: string, data: Partial<Prisma.AthleteUpdateInput>) {
+    try {
+      const athlete = await prisma.athlete.update({
+        where: { id },
+        data,
+      });
+      return athlete;
+    } catch (err: any) {
+      if (err?.code === "P2025") throw Errors.NotFound("Athlete not found.");
+      throw Errors.Server("Failed to update athlete.");
+    }
+  }
+
+  /**
+   * Assign athlete to a coach
+   * - Ensures both belong to same institution (data integrity)
+   */
+  async assignCoach(athleteId: string, coachId: string) {
+    try {
+      const [athlete, coach] = await Promise.all([
+        prisma.athlete.findUnique({ where: { id: athleteId } }),
+        prisma.user.findUnique({ where: { id: coachId, role: "coach" } }),
+      ]);
+
+      if (!athlete) throw Errors.NotFound("Athlete not found.");
+      if (!coach) throw Errors.NotFound("Coach not found.");
+
+      if (athlete.institutionId && coach.institutionId && athlete.institutionId !== coach.institutionId) {
+        throw Errors.BadRequest("Coach and athlete belong to different institutions.");
+      }
+
+      return await prisma.athlete.update({
+        where: { id: athleteId },
+        data: { coachId },
+      });
+    } catch (err) {
+      throw Errors.Server("Failed to assign coach to athlete.");
+    }
+  }
+
+  /**
+   * Delete athlete (admin/institution only)
+   * - Removes linked data via transaction for data safety.
+   */
+  async deleteAthlete(id: string) {
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.performance.deleteMany({ where: { athleteId: id } });
+        await tx.session.deleteMany({ where: { athleteId: id } });
+        await tx.attendance.deleteMany({ where: { athleteId: id } });
+        await tx.athleteCompetition.deleteMany({ where: { athleteId: id } });
+        await tx.athlete.delete({ where: { id } });
+      });
+
+      return true;
+    } catch (err) {
+      throw Errors.Server("Failed to delete athlete.");
+    }
   }
 }
 
