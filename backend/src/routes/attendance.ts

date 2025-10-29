@@ -1,0 +1,85 @@
+/**
+ * src/routes/attendance.ts
+ * ---------------------------------------------------------
+ * Handles athlete attendance tracking routes.
+ * Supports:
+ *  - Secure logging of attendance by coaches/institutions
+ *  - Athlete self-check for viewing own attendance
+ *  - Admin overview for reporting and compliance
+ *  - Anti-spam and data validation safeguards
+ */
+
+import { Router } from "express";
+import { requireAuth } from "../middleware/auth.middleware";
+import { requireRole } from "../middleware/roles.middleware";
+import * as attendanceController from "../controllers/attendance.controller";
+import rateLimit from "express-rate-limit";
+import { validate } from "../middleware/validation.middleware";
+import { attendanceSchema } from "../validators/attendance.validator";
+
+const router = Router();
+
+/**
+ * 🚦 Rate limiting to prevent abuse or accidental mass submissions.
+ */
+const attendanceLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 40, // max 40 requests per minute per IP
+  message: "Too many attendance operations, please slow down.",
+});
+
+// 🔒 All routes require authentication
+router.use(requireAuth);
+
+/**
+ * 🧑‍🎓 Athletes — View their own attendance records
+ */
+router.get(
+  "/my",
+  requireRole("athlete"),
+  attendanceLimiter,
+  attendanceController.getMyAttendance
+);
+
+/**
+ * 🏫 Coaches/Institutions — Mark attendance for multiple athletes
+ * Validates the structure before creating records
+ */
+router.post(
+  "/mark",
+  requireRole("coach"),
+  attendanceLimiter,
+  validate(attendanceSchema.mark),
+  attendanceController.markAttendance
+);
+
+/**
+ * 📅 Coaches/Institutions — Get attendance summary for a specific date or session
+ */
+router.get(
+  "/summary",
+  requireRole("coach"),
+  attendanceLimiter,
+  attendanceController.getAttendanceSummary
+);
+
+/**
+ * 🧾 Admin — Retrieve attendance data for auditing, export, or analytics
+ */
+router.get(
+  "/admin/all",
+  requireRole("admin"),
+  attendanceLimiter,
+  attendanceController.getAllAttendance
+);
+
+/**
+ * 🧹 Admin — Remove invalid or duplicate attendance entries (soft delete)
+ */
+router.delete(
+  "/admin/:attendanceId",
+  requireRole("admin"),
+  attendanceController.deleteAttendanceRecord
+);
+
+export default router;
