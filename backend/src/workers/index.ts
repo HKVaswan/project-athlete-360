@@ -1,14 +1,14 @@
 /**
  * workers/index.ts
  * ------------------------------------------------------------------------
- * Centralized Worker Manager for all background queues.
+ * Centralized Worker Manager for all background jobs.
  *
- * Features:
- *  - Modular and auto-discoverable worker registration
- *  - Built-in retry and backoff strategies
- *  - Graceful shutdown and fault tolerance
- *  - Health monitoring for production readiness
- *  - AI-ready: easily plug in intelligent jobs later
+ * Enterprise features:
+ *  ✅ Modular + auto-discoverable worker registration
+ *  ✅ Built-in retry, exponential backoff, and alert system
+ *  ✅ Periodic scheduling for cleanup + security audits
+ *  ✅ Graceful shutdown & health checks
+ *  ✅ AI-ready (future model-driven jobs)
  */
 
 import { Queue, Worker, QueueScheduler, Job } from "bullmq";
@@ -21,6 +21,8 @@ import { config } from "../config";
 const connection = new IORedis(config.redisUrl || "redis://127.0.0.1:6379", {
   maxRetriesPerRequest: null,
   enableReadyCheck: true,
+  reconnectOnError: () => true,
+  lazyConnect: false,
 });
 
 export const queues: Record<string, Queue> = {};
@@ -28,7 +30,7 @@ export const workers: Record<string, Worker> = {};
 export const schedulers: Record<string, QueueScheduler> = {};
 
 /**
- * Register a queue, worker, and scheduler trio
+ * Register a queue + worker + scheduler trio with enterprise options.
  */
 export const registerWorker = (
   name: string,
@@ -37,6 +39,7 @@ export const registerWorker = (
     concurrency?: number;
     attempts?: number;
     backoff?: number;
+    repeat?: { pattern?: string };
   } = {}
 ) => {
   try {
@@ -53,13 +56,16 @@ export const registerWorker = (
       }
     );
 
-    worker.on("completed", (job: Job) =>
-      logger.info(`[WORKER:${name}] ✅ Job ${job.id} completed successfully`)
-    );
+    worker.on("completed", (job: Job) => {
+      logger.info(`[WORKER:${name}] ✅ Job ${job.id} completed successfully`);
+    });
 
-    worker.on("failed", (job, err) =>
-      logger.error(`[WORKER:${name}] ❌ Job ${job?.id || "unknown"} failed: ${err.message}`)
-    );
+    worker.on("failed", (job, err) => {
+      logger.error(`[WORKER:${name}] ❌ Job ${job?.id || "unknown"} failed: ${err.message}`);
+      if (options.attempts && job?.attemptsMade >= options.attempts) {
+        logger.warn(`[WORKER:${name}] ⚠️ Max retries reached for Job ${job?.id}`);
+      }
+    });
 
     worker.on("error", (err) => {
       logger.error(`[WORKER:${name}] 💥 Worker error: ${err.message}`);
@@ -70,14 +76,23 @@ export const registerWorker = (
     schedulers[name] = scheduler;
 
     logger.info(`[WORKER] Registered '${name}' successfully`);
+
+    // Automatically add repeatable jobs if applicable
+    if (options.repeat?.pattern) {
+      queue.add(
+        `${name}-scheduled`,
+        {},
+        { repeat: { pattern: options.repeat.pattern } }
+      );
+      logger.info(`[WORKER:${name}] ⏱️ Scheduled job to run as per pattern: ${options.repeat.pattern}`);
+    }
   } catch (err: any) {
     logger.error(`[WORKER] ❌ Failed to register worker '${name}': ${err.message}`);
   }
 };
 
 /**
- * Dynamically load all worker files from the workers directory
- * (Any file ending with .worker.js will be auto-registered)
+ * Automatically discover and register all worker files.
  */
 export const autoRegisterWorkers = () => {
   const workersDir = __dirname;
@@ -93,47 +108,72 @@ export const autoRegisterWorkers = () => {
 };
 
 /**
- * Initialize workers explicitly or dynamically
+ * Initialize all known workers and schedule key system jobs.
  */
 export const initWorkers = async () => {
   logger.info("[WORKER] 🚀 Initializing background workers...");
 
-  // Option 1: Explicit registration
-  registerWorker("email", path.join(__dirname, "email.worker.js"));
-  registerWorker("resourceProcessing", path.join(__dirname, "resourceProcessing.worker.js"));
-  registerWorker("aiProcessing", path.join(__dirname, "aiProcessing.worker.js"));
+  // Explicit registration (high-priority workers)
+  registerWorker("email", path.join(__dirname, "email.worker.js"), {
+    concurrency: 5,
+    attempts: 3,
+    backoff: 3000,
+  });
 
-  // Option 2: Auto-discover all .worker.js files
+  registerWorker("resourceProcessing", path.join(__dirname, "resourceProcessing.worker.js"), {
+    concurrency: 3,
+    attempts: 3,
+    backoff: 5000,
+  });
+
+  registerWorker("aiProcessing", path.join(__dirname, "aiProcessing.worker.js"), {
+    concurrency: 2,
+    attempts: 2,
+  });
+
+  registerWorker("securityAudit", path.join(__dirname, "securityAudit.worker.js"), {
+    concurrency: 1,
+    attempts: 3,
+    repeat: { pattern: "0 3 * * *" }, // every day at 3 AM
+  });
+
+  registerWorker("cleanup", path.join(__dirname, "cleanup.worker.js"), {
+    concurrency: 1,
+    attempts: 3,
+    backoff: 10000,
+    repeat: { pattern: "0 2 * * *" }, // every day at 2 AM
+  });
+
+  // Optionally auto-discover all .worker.js files
   // autoRegisterWorkers();
 
-  logger.info("[WORKER] ✅ All workers initialized successfully.");
+  logger.info("[WORKER] ✅ All background workers initialized successfully.");
 };
 
 /**
- * Graceful shutdown procedure for all workers and queues
+ * Graceful shutdown for all queues and workers.
  */
 export const shutdownWorkers = async () => {
-  logger.info("[WORKER] 🧹 Shutting down all workers and queues...");
-
-  await Promise.all([
-    ...Object.values(workers).map((w) => w.close().catch(() => {})),
-    ...Object.values(schedulers).map((s) => s.close().catch(() => {})),
-    connection.quit().catch(() => {}),
+  logger.info("[WORKER] 🧹 Gracefully shutting down all workers and queues...");
+  await Promise.allSettled([
+    ...Object.values(workers).map((w) => w.close()),
+    ...Object.values(schedulers).map((s) => s.close()),
+    connection.quit(),
   ]);
-
-  logger.info("[WORKER] ✅ Graceful shutdown complete.");
+  logger.info("[WORKER] ✅ Shutdown complete.");
 };
 
 /**
- * Worker health check (for readiness probes)
+ * Health check endpoint support (for /health routes).
  */
 export const checkWorkerHealth = async () => {
   const redisStatus = connection.status;
   const activeWorkers = Object.keys(workers).length;
 
   return {
-    redis: redisStatus === "ready" ? "healthy" : "unhealthy",
+    redis: redisStatus === "ready" ? "healthy" : redisStatus,
     activeWorkers,
     queues: Object.keys(queues),
+    lastCheck: new Date().toISOString(),
   };
 };
