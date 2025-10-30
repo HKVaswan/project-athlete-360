@@ -1,0 +1,99 @@
+/**
+ * src/controllers/admin/monitoring.controller.ts
+ * ---------------------------------------------------------------------------
+ * Enterprise-grade System Monitoring Controller
+ *
+ * Provides:
+ *  - Live system health metrics
+ *  - Worker and queue status
+ *  - Database & Redis connectivity checks
+ *  - CPU, memory, and uptime data
+ *
+ * Used by: Admin dashboards, monitoring UIs, or DevOps alerts.
+ */
+
+import { Request, Response } from "express";
+import os from "os";
+import prisma from "../../prismaClient";
+import { logger } from "../../logger";
+import { config } from "../../config";
+import { checkWorkerHealth } from "../../workers";
+import { Errors } from "../../utils/errors";
+
+/**
+ * @desc Returns comprehensive system health data
+ * @route GET /api/admin/monitoring/health
+ */
+export const getSystemHealth = async (req: Request, res: Response) => {
+  try {
+    // Collect server stats
+    const uptime = process.uptime();
+    const memoryUsage = process.memoryUsage();
+    const cpuLoad = os.loadavg();
+    const workerHealth = await checkWorkerHealth();
+
+    // Verify DB connection
+    const dbCheck = await prisma.$queryRaw`SELECT 1 as result;`;
+
+    // Response payload
+    const data = {
+      app: {
+        environment: config.nodeEnv,
+        uptimeSeconds: uptime,
+        version: process.env.npm_package_version || "unknown",
+      },
+      server: {
+        hostname: os.hostname(),
+        platform: os.platform(),
+        arch: os.arch(),
+        cpuLoad,
+        memoryMB: Math.round(memoryUsage.rss / 1024 / 1024),
+      },
+      database: {
+        status: dbCheck ? "connected" : "disconnected",
+      },
+      workers: workerHealth,
+      timestamp: new Date().toISOString(),
+    };
+
+    return res.status(200).json({ success: true, data });
+  } catch (err: any) {
+    logger.error("❌ Monitoring health check failed:", err);
+    throw Errors.Server("Failed to fetch system health");
+  }
+};
+
+/**
+ * @desc Simple ping route for load balancer / uptime monitoring
+ * @route GET /api/admin/monitoring/ping
+ */
+export const ping = async (req: Request, res: Response) => {
+  return res.status(200).json({
+    success: true,
+    message: "pong",
+    timestamp: new Date().toISOString(),
+  });
+};
+
+/**
+ * @desc Returns only database + queue health (for faster checks)
+ * @route GET /api/admin/monitoring/quick
+ */
+export const quickHealthCheck = async (req: Request, res: Response) => {
+  try {
+    const dbCheck = await prisma.$queryRaw`SELECT 1 as result;`;
+    const workerHealth = await checkWorkerHealth();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        database: dbCheck ? "connected" : "disconnected",
+        workers: workerHealth.redis === "healthy" ? "healthy" : "unhealthy",
+        time: new Date().toISOString(),
+      },
+    });
+  } catch (err: any) {
+    logger.error("⚠️ Quick health check failed:", err);
+    throw Errors.Server("Health check failed");
+  }
+};
