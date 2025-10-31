@@ -1,55 +1,78 @@
 /**
  * src/types/superAdmin.d.ts
  * ----------------------------------------------------------------------
- * 🧠 Global Type Declarations for Super Admin Module
- *
- * Purpose:
- *  - Provide consistent typing across controllers, services, and repos.
- *  - Avoid circular imports between modules.
- *  - Enhance code readability and maintainability.
+ * Global Type Declarations for Super Admin & Audit Ecosystem
  */
 
 import type { Request } from "express";
 
 /* -----------------------------------------------------------------------
-   🧩 Super Admin Request Context
+   👑 Super Admin Core Types
 ------------------------------------------------------------------------*/
+export interface SuperAdminUser {
+  id: string;
+  username: string;
+  email: string;
+  role: "super_admin";
+  mfaVerified?: boolean;
+  lastLoginAt?: Date;
+  permissions?: string[];
+}
+
+/**
+ * Used in Express middleware & controllers
+ */
 export interface SuperAdminRequest extends Request {
-  user: {
-    id: string;
-    username: string;
-    email: string;
-    role: "super_admin";
-    mfaVerified?: boolean;
-  };
+  user: SuperAdminUser;
 }
 
 /* -----------------------------------------------------------------------
-   🧾 Audit Log Event Types
+   🧾 Audit Record Structure
 ------------------------------------------------------------------------*/
-export type SuperAdminAction =
-  | "CREATE_SUPERADMIN"
-  | "ADMIN_APPROVAL"
-  | "ADMIN_DEMOTION"
-  | "SYSTEM_CONFIG_UPDATE"
-  | "BACKUP_RUN"
-  | "RESTORE_RUN"
-  | "SECRET_ROTATION"
-  | "AI_HEALTH_CHECK"
-  | "OVERRIDE_ACTION"
-  | "SYSTEM_ALERT";
-
-export interface AuditEventPayload {
+export interface AuditRecord {
+  id?: string;
   actorId: string;
-  actorRole: "super_admin";
+  actorRole: "super_admin" | "admin" | "system";
   ip?: string;
-  action: SuperAdminAction;
+  action: AdminAction;
   entity?: string;
   details?: Record<string, any>;
+  createdAt?: Date;
 }
 
 /* -----------------------------------------------------------------------
-   ⚙️ System Config Types
+   ⚙️ Enum: Administrative Actions
+------------------------------------------------------------------------*/
+export type AdminAction =
+  | "CREATE_ADMIN"
+  | "APPROVE_ADMIN"
+  | "DELETE_ADMIN"
+  | "SUSPEND_USER"
+  | "UPDATE_SYSTEM_CONFIG"
+  | "BACKUP_TRIGGER"
+  | "RESTORE_TRIGGER"
+  | "SECRET_ROTATION"
+  | "IMPERSONATE_USER"
+  | "TERMINATE_IMPERSONATION"
+  | "AI_MODULE_CHECK"
+  | "SYSTEM_ALERT";
+
+/* -----------------------------------------------------------------------
+   🕵️ Impersonation Session
+------------------------------------------------------------------------*/
+export interface ImpersonationSession {
+  id?: string;
+  superAdminId: string;
+  targetUserId: string;
+  targetRole: string;
+  startedAt: Date;
+  expiresAt: Date;
+  terminatedAt?: Date | null;
+  active: boolean;
+}
+
+/* -----------------------------------------------------------------------
+   🔐 System Config & Secret Management
 ------------------------------------------------------------------------*/
 export type ConfigKey =
   | "maintenance_mode"
@@ -61,14 +84,14 @@ export type ConfigKey =
 
 export interface SystemConfigRecord {
   id?: string;
-  key: ConfigKey | string;
+  key: ConfigKey;
   value: string | number | boolean | Record<string, any>;
   updatedBy: string;
   updatedAt?: Date;
 }
 
 /* -----------------------------------------------------------------------
-   🔐 Secret Rotation Types
+   🔑 Secret Rotation Events
 ------------------------------------------------------------------------*/
 export type SecretType = "jwt" | "refresh" | "hmac" | "encryption";
 
@@ -81,29 +104,7 @@ export interface SecretRotationRecord {
 }
 
 /* -----------------------------------------------------------------------
-   👑 Admin Management Types
-------------------------------------------------------------------------*/
-export interface AdminApprovalRequest {
-  adminId: string;
-  approvedBy: string;
-}
-
-export interface AdminDemotionRequest {
-  adminId: string;
-  demotedBy: string;
-  reason?: string;
-}
-
-/* -----------------------------------------------------------------------
-   📦 Backup & Restore Payloads
-------------------------------------------------------------------------*/
-export interface BackupRestorePayload {
-  s3Key: string;
-  confirm: boolean;
-}
-
-/* -----------------------------------------------------------------------
-   📊 System Overview Snapshot
+   🧠 System & AI Health
 ------------------------------------------------------------------------*/
 export interface SystemOverview {
   totalUsers: number;
@@ -115,9 +116,6 @@ export interface SystemOverview {
   environment: string;
 }
 
-/* -----------------------------------------------------------------------
-   🧠 AI Health Check Result
-------------------------------------------------------------------------*/
 export interface AIHealthStatus {
   provider: string;
   latencyMs: number;
