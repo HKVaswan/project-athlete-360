@@ -1,20 +1,14 @@
-/**
- * src/controllers/auth.controller.ts
- * ---------------------------------------------------------------------
- * Handles user registration, login, token generation, and identity checks.
- * Supports multiple onboarding flows: athlete, coach, and admin.
- * Includes validation, approval logic, and secure JWT token handling.
- */
-
 import { Request, Response } from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { randomUUID } from "crypto";
 import prisma from "../prismaClient";
 import logger from "../logger";
-import { Errors, sendErrorResponse } from "../utils/errors";
-import { ApiError } from "../utils/errors";
+import { Errors, sendErrorResponse, ApiError } from "../utils/errors";
 import { config } from "../config";
-import { randomUUID } from "crypto";
+import { auditService } from "../lib/audit";
+import { generateMfaToken, verifyMfaCode } from "../services/mfa.service";
+import { AuthenticatedRequest } from "../middleware/auth.middleware";
 
 /* -----------------------------------------------------------------------
    🧩 Utility Helpers
@@ -24,7 +18,7 @@ const generateCoachCode = () => `COACH-${Math.floor(1000 + Math.random() * 9000)
 const generateInstitutionCode = () => `INST-${Math.floor(1000 + Math.random() * 9000)}`;
 
 /**
- * Sanitize user for response (removes sensitive data)
+ * Sanitize user object for safe API response
  */
 const sanitizeUser = (user: any) => ({
   id: user.id,
@@ -40,83 +34,48 @@ const sanitizeUser = (user: any) => ({
 /**
  * Generate JWT access + refresh tokens
  */
-const generateTokens = (user: any) => {
-  const accessToken = jwt.sign(
-    { userId: user.id, username: user.username, role: user.role },
-    config.jwt.secret,
-    { expiresIn: config.jwt.expiresIn }
-  );
+const generateTokens = (user: any, mfaVerified = false, impersonatedBy?: string) => {
+  const payload = {
+    userId: user.id,
+    username: user.username,
+    role: user.role,
+    mfaVerified,
+    impersonatedBy,
+    sessionVersion: user.sessionVersion || 0,
+  };
 
-  const refreshToken = jwt.sign(
-    { userId: user.id },
-    config.jwt.refreshSecret,
-    { expiresIn: config.jwt.refreshExpiresIn }
-  );
+  const accessToken = jwt.sign(payload, config.jwt.secret, {
+    expiresIn: config.jwt.expiresIn,
+  });
+
+  const refreshToken = jwt.sign({ userId: user.id }, config.jwt.refreshSecret, {
+    expiresIn: config.jwt.refreshExpiresIn,
+  });
 
   return { accessToken, refreshToken };
 };
 
 /* -----------------------------------------------------------------------
-   🔐 Register
+   🔐 Register (Athlete / Coach only)
 ------------------------------------------------------------------------*/
-/**
- * Handles registration of athletes, coaches, and admins.
- * Athletes -> must use institution code (coach optional)
- * Coaches -> must use institution code or invitation
- * Admins  -> registered separately through onboarding flow (payment gateway)
- */
 export const register = async (req: Request, res: Response) => {
   try {
-    const {
-      username,
-      password,
-      name,
-      email,
-      dob,
-      gender,
-      role,
-      sport,
-      institutionCode,
-      coachCode,
-    } = req.body;
+    const { username, password, name, email, dob, gender, role, sport, institutionCode, coachCode } = req.body;
 
-    if (!username || !password || !role) {
-      throw Errors.Validation("Username, password and role are required");
-    }
+    if (!username || !password || !role) throw Errors.Validation("Username, password and role are required");
 
-    // Prevent invalid role creation (admin signup not allowed via public route)
     if (!["athlete", "coach"].includes(role)) {
-      throw Errors.Forbidden("Invalid registration role");
+      throw Errors.Forbidden("Public registration allowed only for athletes and coaches");
     }
 
-    const existing = await prisma.user.findFirst({
-      where: { OR: [{ username }, { email }] },
-    });
+    const existing = await prisma.user.findFirst({ where: { OR: [{ username }, { email }] } });
     if (existing) throw Errors.Duplicate("Username or email already exists");
 
-    // Institution verification
-    let institution = null;
-    if (institutionCode) {
-      institution = await prisma.institution.findUnique({
-        where: { code: institutionCode },
-      });
-      if (!institution) throw Errors.BadRequest("Invalid institution code");
-    } else if (role === "athlete" || role === "coach") {
-      throw Errors.Validation("Institution code is required");
-    }
+    const institution = await prisma.institution.findUnique({ where: { code: institutionCode } });
+    if (!institution) throw Errors.BadRequest("Invalid institution code");
 
-    // Coach validation (if coach code entered)
-    let coach = null;
-    if (coachCode) {
-      coach = await prisma.user.findFirst({
-        where: { coachCode },
-      });
-      if (!coach) throw Errors.BadRequest("Invalid coach code");
-    }
+    const passwordHash = await bcrypt.hash(password, 12);
 
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    // Create User
     const user = await prisma.user.create({
       data: {
         username,
@@ -125,11 +84,10 @@ export const register = async (req: Request, res: Response) => {
         passwordHash,
         role,
         ...(role === "coach" && { coachCode: generateCoachCode() }),
-        ...(institution && { institutionId: institution.id }),
+        institutionId: institution.id,
       },
     });
 
-    // Role-specific creation logic
     if (role === "athlete") {
       await prisma.athlete.create({
         data: {
@@ -146,40 +104,33 @@ export const register = async (req: Request, res: Response) => {
       });
     }
 
-    if (role === "coach") {
-      await prisma.coachInstitution.create({
-        data: {
-          coach: { connect: { id: user.id } },
-          institution: { connect: { id: institution.id } },
-        },
-      });
-    }
-
     const tokens = generateTokens(user);
-    logger.info(`✅ New ${role} registered: ${username}`);
+
+    await auditService.log({
+      actorId: user.id,
+      actorRole: role,
+      action: "USER_REGISTER",
+      details: { email, institutionCode },
+    });
 
     res.status(201).json({
       success: true,
       message: "Registration successful (pending approval if required)",
-      data: {
-        user: sanitizeUser(user),
-        ...tokens,
-      },
+      data: { user: sanitizeUser(user), ...tokens },
     });
   } catch (err: any) {
-    logger.error("❌ Registration failed: " + err.message);
+    logger.error(`[AUTH] Registration failed: ${err.message}`);
     sendErrorResponse(res, err);
   }
 };
 
 /* -----------------------------------------------------------------------
-   🔑 Login
+   🔑 Login (MFA Support for Admin / Super Admin)
 ------------------------------------------------------------------------*/
 export const login = async (req: Request, res: Response) => {
   try {
-    const { identifier, password } = req.body;
-    if (!identifier || !password)
-      throw Errors.Validation("Username/email and password required");
+    const { identifier, password, mfaCode } = req.body;
+    if (!identifier || !password) throw Errors.Validation("Username/email and password required");
 
     const user = await prisma.user.findFirst({
       where: { OR: [{ username: identifier }, { email: identifier }] },
@@ -190,21 +141,52 @@ export const login = async (req: Request, res: Response) => {
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) throw Errors.Auth("Invalid credentials");
 
-    // Block unapproved athletes
     if (user.role === "athlete" && user.athlete && !user.athlete.approved) {
       throw Errors.Forbidden("Athlete account pending approval by coach/admin");
     }
 
-    const tokens = generateTokens(user);
-    logger.info(`🔐 Login success for ${user.username} (${user.role})`);
+    // Super Admin requires MFA
+    if (["admin", "super_admin"].includes(user.role)) {
+      if (!mfaCode) {
+        const challenge = await generateMfaToken(user.id);
+        return res.status(206).json({
+          success: false,
+          code: "MFA_REQUIRED",
+          message: "MFA code required to complete login",
+          data: { challengeId: challenge.id, expiresIn: challenge.expiresIn },
+        });
+      }
 
-    res.json({
-      success: true,
-      message: "Login successful",
-      data: { user: sanitizeUser(user), ...tokens },
+      const verified = await verifyMfaCode(user.id, mfaCode);
+      if (!verified) throw Errors.Auth("Invalid or expired MFA code");
+
+      const tokens = generateTokens(user, true);
+      await auditService.log({
+        actorId: user.id,
+        actorRole: user.role,
+        action: "USER_LOGIN",
+        details: { mfa: true, ip: req.ip },
+      });
+
+      return res.json({
+        success: true,
+        message: "Login successful (MFA verified)",
+        data: { user: sanitizeUser(user), ...tokens },
+      });
+    }
+
+    // Normal login
+    const tokens = generateTokens(user);
+    await auditService.log({
+      actorId: user.id,
+      actorRole: user.role,
+      action: "USER_LOGIN",
+      details: { ip: req.ip },
     });
+
+    res.json({ success: true, message: "Login successful", data: { user: sanitizeUser(user), ...tokens } });
   } catch (err: any) {
-    logger.error("❌ Login failed: " + err.message);
+    logger.error(`[AUTH] Login failed: ${err.message}`);
     sendErrorResponse(res, err);
   }
 };
@@ -230,7 +212,7 @@ export const refreshToken = async (req: Request, res: Response) => {
     const tokens = generateTokens(user);
     res.json({ success: true, data: tokens });
   } catch (err: any) {
-    logger.error("❌ Refresh token failed: " + err.message);
+    logger.error(`[AUTH] Refresh token failed: ${err.message}`);
     sendErrorResponse(res, err);
   }
 };
@@ -238,13 +220,12 @@ export const refreshToken = async (req: Request, res: Response) => {
 /* -----------------------------------------------------------------------
    👤 Me
 ------------------------------------------------------------------------*/
-export const me = async (req: Request, res: Response) => {
+export const me = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
-    if (!userId) throw Errors.Auth("Unauthorized");
+    if (!req.user) throw Errors.Auth("Unauthorized");
 
     const user = await prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: req.user.id },
       include: { athlete: true },
     });
 
@@ -263,12 +244,20 @@ export const me = async (req: Request, res: Response) => {
 /* -----------------------------------------------------------------------
    🚪 Logout
 ------------------------------------------------------------------------*/
-export const logout = async (_req: Request, res: Response) => {
+export const logout = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    // Tokens are stateless (JWT), so logout handled client-side (token deletion)
+    if (req.user) {
+      await auditService.log({
+        actorId: req.user.id,
+        actorRole: req.user.role,
+        action: "USER_LOGOUT",
+        details: { ip: req.ip },
+      });
+    }
+
     res.json({
       success: true,
-      message: "Logout successful. Token invalidated on client side.",
+      message: "Logout successful. Token invalidated client-side.",
     });
   } catch (err: any) {
     sendErrorResponse(res, err);
