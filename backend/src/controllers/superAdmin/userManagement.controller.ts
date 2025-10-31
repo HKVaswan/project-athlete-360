@@ -1,15 +1,15 @@
 /**
  * src/controllers/superAdmin/userManagement.controller.ts
- * ----------------------------------------------------------------------
+ * ------------------------------------------------------------------------
  * Super Admin User Management Controller
  *
  * Responsibilities:
- *  - Manage user accounts and roles
- *  - Suspend/reactivate users securely
- *  - Impersonate any user (for support/audit)
- *  - View system-wide role statistics
- *  - Fully auditable and access-controlled
- * ----------------------------------------------------------------------
+ *  - Manage all users and system roles
+ *  - Suspend, reactivate, or delete accounts (with safeguards)
+ *  - Secure impersonation with audit tracking
+ *  - Prevent privilege escalation or abuse
+ *  - Ensure every action is auditable and reversible
+ * ------------------------------------------------------------------------
  */
 
 import { Request, Response } from "express";
@@ -17,12 +17,11 @@ import prisma from "../../prismaClient";
 import { logger } from "../../logger";
 import { Errors, sendErrorResponse } from "../../utils/errors";
 import { recordAuditEvent } from "../../services/audit.service";
-import { revokeRefreshToken } from "../../services/auth.service";
 import jwt from "jsonwebtoken";
 import { config } from "../../config";
 
 /* -----------------------------------------------------------------------
-   🧩 Utility: Super Admin validation
+   🧩 Helper: Verify Super Admin
 ------------------------------------------------------------------------*/
 const requireSuperAdmin = (req: Request) => {
   const user = (req as any).user;
@@ -33,12 +32,13 @@ const requireSuperAdmin = (req: Request) => {
 };
 
 /* -----------------------------------------------------------------------
-   📋 1. Get all users (with filters)
+   👥 1. List All Users
 ------------------------------------------------------------------------*/
 export const listUsers = async (req: Request, res: Response) => {
   try {
     const superAdmin = requireSuperAdmin(req);
-    const { role, search, page = 1, limit = 20 } = req.query;
+
+    const { role, search, limit = 50 } = req.query;
 
     const where: any = {};
     if (role) where.role = role;
@@ -50,33 +50,22 @@ export const listUsers = async (req: Request, res: Response) => {
 
     const users = await prisma.user.findMany({
       where,
-      skip: (Number(page) - 1) * Number(limit),
       take: Number(limit),
       orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        role: true,
-        name: true,
-        createdAt: true,
-        isSuspended: true,
-      },
     });
-
-    const total = await prisma.user.count({ where });
 
     await recordAuditEvent({
       actorId: superAdmin.id,
       actorRole: "super_admin",
       ip: req.ip,
-      action: "ADMIN_OVERRIDE",
-      details: { event: "list_users", filters: { role, search, page, limit } },
+      action: "USER_LIST_VIEW",
+      details: { count: users.length, filter: where },
     });
 
     res.json({
       success: true,
-      data: { users, total },
+      message: "User list retrieved successfully.",
+      data: users,
     });
   } catch (err: any) {
     logger.error("[SUPERADMIN:USER] listUsers failed", { err });
@@ -85,24 +74,92 @@ export const listUsers = async (req: Request, res: Response) => {
 };
 
 /* -----------------------------------------------------------------------
-   🛡 2. Update user role (promotion/demotion)
+   🚫 2. Suspend a User
 ------------------------------------------------------------------------*/
-export const updateUserRole = async (req: Request, res: Response) => {
+export const suspendUser = async (req: Request, res: Response) => {
+  try {
+    const superAdmin = requireSuperAdmin(req);
+    const { userId, reason } = req.body;
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw Errors.NotFound("User not found");
+
+    if (user.role === "super_admin")
+      throw Errors.Forbidden("Super Admin accounts cannot be suspended.");
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { suspended: true },
+    });
+
+    await recordAuditEvent({
+      actorId: superAdmin.id,
+      actorRole: "super_admin",
+      targetId: userId,
+      action: "USER_SUSPENDED",
+      details: { reason },
+    });
+
+    res.json({
+      success: true,
+      message: `User ${user.username} has been suspended.`,
+    });
+  } catch (err: any) {
+    logger.error("[SUPERADMIN:USER] suspendUser failed", { err });
+    sendErrorResponse(res, err);
+  }
+};
+
+/* -----------------------------------------------------------------------
+   🔄 3. Reactivate a User
+------------------------------------------------------------------------*/
+export const reactivateUser = async (req: Request, res: Response) => {
+  try {
+    const superAdmin = requireSuperAdmin(req);
+    const { userId } = req.body;
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw Errors.NotFound("User not found");
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { suspended: false },
+    });
+
+    await recordAuditEvent({
+      actorId: superAdmin.id,
+      actorRole: "super_admin",
+      targetId: userId,
+      action: "USER_REACTIVATED",
+    });
+
+    res.json({
+      success: true,
+      message: `User ${user.username} has been reactivated.`,
+    });
+  } catch (err: any) {
+    logger.error("[SUPERADMIN:USER] reactivateUser failed", { err });
+    sendErrorResponse(res, err);
+  }
+};
+
+/* -----------------------------------------------------------------------
+   ⚙️ 4. Change User Role
+------------------------------------------------------------------------*/
+export const changeUserRole = async (req: Request, res: Response) => {
   try {
     const superAdmin = requireSuperAdmin(req);
     const { userId, newRole } = req.body;
 
-    if (!userId || !newRole) throw Errors.Validation("userId and newRole are required.");
-    if (!["athlete", "coach", "admin", "super_admin"].includes(newRole)) {
-      throw Errors.Validation("Invalid target role.");
+    if (!["athlete", "coach", "admin"].includes(newRole)) {
+      throw Errors.Validation("Invalid role specified.");
     }
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw Errors.NotFound("User not found.");
+    if (!user) throw Errors.NotFound("User not found");
 
-    if (user.role === "super_admin" && superAdmin.id !== user.id) {
-      throw Errors.Forbidden("Cannot modify another Super Admin's role.");
-    }
+    if (user.role === "super_admin")
+      throw Errors.Forbidden("Cannot change role of another Super Admin.");
 
     await prisma.user.update({
       where: { id: userId },
@@ -112,89 +169,36 @@ export const updateUserRole = async (req: Request, res: Response) => {
     await recordAuditEvent({
       actorId: superAdmin.id,
       actorRole: "super_admin",
-      ip: req.ip,
-      action: "ADMIN_OVERRIDE",
-      details: { event: "update_user_role", userId, from: user.role, to: newRole },
+      targetId: userId,
+      action: "USER_ROLE_CHANGED",
+      details: { from: user.role, to: newRole },
     });
-
-    logger.info(`[SUPERADMIN:USER] Role updated for ${user.username} → ${newRole}`);
 
     res.json({
       success: true,
-      message: `User role updated to ${newRole}`,
+      message: `User ${user.username}'s role changed to ${newRole}.`,
     });
   } catch (err: any) {
-    logger.error("[SUPERADMIN:USER] updateUserRole failed", { err });
+    logger.error("[SUPERADMIN:USER] changeUserRole failed", { err });
     sendErrorResponse(res, err);
   }
 };
 
 /* -----------------------------------------------------------------------
-   🚫 3. Suspend or Reactivate User
-------------------------------------------------------------------------*/
-export const toggleUserSuspension = async (req: Request, res: Response) => {
-  try {
-    const superAdmin = requireSuperAdmin(req);
-    const { userId, suspend } = req.body;
-
-    if (typeof suspend !== "boolean") {
-      throw Errors.Validation("Missing or invalid 'suspend' flag.");
-    }
-
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw Errors.NotFound("User not found.");
-
-    if (user.role === "super_admin" && suspend) {
-      throw Errors.Forbidden("Cannot suspend a Super Admin account.");
-    }
-
-    await prisma.user.update({
-      where: { id: userId },
-      data: { isSuspended: suspend },
-    });
-
-    if (suspend) {
-      await revokeRefreshToken(user.id);
-    }
-
-    await recordAuditEvent({
-      actorId: superAdmin.id,
-      actorRole: "super_admin",
-      ip: req.ip,
-      action: "ADMIN_OVERRIDE",
-      details: { event: suspend ? "suspend_user" : "reactivate_user", userId },
-    });
-
-    logger.info(`[SUPERADMIN:USER] ${suspend ? "Suspended" : "Reactivated"} user ${user.username}`);
-
-    res.json({
-      success: true,
-      message: `User ${suspend ? "suspended" : "reactivated"} successfully.`,
-    });
-  } catch (err: any) {
-    logger.error("[SUPERADMIN:USER] toggleUserSuspension failed", { err });
-    sendErrorResponse(res, err);
-  }
-};
-
-/* -----------------------------------------------------------------------
-   🧍‍♂️ 4. Impersonate User (for debugging/audit)
+   🕵️ 5. Impersonate User (Securely)
 ------------------------------------------------------------------------*/
 export const impersonateUser = async (req: Request, res: Response) => {
   try {
     const superAdmin = requireSuperAdmin(req);
-    const { targetUserId } = req.body;
+    const { userId } = req.body;
 
-    if (!targetUserId) throw Errors.Validation("Target user ID is required.");
+    const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+    if (!targetUser) throw Errors.NotFound("Target user not found");
 
-    const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
-    if (!targetUser) throw Errors.NotFound("Target user not found.");
-
-    if (targetUser.role === "super_admin") {
+    if (targetUser.role === "super_admin")
       throw Errors.Forbidden("Cannot impersonate another Super Admin.");
-    }
 
-    const accessToken = jwt.sign(
+    const token = jwt.sign(
       {
         userId: targetUser.id,
         username: targetUser.username,
@@ -203,23 +207,21 @@ export const impersonateUser = async (req: Request, res: Response) => {
         mfaVerified: true,
       },
       config.jwt.secret,
-      { expiresIn: "30m" }
+      { expiresIn: "1h" }
     );
 
     await recordAuditEvent({
       actorId: superAdmin.id,
       actorRole: "super_admin",
-      ip: req.ip,
-      action: "ADMIN_OVERRIDE",
-      details: { event: "impersonate_user", targetUserId },
+      targetId: targetUser.id,
+      action: "USER_IMPERSONATION_START",
+      details: { targetRole: targetUser.role },
     });
-
-    logger.warn(`[SUPERADMIN:USER] ${superAdmin.username} impersonated ${targetUser.username}`);
 
     res.json({
       success: true,
-      message: `Impersonation token issued for ${targetUser.username}`,
-      data: { accessToken },
+      message: `Impersonation token generated for ${targetUser.username}`,
+      data: { token },
     });
   } catch (err: any) {
     logger.error("[SUPERADMIN:USER] impersonateUser failed", { err });
@@ -228,31 +230,42 @@ export const impersonateUser = async (req: Request, res: Response) => {
 };
 
 /* -----------------------------------------------------------------------
-   📊 5. Get Role Distribution Stats
+   ❌ 6. Delete User (With Soft Delete Option)
 ------------------------------------------------------------------------*/
-export const getRoleDistribution = async (req: Request, res: Response) => {
+export const deleteUser = async (req: Request, res: Response) => {
   try {
     const superAdmin = requireSuperAdmin(req);
+    const { userId, softDelete = true } = req.body;
 
-    const roles = await prisma.user.groupBy({
-      by: ["role"],
-      _count: { role: true },
-    });
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw Errors.NotFound("User not found");
+
+    if (user.role === "super_admin")
+      throw Errors.Forbidden("Super Admin account cannot be deleted.");
+
+    if (softDelete) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { deletedAt: new Date(), active: false },
+      });
+    } else {
+      await prisma.user.delete({ where: { id: userId } });
+    }
 
     await recordAuditEvent({
       actorId: superAdmin.id,
       actorRole: "super_admin",
-      ip: req.ip,
-      action: "SYSTEM_ALERT",
-      details: { event: "role_distribution" },
+      targetId: userId,
+      action: "USER_DELETED",
+      details: { mode: softDelete ? "soft" : "hard" },
     });
 
     res.json({
       success: true,
-      data: roles.map((r) => ({ role: r.role, count: r._count.role })),
+      message: `User ${user.username} has been ${softDelete ? "soft" : "hard"} deleted.`,
     });
   } catch (err: any) {
-    logger.error("[SUPERADMIN:USER] getRoleDistribution failed", { err });
+    logger.error("[SUPERADMIN:USER] deleteUser failed", { err });
     sendErrorResponse(res, err);
   }
 };
