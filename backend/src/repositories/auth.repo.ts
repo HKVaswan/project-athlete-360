@@ -1,23 +1,26 @@
 /**
- * auth.repo.ts
+ * src/repositories/auth.repo.ts
  * ---------------------------------------------------------------------
- * Data access layer for authentication and token persistence.
+ * Enhanced Authentication Repository
  *
  * Responsibilities:
- *  - Find users by email or ID
- *  - Create and update refresh tokens securely
- *  - Manage token revocation and invalidation
- *  - Log and track login sessions (optional)
+ *  - Secure token persistence (hashed)
+ *  - Multi-device refresh management
+ *  - Token revocation and audit logging
+ *  - Super Admin trace visibility for security events
+ *  - Session version and cleanup integration
  */
 
 import { Prisma, User, RefreshToken } from "@prisma/client";
 import prisma from "../prismaClient";
 import { Errors } from "../utils/errors";
 import { hashToken } from "../utils/crypto";
+import { auditService } from "../lib/audit";
+import Analytics from "../lib/analytics";
 
 export class AuthRepository {
   /**
-   * Find a user by email — used during login.
+   * 🔍 Find a user by email — used during login.
    */
   async findUserByEmail(email: string): Promise<User | null> {
     try {
@@ -28,7 +31,7 @@ export class AuthRepository {
   }
 
   /**
-   * Find a user by ID.
+   * 🔍 Find a user by ID.
    */
   async findUserById(id: string): Promise<User | null> {
     try {
@@ -39,58 +42,95 @@ export class AuthRepository {
   }
 
   /**
-   * Create or update a refresh token record for the user.
-   * Each user can have one active refresh token per device.
+   * 💾 Create or update a refresh token (supports per-device).
+   * Each device has its own token record, enabling multi-device logins.
    */
   async saveRefreshToken(
     userId: string,
     token: string,
-    deviceInfo: string | null = null
+    deviceInfo: string | null = null,
+    actorId?: string // super admin performing impersonation
   ): Promise<RefreshToken> {
     try {
       const hashed = await hashToken(token);
-      return await prisma.refreshToken.upsert({
-        where: { userId },
-        update: { tokenHash: hashed, deviceInfo },
+
+      const refresh = await prisma.refreshToken.upsert({
+        where: {
+          userDevice: { userId, deviceInfo: deviceInfo ?? "default" },
+        },
+        update: { tokenHash: hashed, revoked: false, updatedAt: new Date() },
         create: { userId, tokenHash: hashed, deviceInfo },
       });
+
+      await auditService.log({
+        actorId: actorId || userId,
+        actorRole: actorId ? "super_admin" : "user",
+        action: "USER_LOGIN",
+        entity: "refreshToken",
+        entityId: refresh.id,
+        details: { deviceInfo },
+      });
+
+      Analytics.track({
+        event: "login_session_started",
+        distinctId: userId,
+        properties: { deviceInfo, via: actorId ? "impersonation" : "normal" },
+      });
+
+      return refresh;
     } catch (err) {
       throw Errors.Server("Failed to save refresh token.");
     }
   }
 
   /**
-   * Verify if a refresh token is valid and not revoked.
+   * ✅ Verify refresh token validity.
    */
   async verifyRefreshToken(userId: string, token: string): Promise<boolean> {
     try {
-      const record = await prisma.refreshToken.findUnique({ where: { userId } });
-      if (!record) return false;
+      const records = await prisma.refreshToken.findMany({ where: { userId, revoked: false } });
+      if (!records.length) return false;
 
       const hashed = await hashToken(token);
-      return record.tokenHash === hashed && !record.revoked;
+      return records.some((r) => r.tokenHash === hashed);
     } catch (err) {
       throw Errors.Server("Failed to verify refresh token.");
     }
   }
 
   /**
-   * Revoke a user's refresh token (logout or security incident).
+   * 🚫 Revoke all refresh tokens for a user (logout, password reset, or admin action).
    */
-  async revokeRefreshToken(userId: string): Promise<boolean> {
+  async revokeRefreshTokens(userId: string, revokedBy?: string): Promise<boolean> {
     try {
       await prisma.refreshToken.updateMany({
-        where: { userId },
-        data: { revoked: true },
+        where: { userId, revoked: false },
+        data: { revoked: true, revokedAt: new Date() },
       });
+
+      await auditService.log({
+        actorId: revokedBy || userId,
+        actorRole: revokedBy ? "super_admin" : "user",
+        action: "SECURITY_EVENT",
+        entity: "refreshToken",
+        entityId: userId,
+        details: { reason: revokedBy ? "admin_revoked" : "user_logout" },
+      });
+
+      Analytics.track({
+        event: "session_revoked",
+        distinctId: userId,
+        properties: { revokedBy: revokedBy || "self" },
+      });
+
       return true;
     } catch (err) {
-      throw Errors.Server("Failed to revoke refresh token.");
+      throw Errors.Server("Failed to revoke refresh tokens.");
     }
   }
 
   /**
-   * Track a user login session (optional but useful for analytics).
+   * 🕒 Track a user login session for telemetry (non-critical).
    */
   async logLoginSession(userId: string, ipAddress?: string, userAgent?: string) {
     try {
@@ -103,13 +143,12 @@ export class AuthRepository {
         },
       });
     } catch (err) {
-      // do not throw, analytics is non-critical
       console.warn("⚠️ Failed to log login session:", err);
     }
   }
 
   /**
-   * Delete all expired or revoked tokens (cleanup job).
+   * 🧹 Clean up expired or revoked tokens periodically.
    */
   async cleanupExpiredTokens(): Promise<number> {
     try {
@@ -122,9 +161,40 @@ export class AuthRepository {
           ],
         },
       });
+      if (result.count > 0) {
+        await auditService.log({
+          actorId: "system",
+          actorRole: "system",
+          action: "SYSTEM_ALERT",
+          details: { cleanupCount: result.count },
+        });
+      }
       return result.count;
     } catch (err) {
       throw Errors.Server("Failed to cleanup expired tokens.");
+    }
+  }
+
+  /**
+   * 🔄 Increment user's session version (invalidates all previous JWTs)
+   */
+  async bumpSessionVersion(userId: string): Promise<void> {
+    try {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { sessionVersion: { increment: 1 } },
+      });
+
+      await auditService.log({
+        actorId: "system",
+        actorRole: "system",
+        action: "SECURITY_EVENT",
+        entity: "user",
+        entityId: userId,
+        details: { reason: "session_version_bumped" },
+      });
+    } catch (err) {
+      throw Errors.Server("Failed to update session version.");
     }
   }
 }
