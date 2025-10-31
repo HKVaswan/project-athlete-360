@@ -1,233 +1,311 @@
 /**
- * src/controllers/superAdmin/security.controller.ts
+ * src/controllers/superAdmin/system.controller.ts
  * ----------------------------------------------------------------------
- * Super Admin Security Controller
+ * Super Admin System Controller (Enterprise Edition)
  *
  * Responsibilities:
- *  - Multi-Factor Authentication (MFA) setup and verification
- *  - Secret & key rotation (JWT, encryption)
- *  - Intrusion detection and breach response
- *  - Maintenance mode toggling
+ *  - System metrics, backup, and health monitoring
+ *  - Secure manual trigger for backup & restore
+ *  - Infrastructure and AI status endpoints
+ *  - Fully audited and MFA-protected
  * ----------------------------------------------------------------------
  */
 
 import { Request, Response } from "express";
-import crypto from "crypto";
-import jwt from "jsonwebtoken";
-import speakeasy from "speakeasy";
-import qrcode from "qrcode";
-import prisma from "../../prismaClient";
-import { config } from "../../config";
 import { logger } from "../../logger";
 import { Errors, sendErrorResponse } from "../../utils/errors";
+import { runFullBackup } from "../../lib/backupClient";
+import { restoreFromCloudBackup } from "../../lib/restoreClient";
+import { getSystemMetrics } from "../../lib/systemMonitor";
+import { auditService } from "../../lib/audit";
 import { recordAuditEvent } from "../../services/audit.service";
-import { revokeAllSessions } from "../../services/session.service";
+import { prisma } from "../../prismaClient";
+import aiClient from "../../lib/ai/aiClient";
+import crypto from "crypto";
 
 /* -----------------------------------------------------------------------
-   🧩 Utility: Super Admin validation
+   🧩 Utility: Validate Super Admin Access
 ------------------------------------------------------------------------*/
 const requireSuperAdmin = (req: Request) => {
   const user = (req as any).user;
   if (!user || user.role !== "super_admin") {
-    throw Errors.Forbidden("Access denied: Super Admin privileges required.");
+    throw Errors.Forbidden("Access denied: Super admin privileges required.");
+  }
+  if (!user.mfaVerified) {
+    throw Errors.Forbidden("MFA verification required for critical operations.");
   }
   return user;
 };
 
 /* -----------------------------------------------------------------------
-   🔐 1. Setup MFA (TOTP)
+   📊 1. Get System Metrics Snapshot
 ------------------------------------------------------------------------*/
-export const setupMFA = async (req: Request, res: Response) => {
+export const getSystemStatus = async (req: Request, res: Response) => {
+  try {
+    const superAdmin = requireSuperAdmin(req);
+    const metrics = await getSystemMetrics();
+
+    await recordAuditEvent({
+      actorId: superAdmin.id,
+      actorRole: "super_admin",
+      ip: req.ip,
+      action: "SYSTEM_ALERT",
+      details: { event: "get_system_status", metrics },
+    });
+
+    await auditService.log({
+      actorId: superAdmin.id,
+      actorRole: "super_admin",
+      ip: req.ip,
+      action: "SYSTEM_ALERT",
+      details: { event: "system_metrics_snapshot" },
+    });
+
+    res.json({
+      success: true,
+      message: "System metrics snapshot retrieved successfully.",
+      data: metrics,
+    });
+  } catch (err: any) {
+    logger.error("[SUPERADMIN:SYSTEM] getSystemStatus failed", { err });
+    sendErrorResponse(res, err);
+  }
+};
+
+/* -----------------------------------------------------------------------
+   💾 2. Trigger Manual Database Backup
+------------------------------------------------------------------------*/
+export const triggerBackup = async (req: Request, res: Response) => {
   try {
     const superAdmin = requireSuperAdmin(req);
 
-    const secret = speakeasy.generateSecret({
-      name: `ProjectAthlete360 (${superAdmin.username})`,
-      length: 32,
+    logger.info(`[SUPERADMIN:SYSTEM] 🚀 Manual backup triggered by ${superAdmin.id}`);
+    await runFullBackup();
+
+    await recordAuditEvent({
+      actorId: superAdmin.id,
+      actorRole: "super_admin",
+      ip: req.ip,
+      action: "BACKUP_RUN",
+      details: { initiatedBy: superAdmin.username },
     });
 
-    const qrCodeDataURL = await qrcode.toDataURL(secret.otpauth_url!);
+    await auditService.log({
+      actorId: superAdmin.id,
+      actorRole: "super_admin",
+      ip: req.ip,
+      action: "BACKUP_RUN",
+      details: { status: "initiated" },
+    });
 
-    await prisma.user.update({
-      where: { id: superAdmin.id },
+    res.json({
+      success: true,
+      message: "Full database backup initiated successfully.",
+    });
+  } catch (err: any) {
+    logger.error("[SUPERADMIN:SYSTEM] Backup trigger failed", { err });
+    sendErrorResponse(res, err);
+  }
+};
+
+/* -----------------------------------------------------------------------
+   ☁️ 3. Restore from Cloud Backup (2-Step Confirmation)
+------------------------------------------------------------------------*/
+export const requestRestoreConfirmation = async (req: Request, res: Response) => {
+  try {
+    const superAdmin = requireSuperAdmin(req);
+    const { s3Key } = req.body;
+    if (!s3Key) throw Errors.Validation("Backup key (s3Key) is required.");
+
+    const token = crypto.randomBytes(24).toString("hex");
+    const expiresAt = Date.now() + 60_000; // 1 minute validity
+
+    (global as any).restoreConfirmations = (global as any).restoreConfirmations || {};
+    (global as any).restoreConfirmations[token] = { s3Key, expiresAt };
+
+    await auditService.log({
+      actorId: superAdmin.id,
+      actorRole: "super_admin",
+      ip: req.ip,
+      action: "ADMIN_OVERRIDE",
+      details: { event: "restore_request_token", s3Key },
+    });
+
+    res.json({
+      success: true,
+      message: "Restore confirmation token generated. Valid for 1 minute.",
+      data: { token },
+    });
+  } catch (err: any) {
+    logger.error("[SUPERADMIN:SYSTEM] requestRestoreConfirmation failed", { err });
+    sendErrorResponse(res, err);
+  }
+};
+
+export const restoreFromBackup = async (req: Request, res: Response) => {
+  try {
+    const superAdmin = requireSuperAdmin(req);
+    const { confirmToken } = req.body;
+
+    const store = (global as any).restoreConfirmations || {};
+    const record = store[confirmToken];
+
+    if (!record || Date.now() > record.expiresAt) {
+      throw Errors.Forbidden("Invalid or expired restore confirmation token.");
+    }
+
+    const { s3Key } = record;
+    delete store[confirmToken];
+
+    logger.warn(`[SUPERADMIN:SYSTEM] ⚠️ Restore initiated by ${superAdmin.id} from ${s3Key}`);
+    await restoreFromCloudBackup(s3Key);
+
+    await recordAuditEvent({
+      actorId: superAdmin.id,
+      actorRole: "super_admin",
+      ip: req.ip,
+      action: "ADMIN_OVERRIDE",
+      details: { event: "restore_database", s3Key },
+    });
+
+    await auditService.log({
+      actorId: superAdmin.id,
+      actorRole: "super_admin",
+      ip: req.ip,
+      action: "ADMIN_OVERRIDE",
+      details: { restore: "completed", s3Key },
+    });
+
+    res.json({
+      success: true,
+      message: `Database successfully restored from backup: ${s3Key}`,
+    });
+  } catch (err: any) {
+    logger.error("[SUPERADMIN:SYSTEM] Restore operation failed", { err });
+    sendErrorResponse(res, err);
+  }
+};
+
+/* -----------------------------------------------------------------------
+   📂 4. Get Backup History (Paginated)
+------------------------------------------------------------------------*/
+export const getBackupHistory = async (req: Request, res: Response) => {
+  try {
+    const superAdmin = requireSuperAdmin(req);
+    const page = Number(req.query.page || 1);
+    const limit = Number(req.query.limit || 20);
+
+    const [backups, total] = await Promise.all([
+      prisma.systemBackup.findMany({
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+        select: { id: true, key: true, size: true, checksum: true, createdAt: true, status: true },
+      }),
+      prisma.systemBackup.count(),
+    ]);
+
+    await auditService.log({
+      actorId: superAdmin.id,
+      actorRole: "super_admin",
+      ip: req.ip,
+      action: "SYSTEM_ALERT",
+      details: { event: "view_backup_history", count: backups.length },
+    });
+
+    res.json({
+      success: true,
+      data: { backups, pagination: { page, limit, total } },
+    });
+  } catch (err: any) {
+    logger.error("[SUPERADMIN:SYSTEM] getBackupHistory failed", { err });
+    sendErrorResponse(res, err);
+  }
+};
+
+/* -----------------------------------------------------------------------
+   🧠 5. Check AI Subsystem Status (with Timeout)
+------------------------------------------------------------------------*/
+export const getAIStatus = async (req: Request, res: Response) => {
+  try {
+    const superAdmin = requireSuperAdmin(req);
+    const start = Date.now();
+
+    const aiResponse = await Promise.race([
+      aiClient.generate("System self-test: respond OK"),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("AI Timeout")), 5000)),
+    ]);
+
+    const latency = Date.now() - start;
+
+    await auditService.log({
+      actorId: superAdmin.id,
+      actorRole: "super_admin",
+      ip: req.ip,
+      action: "SYSTEM_ALERT",
+      details: { event: "ai_health_check", latency },
+    });
+
+    res.json({
+      success: true,
+      message: "AI subsystem responded successfully.",
       data: {
-        mfaSecret: secret.base32,
+        provider: aiClient["provider"].name,
+        latencyMs: latency,
+        sampleResponse: String(aiResponse).slice(0, 80) + "...",
       },
     });
-
-    await recordAuditEvent({
-      actorId: superAdmin.id,
-      actorRole: "super_admin",
-      ip: req.ip,
-      action: "MFA_SETUP_INITIATED",
-    });
-
-    res.json({
-      success: true,
-      message: "MFA setup initiated. Scan the QR code with your authenticator app.",
-      data: { qrCodeDataURL, base32: secret.base32 },
-    });
   } catch (err: any) {
-    logger.error("[SUPERADMIN:SECURITY] setupMFA failed", { err });
+    logger.error("[SUPERADMIN:SYSTEM] getAIStatus failed", { err });
     sendErrorResponse(res, err);
   }
 };
 
 /* -----------------------------------------------------------------------
-   🔑 2. Verify MFA Code
+   📦 6. Get Platform Overview Summary
 ------------------------------------------------------------------------*/
-export const verifyMFA = async (req: Request, res: Response) => {
+export const getSystemOverview = async (req: Request, res: Response) => {
   try {
     const superAdmin = requireSuperAdmin(req);
-    const { token } = req.body;
-    if (!token) throw Errors.Validation("MFA code is required.");
+    const includeDetails = req.query.details === "true";
 
-    const user = await prisma.user.findUnique({ where: { id: superAdmin.id } });
-    if (!user?.mfaSecret) throw Errors.BadRequest("MFA not set up for this account.");
+    const [users, athletes, institutions, sessions, alerts] = await Promise.all([
+      prisma.user.count(),
+      prisma.athlete.count(),
+      prisma.institution.count(),
+      prisma.session.count(),
+      prisma.notification.count({ where: { type: "analyticsAlert" } }),
+    ]);
 
-    const verified = speakeasy.totp.verify({
-      secret: user.mfaSecret,
-      encoding: "base32",
-      token,
-      window: 1,
-    });
+    const data: any = {
+      totalUsers: users,
+      athletes,
+      institutions,
+      sessions,
+      activeAlerts: alerts,
+      uptimeMinutes: Math.floor(process.uptime() / 60),
+      environment: process.env.NODE_ENV || "development",
+    };
 
-    if (!verified) throw Errors.Auth("Invalid MFA code.");
-
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { mfaVerified: true },
-    });
-
-    await recordAuditEvent({
-      actorId: superAdmin.id,
-      actorRole: "super_admin",
-      ip: req.ip,
-      action: "MFA_VERIFIED",
-    });
-
-    res.json({
-      success: true,
-      message: "MFA verified successfully.",
-    });
-  } catch (err: any) {
-    logger.error("[SUPERADMIN:SECURITY] verifyMFA failed", { err });
-    sendErrorResponse(res, err);
-  }
-};
-
-/* -----------------------------------------------------------------------
-   🔄 3. Rotate JWT / Encryption Keys
-------------------------------------------------------------------------*/
-export const rotateKeys = async (req: Request, res: Response) => {
-  try {
-    const superAdmin = requireSuperAdmin(req);
-    const { type } = req.body; // jwt | encryption
-    if (!["jwt", "encryption"].includes(type)) throw Errors.Validation("Invalid key type.");
-
-    const newKey = crypto.randomBytes(64).toString("hex");
-
-    if (type === "jwt") {
-      await prisma.systemSetting.upsert({
-        where: { key: "JWT_SECRET" },
-        update: { value: newKey },
-        create: { key: "JWT_SECRET", value: newKey },
-      });
-
-      await revokeAllSessions();
-      logger.warn("[SECURITY] JWT secret rotated. All sessions revoked.");
-    } else {
-      await prisma.systemSetting.upsert({
-        where: { key: "ENCRYPTION_KEY" },
-        update: { value: newKey },
-        create: { key: "ENCRYPTION_KEY", value: newKey },
+    if (includeDetails) {
+      data.recentAdmins = await prisma.user.findMany({
+        where: { role: "admin" },
+        select: { id: true, username: true, email: true, createdAt: true },
+        take: 5,
       });
     }
 
-    await recordAuditEvent({
+    await auditService.log({
       actorId: superAdmin.id,
       actorRole: "super_admin",
       ip: req.ip,
-      action: "KEY_ROTATION",
-      details: { type },
+      action: "SYSTEM_ALERT",
+      details: { event: "system_overview", includeDetails },
     });
 
-    res.json({
-      success: true,
-      message: `${type.toUpperCase()} key rotated successfully.`,
-    });
+    res.json({ success: true, data });
   } catch (err: any) {
-    logger.error("[SUPERADMIN:SECURITY] rotateKeys failed", { err });
-    sendErrorResponse(res, err);
-  }
-};
-
-/* -----------------------------------------------------------------------
-   🚨 4. Trigger Security Lockdown
-------------------------------------------------------------------------*/
-export const triggerLockdown = async (req: Request, res: Response) => {
-  try {
-    const superAdmin = requireSuperAdmin(req);
-    const { reason } = req.body;
-
-    await prisma.systemSetting.upsert({
-      where: { key: "SYSTEM_LOCKDOWN" },
-      update: { value: "true" },
-      create: { key: "SYSTEM_LOCKDOWN", value: "true" },
-    });
-
-    await revokeAllSessions();
-
-    await recordAuditEvent({
-      actorId: superAdmin.id,
-      actorRole: "super_admin",
-      ip: req.ip,
-      action: "SYSTEM_LOCKDOWN",
-      details: { reason },
-    });
-
-    logger.error(`[SECURITY] 🚨 SYSTEM LOCKDOWN initiated by ${superAdmin.username}`);
-
-    res.json({
-      success: true,
-      message: "System lockdown activated. All sessions have been revoked.",
-    });
-  } catch (err: any) {
-    logger.error("[SUPERADMIN:SECURITY] triggerLockdown failed", { err });
-    sendErrorResponse(res, err);
-  }
-};
-
-/* -----------------------------------------------------------------------
-   🩺 5. Security Health Check
-------------------------------------------------------------------------*/
-export const getSecurityStatus = async (req: Request, res: Response) => {
-  try {
-    const superAdmin = requireSuperAdmin(req);
-
-    const jwtSecret = await prisma.systemSetting.findUnique({ where: { key: "JWT_SECRET" } });
-    const encryptionKey = await prisma.systemSetting.findUnique({ where: { key: "ENCRYPTION_KEY" } });
-    const lockdownStatus = await prisma.systemSetting.findUnique({ where: { key: "SYSTEM_LOCKDOWN" } });
-
-    const stats = {
-      jwtKeyLastUpdated: jwtSecret?.updatedAt || null,
-      encryptionKeyLastUpdated: encryptionKey?.updatedAt || null,
-      lockdownActive: lockdownStatus?.value === "true",
-    };
-
-    await recordAuditEvent({
-      actorId: superAdmin.id,
-      actorRole: "super_admin",
-      ip: req.ip,
-      action: "SECURITY_STATUS_CHECK",
-    });
-
-    res.json({
-      success: true,
-      data: stats,
-    });
-  } catch (err: any) {
-    logger.error("[SUPERADMIN:SECURITY] getSecurityStatus failed", { err });
+    logger.error("[SUPERADMIN:SYSTEM] getSystemOverview failed", { err });
     sendErrorResponse(res, err);
   }
 };
