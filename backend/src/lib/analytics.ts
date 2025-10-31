@@ -1,60 +1,114 @@
 /**
  * src/lib/analytics.ts
  * -------------------------------------------------------------------------
- * Enterprise-grade Analytics + Telemetry Manager
+ * Enterprise-Grade Analytics & Telemetry Manager (v3)
  *
- * Features:
- *  - Unified tracking API for multiple analytics providers
- *  - Works across backend (server-side) + frontend events
- *  - Intelligent batching for efficiency
- *  - Safe mode (no analytics in dev/test)
- *  - Extensible: easily plug in Mixpanel, Plausible, PostHog, or custom DB
- *  - Auto-sanitizes data (no sensitive or PII data leakage)
+ * Key Capabilities:
+ *  - Multi-provider event tracking (Mixpanel, Plausible, custom DB)
+ *  - Super-admin guard for analytics data visibility
+ *  - Encrypted telemetry for sensitive server metrics
+ *  - Deduplication & throttling for repeated events
+ *  - Auto-sanitization (deep scrub for PII & secrets)
+ *  - Safe mode for dev/test (no outbound analytics)
+ *  - Extensible queue for offline flush / S3 / stream
  */
 
 import axios from "axios";
 import Mixpanel from "mixpanel";
+import crypto from "crypto";
 import { config } from "../config";
 import { logger } from "../logger";
+import { ensureSuperAdmin } from "./securityManager";
 
 // ---------------------------------------------------------------------------
-// 🔧 Setup
+// ⚙️ Provider Setup
 // ---------------------------------------------------------------------------
 
-// Lazy initialize Mixpanel only if token exists
 const mixpanel = config.mixpanelToken
   ? Mixpanel.init(config.mixpanelToken, { protocol: "https" })
   : null;
 
-// Simple Plausible endpoint (for privacy-first tracking)
 const plausibleEndpoint = config.plausibleApi || "https://plausible.io/api/event";
-
-// Batching queue (for future extension — sending logs in batches)
 const queue: any[] = [];
+const lastEventTimestamps = new Map<string, number>(); // deduplication map
 
 // ---------------------------------------------------------------------------
-// 🧱 Core Analytics Interface
+// 🔒 Internal Helpers
 // ---------------------------------------------------------------------------
 
-type AnalyticsEvent = {
-  event: string;
-  distinctId?: string;
-  properties?: Record<string, any>;
-  provider?: "mixpanel" | "plausible" | "custom";
-  timestamp?: string;
-};
+const ENCRYPTION_KEY = config.telemetryKey || process.env.TELEMETRY_KEY || "";
+const shouldEncryptTelemetry = Boolean(ENCRYPTION_KEY);
+
+function encryptTelemetry(data: any) {
+  if (!shouldEncryptTelemetry) return data;
+  try {
+    const serialized = JSON.stringify(data);
+    const cipher = crypto.createCipheriv(
+      "aes-256-cbc",
+      crypto.createHash("sha256").update(ENCRYPTION_KEY).digest(),
+      Buffer.alloc(16, 0)
+    );
+    let encrypted = cipher.update(serialized, "utf8", "base64");
+    encrypted += cipher.final("base64");
+    return encrypted;
+  } catch (err) {
+    logger.warn(`[Analytics] ⚠️ Telemetry encryption failed: ${err.message}`);
+    return data;
+  }
+}
+
+/**
+ * Sanitize deeply — removes PII and sensitive content before sending.
+ */
+function deepSanitize(obj: Record<string, any> = {}, blacklist = ["password", "token", "secret", "otp", "auth", "email", "phone"]) {
+  const clean: Record<string, any> = {};
+  for (const key in obj) {
+    const lower = key.toLowerCase();
+    if (blacklist.some((b) => lower.includes(b))) continue;
+
+    const value = obj[key];
+    if (typeof value === "object" && value !== null) {
+      clean[key] = deepSanitize(value, blacklist);
+    } else {
+      clean[key] = value;
+    }
+  }
+  return clean;
+}
+
+/**
+ * Prevent duplicate events within 5 seconds.
+ */
+function shouldThrottle(eventName: string): boolean {
+  const now = Date.now();
+  const last = lastEventTimestamps.get(eventName);
+  if (last && now - last < 5000) return true;
+  lastEventTimestamps.set(eventName, now);
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+// 🧱 Core Analytics Class
+// ---------------------------------------------------------------------------
 
 export class Analytics {
   /**
-   * Safely track an event across all enabled providers.
+   * Track any event across enabled providers.
    */
-  static async track(event: AnalyticsEvent) {
+  static async track(event: {
+    event: string;
+    distinctId?: string;
+    properties?: Record<string, any>;
+    provider?: "mixpanel" | "plausible" | "custom";
+    timestamp?: string;
+  }) {
     try {
       if (config.env === "test" || !config.enableAnalytics) return;
+      if (shouldThrottle(event.event)) return;
 
-      const safeProps = Analytics.sanitize(event.properties);
+      const safeProps = deepSanitize(event.properties);
 
-      // Send to Mixpanel (if configured)
+      // Mixpanel
       if (mixpanel && config.enableMixpanel) {
         mixpanel.track(event.event, {
           distinct_id: event.distinctId,
@@ -63,28 +117,26 @@ export class Analytics {
         });
       }
 
-      // Send to Plausible (privacy-friendly)
+      // Plausible
       if (config.enablePlausible) {
         await axios.post(
           plausibleEndpoint,
           {
             name: event.event,
-            url: event.properties?.url || "https://pa360.net",
+            url: safeProps?.url || "https://pa360.net",
             domain: config.plausibleDomain || "pa360.net",
           },
           {
             headers: {
               "User-Agent": "ProjectAthlete360-Server",
               "Content-Type": "application/json",
-              Authorization: config.plausibleToken
-                ? `Bearer ${config.plausibleToken}`
-                : undefined,
+              Authorization: config.plausibleToken ? `Bearer ${config.plausibleToken}` : undefined,
             },
           }
         );
       }
 
-      // Send to custom internal analytics DB (future extension)
+      // Custom DB (future streaming / Redshift / S3)
       if (config.enableCustomAnalytics) {
         queue.push({
           event: event.event,
@@ -101,12 +153,12 @@ export class Analytics {
   }
 
   /**
-   * Identify user — used for Mixpanel or future personalization engines
+   * Identify a user for Mixpanel or personalization systems.
    */
   static identify(userId: string, traits: Record<string, any> = {}) {
     try {
       if (!mixpanel || !config.enableMixpanel) return;
-      mixpanel.people.set(userId, Analytics.sanitize(traits));
+      mixpanel.people.set(userId, deepSanitize(traits));
       logger.info(`[Analytics] 👤 Identified user: ${userId}`);
     } catch (err: any) {
       logger.error(`[Analytics] ❌ Identify failed: ${err.message}`);
@@ -114,13 +166,14 @@ export class Analytics {
   }
 
   /**
-   * Send system telemetry — usage metrics, worker performance, etc.
+   * Track system telemetry — safely encrypted if configured.
    */
   static telemetry(component: string, data: Record<string, any>) {
     try {
+      const encryptedData = encryptTelemetry(data);
       const event = {
         event: `telemetry:${component}`,
-        properties: { ...data, env: config.env },
+        properties: { data: encryptedData, env: config.env },
       };
       Analytics.track(event);
     } catch (err: any) {
@@ -129,31 +182,29 @@ export class Analytics {
   }
 
   /**
-   * Sanitize data — removes PII and sensitive content before tracking.
-   */
-  private static sanitize(data: Record<string, any> = {}) {
-    const blacklist = ["password", "token", "otp", "secret", "auth", "email"];
-    const clean: Record<string, any> = {};
-
-    for (const key in data) {
-      const lower = key.toLowerCase();
-      if (blacklist.some((b) => lower.includes(b))) continue;
-      clean[key] = data[key];
-    }
-    return clean;
-  }
-
-  /**
-   * Flush batched analytics data (for future DB/streaming integrations)
+   * Flush queued analytics (DB, stream, etc.)
    */
   static async flushQueue() {
     if (!queue.length) return;
     try {
-      // Example: send to a dedicated analytics DB or S3 batch
-      logger.info(`[Analytics] 🚀 Flushing ${queue.length} batched events...`);
+      logger.info(`[Analytics] 🚀 Flushing ${queue.length} queued events...`);
       queue.splice(0, queue.length);
-    } catch (err) {
+    } catch (err: any) {
       logger.error(`[Analytics] ❌ Failed to flush analytics queue: ${err.message}`);
+    }
+  }
+
+  /**
+   * Export analytics data — accessible only by Super Admins.
+   */
+  static async exportAll(requestingRole: string) {
+    ensureSuperAdmin(requestingRole);
+    try {
+      logger.info("[Analytics] 📦 Exporting analytics dataset for Super Admin...");
+      return queue.slice(); // can later integrate with S3 or internal dashboard
+    } catch (err: any) {
+      logger.error(`[Analytics] ❌ Export failed: ${err.message}`);
+      throw err;
     }
   }
 }
@@ -163,6 +214,6 @@ export class Analytics {
 // ---------------------------------------------------------------------------
 // await Analytics.track({ event: "user_signup", distinctId: user.id, properties: { role: "athlete" } });
 // Analytics.telemetry("ai-engine", { activeWorkers: 5, latency: "120ms" });
-// Analytics.identify(user.id, { role: "coach", plan: "pro" });
+// await Analytics.exportAll("superadmin");
 
 export default Analytics;
