@@ -1,30 +1,35 @@
-// src/middleware/auth.middleware.ts
 import { Request, Response, NextFunction } from "express";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import logger from "../logger";
 import { getUserSessionVersion, isTokenRevoked } from "../services/session.service";
 import { recordAuditEvent } from "../services/audit.service";
+import { Errors, ApiError } from "../utils/errors";
+import { verifyMfaSession } from "../services/mfa.service"; // (new helper for live MFA validation)
+import { ensureSuperAdmin } from "../lib/securityManager"; // ensures caller is super admin
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   throw new Error("JWT_SECRET is not set in environment variables.");
 }
 
-// Strong typing for authenticated requests
+// ───────────────────────────────
+// 🔒 Authenticated Request Type
+// ───────────────────────────────
 export interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
     username: string;
     role: "athlete" | "coach" | "admin" | "super_admin";
     email?: string;
-    impersonatedBy?: string; // if super admin impersonating
+    impersonatedBy?: string;
     sessionVersion?: number;
+    mfaVerified?: boolean;
   };
   isImpersonation?: boolean;
 }
 
 // ───────────────────────────────
-// 🔒 Authentication Middleware
+// 🔑 Authentication Middleware
 // ───────────────────────────────
 export const requireAuth = async (
   req: AuthenticatedRequest,
@@ -34,57 +39,54 @@ export const requireAuth = async (
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith("Bearer ")) {
-      return res.status(401).json({
-        success: false,
-        code: "NO_TOKEN",
-        message: "Access denied: Missing or invalid authorization header.",
-      });
+      throw Errors.Auth("Missing or invalid authorization header");
     }
 
     const token = authHeader.split(" ")[1];
     let decoded: JwtPayload;
 
-    // Verify token integrity
     try {
       decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
     } catch (err) {
       logger.warn("[AUTH] Invalid or expired token", { ip: req.ip });
-      return res.status(401).json({
-        success: false,
-        code: "INVALID_TOKEN",
-        message: "Session expired or invalid token.",
-      });
+      throw Errors.Auth("Session expired or invalid token");
     }
 
-    // Check token revocation or version mismatch
+    // Check token revocation / session invalidation
     if (decoded.userId) {
-      const isRevoked = await isTokenRevoked(decoded.userId, token);
-      const sessionVersion = await getUserSessionVersion(decoded.userId);
+      const [revoked, sessionVersion] = await Promise.all([
+        isTokenRevoked(decoded.userId, token),
+        getUserSessionVersion(decoded.userId),
+      ]);
 
-      if (isRevoked || sessionVersion !== decoded.sessionVersion) {
-        logger.info("[AUTH] Revoked or outdated token attempt", { userId: decoded.userId });
-        return res.status(401).json({
-          success: false,
-          code: "TOKEN_REVOKED",
-          message: "Session has been revoked or replaced. Please log in again.",
+      if (revoked || sessionVersion !== decoded.sessionVersion) {
+        await recordAuditEvent({
+          actorId: decoded.userId,
+          actorRole: decoded.role,
+          action: "SECURITY_EVENT",
+          details: { reason: "revoked_token", ip: req.ip, ua: req.get("user-agent") },
         });
+        throw Errors.Auth("Session revoked or replaced. Please log in again.");
       }
     }
 
-    // Attach user info securely
+    // Attach user to request
     req.user = {
       id: decoded.userId || decoded.id,
       username: decoded.username,
       role: decoded.role,
       email: decoded.email,
-      impersonatedBy: decoded.impersonatedBy || undefined,
+      impersonatedBy: decoded.impersonatedBy,
       sessionVersion: decoded.sessionVersion || 0,
+      mfaVerified: decoded.mfaVerified || false,
     };
 
-    // If impersonation detected — mark request and log
+    // ───────────────────────────────
+    // 🕵️ Impersonation Detection & Logging
+    // ───────────────────────────────
     if (decoded.impersonatedBy) {
       req.isImpersonation = true;
-      recordAuditEvent({
+      await recordAuditEvent({
         actorId: decoded.impersonatedBy,
         actorRole: "super_admin",
         targetId: decoded.userId,
@@ -98,13 +100,20 @@ export const requireAuth = async (
       });
     }
 
-    // Super Admin must have MFA verified
-    if (decoded.role === "super_admin" && !decoded.mfaVerified) {
-      return res.status(403).json({
-        success: false,
-        code: "MFA_REQUIRED",
-        message: "Multi-Factor Authentication required for Super Admin.",
-      });
+    // ───────────────────────────────
+    // 🔐 Enforce MFA for Super Admin
+    // ───────────────────────────────
+    if (decoded.role === "super_admin") {
+      const validMfa = decoded.mfaVerified || (await verifyMfaSession(decoded.userId));
+      if (!validMfa) {
+        await recordAuditEvent({
+          actorId: decoded.userId,
+          actorRole: "super_admin",
+          action: "SECURITY_EVENT",
+          details: { reason: "missing_mfa", ip: req.ip },
+        });
+        throw Errors.Forbidden("Multi-Factor Authentication required for Super Admin access.");
+      }
     }
 
     next();
@@ -112,9 +121,13 @@ export const requireAuth = async (
     logger.error("[AUTH] Middleware Error", {
       message: err.message,
       stack: err.stack,
-      path: req.originalUrl,
+      route: req.originalUrl,
       ip: req.ip,
     });
+
+    if (err instanceof ApiError) {
+      return res.status(err.statusCode).json(err.toJSON());
+    }
 
     res.status(500).json({
       success: false,
@@ -125,16 +138,12 @@ export const requireAuth = async (
 };
 
 // ───────────────────────────────
-// 🧩 Optional: Role-based protection
+// 🧩 Role-Based Access Middleware
 // ───────────────────────────────
 export const requireRole = (roles: string[]) => {
   return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        code: "UNAUTHORIZED",
-        message: "User not authenticated.",
-      });
+      throw Errors.Auth("User not authenticated.");
     }
 
     if (!roles.includes(req.user.role)) {
@@ -144,13 +153,40 @@ export const requireRole = (roles: string[]) => {
         userId: req.user.id,
       });
 
-      return res.status(403).json({
-        success: false,
-        code: "FORBIDDEN",
-        message: "Access denied for your role.",
-      });
+      throw Errors.Forbidden(`Access denied. Required role: ${roles.join(", ")}`);
     }
 
     next();
   };
+};
+
+// ───────────────────────────────
+// 🧠 Super Admin Access Only
+// ───────────────────────────────
+export const requireSuperAdmin = (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    if (!req.user || req.user.role !== "super_admin") {
+      throw Errors.Forbidden("Super Admin privileges required.");
+    }
+
+    if (!req.user.mfaVerified) {
+      throw Errors.Forbidden("Super Admin MFA validation required.");
+    }
+
+    ensureSuperAdmin(req.user.role);
+    next();
+  } catch (err: any) {
+    logger.warn(`[AUTH] Super Admin access denied: ${err.message}`);
+    if (err instanceof ApiError) {
+      return res.status(err.statusCode).json(err.toJSON());
+    }
+    res.status(403).json({
+      success: false,
+      message: "Access denied.",
+    });
+  }
 };
