@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Payment Failed — Action Required</title>
+  <style>
+    body {
+      font-family: 'Inter', Arial, sans-serif;
+      background: #f7f9fb;
+      color: #222;
+      padding: 0;
+      margin: 0;
+    }
+    .container {
+      max-width: 620px;
+      margin: 40px auto;
+      background: #ffffff;
+      border-radius: 14px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+    .header {
+      background: linear-gradient(135deg, #0077ff, #0044cc);
+      color: #fff;
+      text-align: center;
+      padding: 28px 20px;
+    }
+    .content {
+      padding: 35px 30px;
+      text-align: left;
+    }
+    h1 {
+      font-size: 22px;
+      margin-bottom: 12px;
+      color: #111;
+    }
+    p {
+      font-size: 15px;
+      line-height: 1.6;
+      margin: 0 0 16px;
+      color: #333;
+    }
+    .btn {
+      display: inline-block;
+      background: #0077ff;
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 600;
+      text-decoration: none;
+      margin-top: 12px;
+    }
+    .footer {
+      font-size: 13px;
+      color: #777;
+      text-align: center;
+      padding: 25px;
+      background: #f3f5f7;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>Payment Failed — Action Required</h2>
+    </div>
+    <div class="content">
+      <h1>We couldn’t process your renewal payment</h1>
+      <p>Hi {{adminName}},</p>
+      <p>We attempted to renew your <strong>{{planName}}</strong> plan, but your payment did not go through.</p>
+
+      <p>To ensure uninterrupted access to your institution’s account and data, please update your payment method or retry the transaction.</p>
+
+      <p>Don’t worry — your account and athlete data remain safe and secure for the next <strong>7 days</strong>. After that, your plan may be temporarily paused until payment is completed.</p>
+
+      <a href="{{retryLink}}" class="btn">Retry Payment</a>
+
+      <p>If you’ve already made the payment, please ignore this message — your plan will reactivate automatically once confirmed.</p>
+
+      <p>Thank you for staying with us,<br>
+      <strong>The Project Athlete 360 Team</strong></p>
+    </div>
+    <div class="footer">
+      © {{currentYear}} Project Athlete 360. All rights reserved.<br/>
+      You’re receiving this email because you have an active account with Project Athlete 360.
+    </div>
+  </div>
+</body>
+</html>
