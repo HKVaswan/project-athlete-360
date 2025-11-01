@@ -1,0 +1,111 @@
+<!-- templates/email/invitation_athlete.hbs -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Your Coach Invited You to Project Athlete 360</title>
+  <style>
+    body {
+      font-family: "Inter", Arial, sans-serif;
+      background-color: #f8fafc;
+      margin: 0;
+      color: #222;
+      padding: 0;
+    }
+    .container {
+      max-width: 600px;
+      margin: 40px auto;
+      background: #ffffff;
+      border-radius: 14px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+      overflow: hidden;
+    }
+    .header {
+      background: linear-gradient(135deg, #007bff, #004aad);
+      color: #fff;
+      text-align: center;
+      padding: 32px 20px;
+    }
+    .header h1 {
+      font-size: 22px;
+      margin: 0;
+    }
+    .body {
+      padding: 30px 40px;
+      line-height: 1.6;
+    }
+    .body h2 {
+      color: #004aad;
+      font-size: 20px;
+      margin-bottom: 12px;
+    }
+    .body p {
+      font-size: 15px;
+      color: #333;
+    }
+    .cta {
+      text-align: center;
+      margin: 32px 0;
+    }
+    .cta a {
+      background: #007bff;
+      color: #fff;
+      text-decoration: none;
+      padding: 12px 26px;
+      border-radius: 8px;
+      font-weight: 600;
+      display: inline-block;
+      letter-spacing: 0.3px;
+    }
+    .cta a:hover {
+      background: #004aad;
+    }
+    .footer {
+      background: #f1f4f9;
+      color: #555;
+      text-align: center;
+      font-size: 13px;
+      padding: 16px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Welcome to Project Athlete 360</h1>
+    </div>
+
+    <div class="body">
+      <h2>Hey Champ,</h2>
+
+      <p>
+        <strong>{{inviter}}</strong> — your coach, has invited you to join 
+        <strong>Project Athlete 360</strong>, a platform made to help athletes like you grow stronger, smarter, and more successful.
+      </p>
+
+      <p>
+        Here, you’ll find tools to track your progress, get insights from your coach, and connect with a growing sports community working to 
+        <strong>#FixIndianSport</strong>.
+      </p>
+
+      <div class="cta">
+        <a href="{{link}}" target="_blank">Accept Your Invitation</a>
+      </div>
+
+      <p style="font-size: 14px; color: #666; margin-top: 20px;">
+        This link will expire in <strong>{{expiry}} hours</strong>.  
+        If you weren’t expecting this invitation, please ignore this email.
+      </p>
+    </div>
+
+    <div class="footer">
+      <p>
+        © {{year}} Project Athlete 360 | Empowering Athletes Everywhere  
+        <br />#ProjectAthlete360 • #FixIndianSport
+      </p>
+    </div>
+  </div>
+</body>
+</html>
