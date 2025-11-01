@@ -1,14 +1,15 @@
-// src/services/resource.service.ts
 /**
- * Resource Service — Enterprise-grade
- * -----------------------------------
- * Manages shared learning/training resources, uploaded files, and documents.
- * Features:
- *  - Upload, list, delete, and update metadata
- *  - Secure ownership & institutional access
- *  - Pagination + query filters
- *  - Future AI tagging + preview analysis integration
- *  - S3 / Cloud-ready architecture
+ * src/services/resource.service.ts
+ * ---------------------------------------------------------------------------
+ * Resource Service — Enterprise Edition
+ * ---------------------------------------------------------------------------
+ * Responsibilities:
+ *  - Secure file & resource management
+ *  - Enforces plan-based quotas (storage, upload size, resource count)
+ *  - Automatic S3/Cloud cleanup
+ *  - Full audit trail for compliance
+ *  - AI-ready metadata tagging & versioning support
+ * ---------------------------------------------------------------------------
  */
 
 import prisma from "../prismaClient";
@@ -16,6 +17,8 @@ import logger from "../logger";
 import { Errors } from "../utils/errors";
 import { paginate, computeNextCursor } from "../utils/pagination";
 import { uploadToS3, deleteFromS3 } from "../integrations/s3";
+import { quotaService } from "./quota.service";
+import { recordAuditEvent } from "./audit.service";
 
 type UploadResourceInput = {
   uploaderId: string;
@@ -26,6 +29,7 @@ type UploadResourceInput = {
   fileUrl: string;
   fileType: string;
   fileSize: number;
+  visibility?: "private" | "institution" | "public";
 };
 
 type GetResourcesQuery = {
@@ -41,52 +45,76 @@ type UpdateResourceInput = {
   title?: string;
   description?: string;
   tags?: string[];
+  visibility?: "private" | "institution" | "public";
 };
 
-/**
- * 🧩 Create / Upload new resource
- * Handles file metadata and upload integration (S3, Cloudinary, etc.)
- */
+/* ---------------------------------------------------------------------------
+   🧩 Upload new resource — Enforces Plan Limits + Audit Trail
+--------------------------------------------------------------------------- */
 export const uploadResource = async (payload: UploadResourceInput) => {
-  const { uploaderId, institutionId, title, description, tags, fileUrl, fileType, fileSize } =
-    payload;
+  const { uploaderId, institutionId, title, description, tags, fileUrl, fileType, fileSize, visibility } = payload;
 
   if (!uploaderId || !institutionId || !title || !fileUrl || !fileType) {
     throw Errors.Validation("Missing required fields for resource upload");
   }
 
-  // Validate file size & type limits (security)
-  const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
-  const ALLOWED_TYPES = ["image/", "video/", "application/pdf", "text/plain", "application/msword"];
+  // File validation
+  const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+  const ALLOWED_TYPES = [
+    "image/",
+    "video/",
+    "application/pdf",
+    "application/msword",
+    "text/plain",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument"
+  ];
   const isAllowed = ALLOWED_TYPES.some((t) => fileType.startsWith(t));
   if (!isAllowed) throw Errors.Validation("File type not allowed");
-  if (fileSize > MAX_FILE_SIZE) throw Errors.Validation("File size exceeds 50MB limit");
+  if (fileSize > MAX_FILE_SIZE) throw Errors.Validation("File size exceeds 100MB limit");
 
+  // Validate uploader and institution
   const uploader = await prisma.user.findUnique({ where: { id: uploaderId } });
   if (!uploader) throw Errors.NotFound("Uploader not found");
 
+  const institution = await prisma.institution.findUnique({ where: { id: institutionId } });
+  if (!institution) throw Errors.NotFound("Institution not found");
+
+  // Enforce quota limits
+  await quotaService.ensureWithinQuota(institutionId, "resources", fileSize);
+
+  // Create resource
   const resource = await prisma.resource.create({
     data: {
       uploaderId,
       institutionId,
       title,
       description,
-      tags,
+      tags: tags?.map((t) => t.toLowerCase()) || [],
       fileUrl,
       fileType,
       fileSize,
+      visibility: visibility || "institution",
     },
+  });
+
+  // Record audit event
+  await recordAuditEvent({
+    actorId: uploaderId,
+    actorRole: uploader.role,
+    action: "RESOURCE_UPLOAD",
+    ip: undefined,
+    details: { title, fileSize, institutionId },
   });
 
   logger.info(`📤 Resource uploaded: ${title} by ${uploader.username}`);
   return resource;
 };
 
-/**
- * 📚 Get all resources with filters & pagination
- * Supports search, tag filtering, and institutional access scope.
- */
-export const getResources = async (query: GetResourcesQuery) => {
+/* ---------------------------------------------------------------------------
+   📚 List resources — Supports search, filters, pagination
+--------------------------------------------------------------------------- */
+export const getResources = async (query: GetResourcesQuery, requester?: { id: string; role: string; institutionId?: string }) => {
   const { search, tag, institutionId } = query;
 
   const where: any = {};
@@ -97,8 +125,13 @@ export const getResources = async (query: GetResourcesQuery) => {
       { tags: { has: search.toLowerCase() } },
     ];
   }
+
   if (tag) where.tags = { has: tag.toLowerCase() };
-  if (institutionId) where.institutionId = institutionId;
+
+  // Enforce institution scope unless super_admin
+  if (requester?.role !== "super_admin") {
+    where.institutionId = requester?.institutionId || institutionId;
+  }
 
   const { prismaArgs, meta } = await paginate(query, "offset", {
     where,
@@ -121,10 +154,10 @@ export const getResources = async (query: GetResourcesQuery) => {
   return { data: resources, meta };
 };
 
-/**
- * 🧾 Get a single resource by ID
- */
-export const getResourceById = async (id: string) => {
+/* ---------------------------------------------------------------------------
+   🧾 Get single resource (secure visibility enforcement)
+--------------------------------------------------------------------------- */
+export const getResourceById = async (id: string, requester?: { id: string; role: string; institutionId?: string }) => {
   const resource = await prisma.resource.findUnique({
     where: { id },
     include: {
@@ -134,20 +167,39 @@ export const getResourceById = async (id: string) => {
   });
 
   if (!resource) throw Errors.NotFound("Resource not found");
+
+  // Enforce visibility
+  if (
+    resource.visibility === "private" &&
+    requester?.id !== resource.uploaderId &&
+    requester?.role !== "admin" &&
+    requester?.role !== "super_admin"
+  ) {
+    throw Errors.Forbidden("You are not authorized to view this resource");
+  }
+
+  if (
+    resource.visibility === "institution" &&
+    requester?.institutionId !== resource.institutionId &&
+    requester?.role !== "super_admin"
+  ) {
+    throw Errors.Forbidden("Resource restricted to the same institution");
+  }
+
   return resource;
 };
 
-/**
- * ✏️ Update resource metadata (title, description, tags)
- */
+/* ---------------------------------------------------------------------------
+   ✏️ Update resource metadata (Uploader/Admin/SuperAdmin)
+--------------------------------------------------------------------------- */
 export const updateResource = async (id: string, updaterId: string, data: UpdateResourceInput) => {
   const resource = await prisma.resource.findUnique({ where: { id } });
   if (!resource) throw Errors.NotFound("Resource not found");
 
-  // Only uploader or admin can update
   const updater = await prisma.user.findUnique({ where: { id: updaterId } });
-  if (!updater || (updater.role !== "admin" && updater.id !== resource.uploaderId))
+  if (!updater || (updater.id !== resource.uploaderId && !["admin", "super_admin"].includes(updater.role))) {
     throw Errors.Forbidden("Not authorized to update this resource");
+  }
 
   const updated = await prisma.resource.update({
     where: { id },
@@ -155,25 +207,34 @@ export const updateResource = async (id: string, updaterId: string, data: Update
       title: data.title ?? resource.title,
       description: data.description ?? resource.description,
       tags: data.tags?.map((t) => t.toLowerCase()) ?? resource.tags,
+      visibility: data.visibility ?? resource.visibility,
     },
+  });
+
+  await recordAuditEvent({
+    actorId: updater.id,
+    actorRole: updater.role,
+    action: "RESOURCE_UPDATE",
+    details: { id, title: updated.title },
   });
 
   logger.info(`✏️ Resource updated: ${id} by ${updater.username}`);
   return updated;
 };
 
-/**
- * 🗑️ Delete resource (with S3 cleanup)
- */
+/* ---------------------------------------------------------------------------
+   🗑️ Delete resource — Enforces Ownership & Audit trail
+--------------------------------------------------------------------------- */
 export const deleteResource = async (id: string, requesterId: string) => {
   const resource = await prisma.resource.findUnique({ where: { id } });
   if (!resource) throw Errors.NotFound("Resource not found");
 
   const user = await prisma.user.findUnique({ where: { id: requesterId } });
-  if (!user || (user.id !== resource.uploaderId && user.role !== "admin"))
-    throw Errors.Forbidden("Not authorized to delete resource");
+  if (!user || (user.id !== resource.uploaderId && !["admin", "super_admin"].includes(user.role))) {
+    throw Errors.Forbidden("Not authorized to delete this resource");
+  }
 
-  // Delete file from storage (S3)
+  // Delete from S3
   try {
     await deleteFromS3(resource.fileUrl);
   } catch (err) {
@@ -182,16 +243,22 @@ export const deleteResource = async (id: string, requesterId: string) => {
 
   await prisma.resource.delete({ where: { id } });
 
+  await recordAuditEvent({
+    actorId: user.id,
+    actorRole: user.role,
+    action: "RESOURCE_DELETE",
+    details: { id, title: resource.title },
+  });
+
   logger.warn(`🗑️ Resource ${id} deleted by ${user.username}`);
   return { success: true, message: "Resource deleted successfully" };
 };
 
-/**
- * 🧠 Future Enhancements
- * ----------------------
- * - AI-based tagging/classification (lib/ai/aiClient.ts)
- * - Version control (auto-create new record for each upload update)
- * - Download tracking (audit logs)
- * - Institution resource sharing policies
- * - Scheduled resource cleanup worker
- */
+/* ---------------------------------------------------------------------------
+   🧠 Future Enhancements
+--------------------------------------------------------------------------- */
+// - AI-based tagging/classification via lib/ai/aiClient.ts
+// - Download & view analytics (for insights & engagement)
+// - Version control & auto cleanup for outdated files
+// - Tiered access & sharing policies per subscription plan
+// - Auto resource expiration for free-tier plans
