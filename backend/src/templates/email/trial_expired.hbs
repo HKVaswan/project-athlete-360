@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en" style="margin:0;padding:0;background:#f6f8fb;">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Your Free Trial Has Ended | Project Athlete 360</title>
+    <style>
+      body {
+        font-family: "Inter", Arial, sans-serif;
+        background-color: #f6f8fb;
+        margin: 0;
+        padding: 0;
+        color: #1f2937;
+      }
+      .container {
+        max-width: 640px;
+        margin: 40px auto;
+        background: #ffffff;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+      }
+      .header {
+        background: linear-gradient(135deg, #ff7f50, #ff6b6b);
+        padding: 28px 40px;
+        text-align: center;
+        color: #ffffff;
+      }
+      .header img {
+        width: 72px;
+        height: 72px;
+        margin-bottom: 12px;
+      }
+      .content {
+        padding: 40px 45px;
+        line-height: 1.6;
+      }
+      .content h1 {
+        font-size: 26px;
+        color: #111827;
+        margin-bottom: 14px;
+      }
+      .content p {
+        font-size: 16px;
+        color: #374151;
+        margin: 8px 0;
+      }
+      .expired-box {
+        background: #fff1f2;
+        border-left: 5px solid #ef4444;
+        padding: 15px;
+        border-radius: 8px;
+        margin: 20px 0;
+      }
+      .highlight {
+        font-weight: 600;
+        color: #ef4444;
+      }
+      .cta-button {
+        display: inline-block;
+        background: #007bff;
+        color: #ffffff !important;
+        text-decoration: none;
+        padding: 12px 28px;
+        font-size: 15px;
+        font-weight: 600;
+        border-radius: 8px;
+        margin-top: 20px;
+      }
+      .cta-button:hover {
+        background: #005fcc;
+      }
+      .plan-highlight {
+        background: #f0f9ff;
+        border-left: 5px solid #0284c7;
+        padding: 15px;
+        border-radius: 8px;
+        margin-top: 25px;
+      }
+      .footer {
+        background: #f9fafb;
+        padding: 25px 40px;
+        font-size: 13px;
+        text-align: center;
+        color: #6b7280;
+        border-top: 1px solid #e5e7eb;
+      }
+      .footer a {
+        color: #007bff;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <!-- Header -->
+      <div class="header">
+        <img src="https://pa360.net/logo.png" alt="Project Athlete 360" />
+        <h2>Project Athlete 360</h2>
+      </div>
+
+      <!-- Content -->
+      <div class="content">
+        <h1>Hey {{name}},</h1>
+
+        <div class="expired-box">
+          ⏰ Your <span class="highlight">free trial</span> ended on <strong>{{expiryDate}}</strong>.
+        </div>
+
+        <p>
+          We hope you enjoyed exploring <strong>Project Athlete 360</strong> —  
+          where science, data, and training come together to empower athletes and institutions like yours.
+        </p>
+
+        <p>
+          Your account and all data are <strong>safely stored for the next {{gracePeriodDays}} days</strong>, 
+          after which access will be paused until you choose a plan.
+        </p>
+
+        <div class="plan-highlight">
+          <p><strong>Upgrade now</strong> to continue:</p>
+          <ul style="margin-top:10px;">
+            <li>✅ Access your athlete performance analytics</li>
+            <li>✅ Keep all institution data intact</li>
+            <li>✅ Continue using training dashboards & reports</li>
+          </ul>
+        </div>
+
+        <p style="margin-top: 25px;">
+          <a href="{{upgradeLink}}" class="cta-button">Upgrade My Plan</a>
+        </p>
+
+        <p style="margin-top: 25px;">
+          Every athlete deserves continuous growth — let’s make sure your journey doesn’t stop here.  
+          The team at <strong>Project Athlete 360</strong> is ready to support you whenever you’re ready to resume.
+        </p>
+
+        <p style="margin-top: 25px;">See you back on the field 🏆</p>
+        <p>— The <strong>Project Athlete 360</strong> Team</p>
+      </div>
+
+      <!-- Footer -->
+      <div class="footer">
+        <p>
+          You’re receiving this because your Project Athlete 360 trial has expired.<br />
+          Need help renewing? Contact us at 
+          <a href="mailto:support@pa360.net">support@pa360.net</a>.
+        </p>
+        <p style="margin-top: 12px;">
+          &copy; {{year}} Project Athlete 360. All rights reserved.<br />
+          <a href="https://pa360.net">pa360.net</a> • 
+          <a href="https://projectathlete360.com">projectathlete360.com</a>
+        </p>
+      </div>
+    </div>
+  </body>
+</html>
