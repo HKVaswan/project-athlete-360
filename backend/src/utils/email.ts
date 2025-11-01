@@ -2,25 +2,24 @@
  * src/utils/email.ts
  * -------------------------------------------------------
  * Centralized enterprise email utility.
- * Supports HTML templating, attachments, and dynamic providers.
+ * Supports Handlebars (.hbs) templates, queuing, attachments,
+ * and multi-provider delivery (SMTP, SES, or fallback queue).
  */
 
 import nodemailer, { Transporter } from "nodemailer";
 import path from "path";
 import fs from "fs";
-import config from "../config";
+import Handlebars from "handlebars";
+import { config } from "../config";
 import { logger } from "../logger";
+import { addNotificationJob } from "../workers/notification.worker";
+import { ApiError } from "../utils/errors";
 
-let transporter: Transporter;
+let transporter: Transporter | null = null;
 
 // ----------------------------------------------------------------------------
 // 🧭 Transport Initialization
 // ----------------------------------------------------------------------------
-
-/**
- * Initializes transporter based on environment.
- * Supports SMTP (default) or AWS SES.
- */
 const initializeTransporter = (): Transporter => {
   if (transporter) return transporter;
 
@@ -28,11 +27,8 @@ const initializeTransporter = (): Transporter => {
     transporter = nodemailer.createTransport({
       host: config.email.smtpHost,
       port: config.email.smtpPort,
-      secure: config.email.smtpSecure, // true for 465, false for other ports
-      auth: {
-        user: config.email.smtpUser,
-        pass: config.email.smtpPass,
-      },
+      secure: config.email.smtpSecure,
+      auth: { user: config.email.smtpUser, pass: config.email.smtpPass },
     });
   } else if (config.email.provider === "ses") {
     const AWS = require("aws-sdk");
@@ -42,9 +38,7 @@ const initializeTransporter = (): Transporter => {
       secretAccessKey: config.email.sesSecret,
     });
     const ses = new AWS.SES({ apiVersion: "2010-12-01" });
-    transporter = nodemailer.createTransport({
-      SES: { ses, aws: AWS },
-    });
+    transporter = nodemailer.createTransport({ SES: { ses, aws: AWS } });
   } else {
     throw new Error("Invalid email provider configuration.");
   }
@@ -54,71 +48,101 @@ const initializeTransporter = (): Transporter => {
 };
 
 // ----------------------------------------------------------------------------
+// 🧩 Template Loader & Renderer
+// ----------------------------------------------------------------------------
+const templateCache: Record<string, Handlebars.TemplateDelegate> = {};
+
+const loadTemplate = (templateName: string): Handlebars.TemplateDelegate => {
+  if (templateCache[templateName]) return templateCache[templateName];
+
+  const filePath = path.join(__dirname, "../../templates/email", `${templateName}.hbs`);
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`Template not found: ${templateName}`);
+  }
+
+  const source = fs.readFileSync(filePath, "utf8");
+  const compiled = Handlebars.compile(source);
+  templateCache[templateName] = compiled;
+  return compiled;
+};
+
+// ----------------------------------------------------------------------------
 // 📤 Send Email
 // ----------------------------------------------------------------------------
-
 export interface EmailOptions {
   to: string;
   subject: string;
+  template?: string;
+  variables?: Record<string, string | number>;
   html?: string;
   text?: string;
-  templateName?: string;
-  variables?: Record<string, string>;
   attachments?: { filename: string; path: string }[];
+  useQueue?: boolean; // send asynchronously via worker
 }
 
-/**
- * Reads template from `templates/email/` directory.
- */
-const loadTemplate = (templateName: string, variables?: Record<string, string>): string => {
-  const filePath = path.join(__dirname, "../../templates/email", `${templateName}.html`);
-  let html = fs.readFileSync(filePath, "utf8");
-
-  if (variables) {
-    for (const [key, value] of Object.entries(variables)) {
-      const regex = new RegExp(`{{\\s*${key}\\s*}}`, "g");
-      html = html.replace(regex, value);
-    }
-  }
-  return html;
-};
-
-/**
- * Send an email using the configured transporter.
- */
 export const sendEmail = async (options: EmailOptions): Promise<void> => {
   try {
+    const {
+      to,
+      subject,
+      template,
+      variables = {},
+      html,
+      text,
+      attachments,
+      useQueue = false,
+    } = options;
+
+    // 📨 If useQueue = true → delegate to notification worker
+    if (useQueue) {
+      await addNotificationJob({
+        type: "custom",
+        recipientId: to,
+        title: subject,
+        body: text || "You’ve received a new message from Project Athlete 360.",
+        channel: ["email"],
+        meta: { template, templateContext: variables },
+      });
+      return;
+    }
+
     const mailTransporter = initializeTransporter();
 
-    const htmlContent =
-      options.html ||
-      (options.templateName ? loadTemplate(options.templateName, options.variables) : undefined);
+    let htmlContent = html;
+    if (template) {
+      const render = loadTemplate(template);
+      htmlContent = render(variables);
+    }
 
     await mailTransporter.sendMail({
       from: `${config.email.fromName} <${config.email.fromEmail}>`,
-      to: options.to,
-      subject: options.subject,
-      text: options.text || "Please view this email in HTML format.",
+      to,
+      subject,
+      text: text || "Please view this email in HTML format.",
       html: htmlContent,
-      attachments: options.attachments,
+      attachments,
     });
 
-    logger.info(`[EMAIL] Sent successfully to ${options.to}`);
+    logger.info(`[EMAIL] ✅ Sent successfully to ${to} (${template || "custom"})`);
   } catch (error: any) {
-    logger.error(`[EMAIL ERROR] Failed to send to ${options.to}: ${error.message}`);
-    throw error;
+    logger.error(`[EMAIL ERROR] ❌ Failed to send to ${options.to}: ${error.message}`);
+    throw new ApiError(500, `Failed to send email: ${error.message}`);
   }
 };
 
 // ----------------------------------------------------------------------------
-// 📬 Common Email Templates (Reusable Functions)
+// 📬 Common Email Templates (Reusable Shortcuts)
 // ----------------------------------------------------------------------------
 
-export const sendVerificationEmail = async (to: string, username: string, verificationLink: string) =>
+export const sendVerificationEmail = async (
+  to: string,
+  username: string,
+  verificationLink: string
+) =>
   sendEmail({
     to,
     subject: "Verify Your Account - Project Athlete 360",
-    templateName: "verify-account",
+    template: "verify_account",
     variables: { username, verificationLink },
   });
 
@@ -126,14 +150,18 @@ export const sendPasswordResetEmail = async (to: string, resetLink: string) =>
   sendEmail({
     to,
     subject: "Password Reset Request - Project Athlete 360",
-    templateName: "password-reset",
+    template: "password_reset",
     variables: { resetLink },
   });
 
-export const sendInvitationEmail = async (to: string, inviter: string, invitationLink: string) =>
+export const sendInvitationEmail = async (
+  to: string,
+  inviter: string,
+  invitationLink: string
+) =>
   sendEmail({
     to,
-    subject: "You're Invited to Join - Project Athlete 360",
-    templateName: "invitation",
+    subject: "You’re Invited to Join - Project Athlete 360",
+    template: "invitation",
     variables: { inviter, invitationLink },
   });
