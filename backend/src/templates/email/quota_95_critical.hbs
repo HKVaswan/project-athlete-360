@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>🚨 Critical Alert: 95% Quota Reached</title>
+    <style>
+      body {
+        background-color: #fff7f7;
+        font-family: "Inter", Arial, sans-serif;
+        color: #111;
+        margin: 0;
+        padding: 0;
+      }
+      .container {
+        max-width: 600px;
+        margin: 40px auto;
+        background-color: #ffffff;
+        border-radius: 14px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+        overflow: hidden;
+        border-top: 6px solid #d00000;
+      }
+      .header {
+        background-color: #d00000;
+        color: #fff;
+        text-align: center;
+        padding: 24px;
+        font-size: 22px;
+        font-weight: 700;
+      }
+      .content {
+        padding: 32px;
+        line-height: 1.6;
+      }
+      .highlight {
+        background-color: #fff3cd;
+        padding: 10px 14px;
+        border-radius: 8px;
+        border-left: 4px solid #ffcc00;
+        margin: 20px 0;
+        font-weight: 500;
+      }
+      .cta-button {
+        display: inline-block;
+        background-color: #d62828;
+        color: #fff;
+        padding: 14px 30px;
+        text-decoration: none;
+        border-radius: 6px;
+        font-weight: 600;
+        margin-top: 20px;
+      }
+      .cta-button:hover {
+        background-color: #b71c1c;
+      }
+      .footer {
+        background-color: #fafafa;
+        padding: 20px;
+        text-align: center;
+        font-size: 13px;
+        color: #555;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <div class="header">
+        🚨 Urgent: Storage & Usage Limit Nearly Reached
+      </div>
+
+      <div class="content">
+        <p>Dear {{institutionName}},</p>
+
+        <p>
+          Your institution’s plan has reached <strong>95%</strong> of its allowed resources 
+          ({{used}} of {{limit}}). This includes analytics data, video uploads, and athlete records.
+        </p>
+
+        <div class="highlight">
+          Once you hit <strong>100%</strong>, certain platform features such as video uploads,
+          athlete analytics, and performance data tracking may be temporarily paused until your plan is upgraded.
+        </div>
+
+        <p>
+          To avoid any disruption to your athletes or staff, please upgrade your plan now.
+          It takes less than a minute — and your data remains safe and accessible throughout.
+        </p>
+
+        <a href="{{upgradeLink}}" class="cta-button">Upgrade Plan Now</a>
+
+        <p style="margin-top: 28px;">
+          Need help choosing the right plan? <br />
+          Our support team can assist you instantly.
+        </p>
+
+        <p>
+          — Project Athlete 360 Support Team <br />
+          <a href="mailto:support@pa360.net" style="color:#d62828; text-decoration:none;">support@pa360.net</a>
+        </p>
+      </div>
+
+      <div class="footer">
+        You are receiving this critical alert because your usage exceeded 95% of your current plan.<br />
+        Failure to upgrade may result in temporary service interruptions. <br /><br />
+        © {{year}} Project Athlete 360 — All Rights Reserved.
+      </div>
+    </div>
+  </body>
+</html>
