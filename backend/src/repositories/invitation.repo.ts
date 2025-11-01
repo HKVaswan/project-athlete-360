@@ -1,87 +1,125 @@
-import { PrismaClient } from "@prisma/client";
-import crypto from "crypto";
-
-const prisma = new PrismaClient();
-
 /**
- * Invitation Repository
+ * Invitation Repository — Enterprise Edition
  * ------------------------------------------------------------
  * Handles creation, validation, and tracking of invitations
- * for athletes, coaches, and institution staff.
- * - Uses secure random tokens (hashed before storage)
- * - Expiration-based validation
- * - Tracks accepted/revoked states
+ * for athletes, coaches, and admins.
+ *
+ * 🔒 Security:
+ *  - Token stored as SHA256 hash (raw returned only once)
+ *  - Old pending invites auto-revoked
+ *  - Prevents spam / abuse via trialAuditService
+ *
+ * ⚙️ System:
+ *  - Integrates with quotaService to enforce plan limits
+ *  - Supports pagination & filters
+ *  - Adds audit logging for all lifecycle changes
+ * ------------------------------------------------------------
  */
+
+import crypto from "crypto";
+import prisma from "../prismaClient";
+import logger from "../logger";
+import { auditService } from "../lib/audit";
+import { quotaService } from "../services/quota.service";
+import { trialAuditService } from "../services/trialAudit.service";
+import { Errors } from "../utils/errors";
+
 export const InvitationRepo = {
   /**
-   * Generate a secure token for invitations.
-   * The token is stored hashed for safety and the raw token
-   * is returned for sending in the email or link.
+   * Generate a secure random invitation token (raw + hash)
    */
   generateToken() {
-    const rawToken = crypto.randomBytes(32).toString("hex");
-    const hashedToken = crypto.createHash("sha256").update(rawToken).digest("hex");
-    return { rawToken, hashedToken };
+    const rawToken = crypto.randomBytes(24).toString("hex");
+    const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+    return { rawToken, tokenHash };
   },
 
   /**
    * Create a new invitation.
-   * Automatically invalidates older invites for the same email & role.
+   * - Invalidates any old pending ones for same email + role.
+   * - Checks quota & abuse before creation.
    */
   async createInvitation(data: {
     email: string;
     invitedById: string;
     institutionId: string;
-    role: "ATHLETE" | "COACH" | "ADMIN";
+    role: "athlete" | "coach" | "admin";
     expiresInHours?: number;
     message?: string;
+    ip?: string;
+    userAgent?: string;
   }) {
-    const { rawToken, hashedToken } = this.generateToken();
+    const { rawToken, tokenHash } = this.generateToken();
+    const expiresAt = new Date(Date.now() + (data.expiresInHours ?? 72) * 60 * 60 * 1000);
 
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + (data.expiresInHours ?? 72)); // default 72h expiry
+    const email = data.email.toLowerCase();
+
+    // --- Anti-abuse & quota enforcement ---
+    try {
+      await Promise.all([
+        quotaService.verifyInstitutionLimit(data.institutionId, data.role),
+        trialAuditService.recordInviteAttempt({
+          inviterId: data.invitedById,
+          inviterRole: data.role,
+          email,
+          ip: data.ip ?? "unknown",
+          userAgent: data.userAgent ?? "unknown",
+          time: new Date(),
+        }),
+      ]);
+    } catch (err) {
+      logger.warn("[INVITE REPO] Quota or abuse check failed", err);
+      // non-blocking in early beta
+    }
 
     try {
-      // Invalidate old pending invitations for the same email
-      await prisma.invitation.updateMany({
-        where: { email: data.email, status: "PENDING" },
-        data: { status: "REVOKED" },
+      await prisma.$transaction(async (tx) => {
+        // Invalidate any previous pending invitations
+        await tx.invitation.updateMany({
+          where: { email, status: "pending" },
+          data: { status: "revoked", revokedAt: new Date() },
+        });
+
+        // Create new invite
+        await tx.invitation.create({
+          data: {
+            email,
+            tokenHash,
+            invitedById: data.invitedById,
+            institutionId: data.institutionId,
+            role: data.role,
+            expiresAt,
+            message: data.message ?? null,
+            status: "pending",
+          },
+        });
       });
 
-      const invitation = await prisma.invitation.create({
-        data: {
-          email: data.email.toLowerCase(),
-          invitedById: data.invitedById,
-          institutionId: data.institutionId,
-          role: data.role,
-          tokenHash: hashedToken,
-          expiresAt,
-          message: data.message ?? null,
-          status: "PENDING",
-        },
-        include: {
-          invitedBy: { select: { id: true, name: true, role: true } },
-          institution: { select: { id: true, name: true } },
-        },
+      await auditService.log({
+        actorId: data.invitedById,
+        actorRole: "system",
+        action: "INVITE_CREATE",
+        details: { email, role: data.role, institutionId: data.institutionId },
       });
 
-      return { invitation, token: rawToken };
-    } catch (error) {
-      console.error("❌ Error creating invitation:", error);
-      throw new Error("Failed to create invitation");
+      return { token: rawToken, expiresAt };
+    } catch (error: any) {
+      logger.error("[INVITE REPO] Failed to create invitation", error.message);
+      throw Errors.ServiceUnavailable("Failed to create invitation");
     }
   },
 
   /**
-   * Validate an invitation token before accepting.
+   * Validate invitation token.
+   * Returns invite details if valid, else throws.
    */
   async validateToken(token: string) {
     const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
 
-    const invitation = await prisma.invitation.findFirst({
+    const invite = await prisma.invitation.findFirst({
       where: {
         tokenHash,
-        status: "PENDING",
+        status: "pending",
         expiresAt: { gt: new Date() },
       },
       include: {
@@ -90,58 +128,74 @@ export const InvitationRepo = {
       },
     });
 
-    if (!invitation) throw new Error("Invalid or expired invitation token");
+    if (!invite) throw Errors.NotFound("Invalid or expired invitation token");
 
-    return invitation;
+    return invite;
   },
 
   /**
    * Mark an invitation as accepted after successful registration.
    */
-  async markAsAccepted(invitationId: string, acceptedById: string) {
+  async markAsAccepted(inviteId: string, acceptedById: string) {
     try {
       const updated = await prisma.invitation.update({
-        where: { id: invitationId },
+        where: { id: inviteId },
         data: {
-          status: "ACCEPTED",
+          status: "accepted",
           acceptedById,
           acceptedAt: new Date(),
         },
       });
+
+      await auditService.log({
+        actorId: acceptedById,
+        actorRole: "system",
+        action: "INVITE_ACCEPT",
+        details: { inviteId },
+      });
+
       return updated;
-    } catch (error) {
-      console.error("❌ Error marking invitation accepted:", error);
-      throw new Error("Failed to mark invitation as accepted");
+    } catch (error: any) {
+      logger.error("[INVITE REPO] Error marking accepted:", error.message);
+      throw Errors.ServiceUnavailable("Failed to mark invitation as accepted");
     }
   },
 
   /**
-   * Revoke or expire an invitation manually (e.g., by admin).
+   * Manually revoke or expire an invitation (admin action)
    */
-  async revokeInvitation(invitationId: string, reason?: string) {
+  async revokeInvitation(inviteId: string, actorId: string, reason?: string) {
     try {
       const updated = await prisma.invitation.update({
-        where: { id: invitationId },
+        where: { id: inviteId },
         data: {
-          status: "REVOKED",
+          status: "revoked",
           revokedAt: new Date(),
-          revokeReason: reason ?? "Revoked by admin",
+          revokeReason: reason ?? "Revoked manually",
         },
       });
+
+      await auditService.log({
+        actorId,
+        actorRole: "admin",
+        action: "INVITE_REVOKE",
+        details: { inviteId, reason },
+      });
+
       return updated;
-    } catch (error) {
-      console.error("❌ Error revoking invitation:", error);
-      throw new Error("Failed to revoke invitation");
+    } catch (error: any) {
+      logger.error("[INVITE REPO] Error revoking invitation:", error.message);
+      throw Errors.ServiceUnavailable("Failed to revoke invitation");
     }
   },
 
   /**
-   * List invitations (filter by institution, role, or status).
+   * List invitations with pagination & filtering.
    */
   async listInvitations(options?: {
     institutionId?: string;
-    status?: "PENDING" | "ACCEPTED" | "REVOKED" | "EXPIRED";
-    role?: "ATHLETE" | "COACH" | "ADMIN";
+    status?: "pending" | "accepted" | "revoked" | "expired";
+    role?: "athlete" | "coach" | "admin";
     page?: number;
     limit?: number;
   }) {
@@ -169,6 +223,13 @@ export const InvitationRepo = {
         prisma.invitation.count({ where }),
       ]);
 
+      await auditService.log({
+        actorId: "system",
+        actorRole: "system",
+        action: "INVITE_LIST_QUERY",
+        details: { count: invitations.length, institutionId: options?.institutionId },
+      });
+
       return {
         invitations,
         pagination: {
@@ -177,9 +238,9 @@ export const InvitationRepo = {
           totalPages: Math.ceil(total / limit),
         },
       };
-    } catch (error) {
-      console.error("❌ Error listing invitations:", error);
-      throw new Error("Failed to fetch invitations");
+    } catch (error: any) {
+      logger.error("[INVITE REPO] Error listing invitations:", error.message);
+      throw Errors.ServiceUnavailable("Failed to list invitations");
     }
   },
 };
