@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Usage Alert — 70% Quota Reached</title>
+    <style>
+      body {
+        background-color: #f7f8fa;
+        font-family: "Inter", Arial, sans-serif;
+        color: #222;
+        margin: 0;
+        padding: 0;
+      }
+      .container {
+        max-width: 600px;
+        background: #ffffff;
+        margin: 40px auto;
+        border-radius: 14px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        overflow: hidden;
+      }
+      .header {
+        background-color: #023e8a;
+        color: #fff;
+        padding: 24px;
+        text-align: center;
+        font-size: 20px;
+        font-weight: 600;
+      }
+      .content {
+        padding: 28px;
+      }
+      .cta-button {
+        display: inline-block;
+        padding: 12px 24px;
+        background-color: #0077b6;
+        color: #fff;
+        text-decoration: none;
+        border-radius: 6px;
+        margin-top: 16px;
+        font-weight: 500;
+      }
+      .footer {
+        text-align: center;
+        font-size: 13px;
+        color: #777;
+        padding: 20px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <div class="header">
+        Project Athlete 360 — Usage Alert
+      </div>
+
+      <div class="content">
+        <p>Hi {{institutionName}},</p>
+
+        <p>You've currently used <strong>70%</strong> of your plan’s available resources ({{used}} of {{limit}}).</p>
+
+        <p>We recommend keeping some buffer to ensure smooth uploads, analytics, and team access — especially during peak hours.</p>
+
+        <p>Upgrading now helps avoid interruptions and unlocks more athlete connections, analytics storage, and upload capacity.</p>
+
+        <a href="{{upgradeLink}}" class="cta-button">Review & Upgrade Plan</a>
+
+        <p style="margin-top: 24px;">Stay focused on performance — we’ll handle the tech for you.</p>
+
+        <p>— The Project Athlete 360 Team</p>
+      </div>
+
+      <div class="footer">
+        You’re receiving this email because your account usage reached 70% of its plan limit.<br />
+        © {{year}} Project Athlete 360 — All rights reserved.
+      </div>
+    </div>
+  </body>
+</html>
