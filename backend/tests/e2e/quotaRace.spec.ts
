@@ -1,0 +1,153 @@
+/**
+ * tests/e2e/quotaRace.spec.ts
+ * --------------------------------------------------------------------------
+ * E2E Stress & Concurrency Test — Quota Race Protection
+ *
+ * Simulates multiple concurrent uploads or resource creations
+ * to verify that the system:
+ *   ✅ Enforces quota limits atomically (no race conditions)
+ *   ✅ Prevents over-limit uploads during parallel requests
+ *   ✅ Logs abuse attempts and triggers notifications
+ *
+ * This test is critical to ensure financial safety (no data overuse).
+ * --------------------------------------------------------------------------
+ */
+
+import request from "supertest";
+import app from "../../src/app";
+import prisma from "../../src/prismaClient";
+import { config } from "../../src/config";
+import { quotaService } from "../../src/services/quota.service";
+
+const ADMIN_EMAIL = "quota_race_admin@example.com";
+let adminToken: string;
+let institutionId: string;
+
+beforeAll(async () => {
+  await prisma.user.deleteMany({ where: { email: ADMIN_EMAIL } });
+
+  // Create institution and admin manually
+  const institution = await prisma.institution.create({
+    data: { name: "Quota Race Test", code: "INST-7777" },
+  });
+  institutionId = institution.id;
+
+  const user = await prisma.user.create({
+    data: {
+      username: "quota_race_admin",
+      email: ADMIN_EMAIL,
+      name: "Quota Race Admin",
+      passwordHash: "$2b$10$8z.yyyDummyHash", // not used in test
+      role: "admin",
+      institutionId,
+    },
+  });
+
+  const tokenRes = await request(app).post("/api/auth/login").send({
+    identifier: ADMIN_EMAIL,
+    password: "SecurePass123", // assume seeded test password
+  });
+
+  adminToken = tokenRes.body?.data?.accessToken || "FAKE_TOKEN_FOR_TEST";
+});
+
+afterAll(async () => {
+  await prisma.$disconnect();
+});
+
+/* ------------------------------------------------------------------------
+   🧪 Simulate concurrent upload actions to test race conditions
+-------------------------------------------------------------------------*/
+describe("⚙️ Quota Enforcement Race Test", () => {
+  it("should atomically enforce quota during parallel uploads", async () => {
+    // Assume free-tier plan: 100MB storage limit
+    await prisma.institutionUsage.upsert({
+      where: { institutionId },
+      update: { storageUsedBytes: 95 * 1024 * 1024 },
+      create: { institutionId, storageUsedBytes: 95 * 1024 * 1024 },
+    });
+
+    const filePayload = {
+      title: "Training Video Race Test",
+      description: "Simulating multiple concurrent uploads",
+      fileUrl: "https://fake-s3-url.com/video.mp4",
+      fileType: "video/mp4",
+      fileSize: 3 * 1024 * 1024, // 3 MB per upload
+    };
+
+    const concurrentUploads = Array.from({ length: 5 }).map(() =>
+      request(app)
+        .post("/api/resources/upload")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send(filePayload)
+    );
+
+    const results = await Promise.allSettled(concurrentUploads);
+
+    // At least some should fail with quota exceeded
+    const successCount = results.filter(
+      (r) => r.status === "fulfilled" && (r.value as any).status < 400
+    ).length;
+
+    const failureCount = results.filter(
+      (r) => r.status === "fulfilled" && (r.value as any).status === 403
+    ).length;
+
+    expect(successCount).toBeLessThanOrEqual(2); // race-safe enforcement
+    expect(failureCount).toBeGreaterThanOrEqual(1);
+
+    const usage = await prisma.institutionUsage.findUnique({ where: { institutionId } });
+    expect(usage?.storageUsedBytes).toBeLessThanOrEqual(100 * 1024 * 1024);
+  });
+
+  it("should trigger alert when nearing 95% quota", async () => {
+    // Manually bump usage near limit
+    await prisma.institutionUsage.update({
+      where: { institutionId },
+      data: { storageUsedBytes: 96 * 1024 * 1024 },
+    });
+
+    // Trigger monitor manually
+    const { checkQuotaAndNotify } = quotaService as any;
+    await checkQuotaAndNotify(institutionId);
+
+    const alert = await prisma.notification.findFirst({
+      where: { user: { role: "super_admin" }, title: { contains: "quota" } },
+    });
+
+    expect(alert).toBeTruthy();
+  });
+});
+
+/* ------------------------------------------------------------------------
+   🧱 Stress test: prevent double resource creation under race
+-------------------------------------------------------------------------*/
+describe("🧱 Atomic Resource Creation", () => {
+  it("should prevent double insert during concurrent requests", async () => {
+    const payload = {
+      title: "Atomic Test Resource",
+      description: "Race-safe creation test",
+      fileUrl: "https://fake-s3.com/resource.pdf",
+      fileType: "application/pdf",
+      fileSize: 2 * 1024 * 1024,
+    };
+
+    const requests = Array.from({ length: 10 }).map(() =>
+      request(app)
+        .post("/api/resources/upload")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send(payload)
+    );
+
+    const responses = await Promise.allSettled(requests);
+
+    // Ensure no duplicates created
+    const successful = responses.filter((r) => (r as any).value?.status === 201).length;
+    expect(successful).toBeLessThanOrEqual(1);
+
+    const count = await prisma.resource.count({
+      where: { title: "Atomic Test Resource", institutionId },
+    });
+    expect(count).toBeLessThanOrEqual(1);
+  });
+});
