@@ -3,46 +3,37 @@
  * ------------------------------------------------------------------------
  * 🧩 Device Fingerprint Middleware (Enterprise-Grade)
  *
- * Collects, normalizes, and hashes device identifiers for security analysis,
- * anti-abuse detection, and trial-reuse prevention.
+ * Collects, normalizes, and hashes device identifiers for:
+ *  - Security analysis & intrusion detection
+ *  - Anti-abuse & trial-reuse prevention
+ *  - MFA trust device validation
  *
- * Features:
- *  - Privacy-safe (stores only SHA-256 hashes of identifiers)
- *  - Works for both web and API clients
- *  - Adds `req.fingerprint` for downstream services (auth, trial, security)
- *  - Compatible with IntrusionDetection & TrialAudit systems
+ * ✅ Privacy-safe (hashes only)
+ * ✅ Unified with /lib/deviceFingerprint.ts
+ * ✅ Adds `req.fingerprint` for downstream services (auth, trialAudit, rateLimit)
+ * ✅ Non-blocking (failsafe: always lets request proceed)
  * ------------------------------------------------------------------------
  */
 
 import { Request, Response, NextFunction } from "express";
-import crypto from "crypto";
 import logger from "../logger";
+import {
+  generateDeviceFingerprint,
+  normalizeFingerprintForDB,
+  DeviceFingerprint,
+} from "../lib/deviceFingerprint";
 
-/* ------------------------------------------------------------------------
-   🔒 Utility: Hash identifier securely (SHA-256)
------------------------------------------------------------------------- */
-const hash = (input: string): string =>
-  crypto.createHash("sha256").update(input.trim().toLowerCase()).digest("hex");
-
-/* ------------------------------------------------------------------------
-   🧠 Middleware Definition
------------------------------------------------------------------------- */
+/**
+ * Extended Request type that includes fingerprint info
+ */
 export interface FingerprintedRequest extends Request {
-  fingerprint?: {
-    hashedIp: string;
-    hashedUA: string | null;
-    hashedDevice: string | null;
-    ip: string;
-    userAgent?: string;
-    rawDeviceId?: string | null;
-  };
+  fingerprint?: DeviceFingerprint;
+  normalizedFingerprint?: ReturnType<typeof normalizeFingerprintForDB>;
 }
 
 /**
- * Generates a robust fingerprint using:
- *  - IP address (always required)
- *  - User-Agent (browser/app info)
- *  - Optional `X-Device-ID` header for app/mobile identification
+ * 🧠 Core Middleware
+ * Collects fingerprint & attaches to request for downstream use.
  */
 export const deviceFingerprint = (
   req: FingerprintedRequest,
@@ -50,59 +41,45 @@ export const deviceFingerprint = (
   next: NextFunction
 ) => {
   try {
-    const ip =
-      (req.headers["x-forwarded-for"] as string)?.split(",")[0].trim() ||
-      req.socket.remoteAddress ||
-      "unknown";
+    // Generate fingerprint from current request
+    const fingerprint = generateDeviceFingerprint(req);
+    req.fingerprint = fingerprint;
+    req.normalizedFingerprint = normalizeFingerprintForDB(fingerprint);
 
-    const userAgent = req.headers["user-agent"] || "unknown";
-    const rawDeviceId =
-      (req.headers["x-device-id"] as string) ||
-      (req.cookies?.deviceId as string) ||
-      null;
-
-    const hashedIp = hash(ip);
-    const hashedUA = userAgent !== "unknown" ? hash(userAgent) : null;
-    const hashedDevice = rawDeviceId ? hash(rawDeviceId) : null;
-
-    req.fingerprint = {
-      hashedIp,
-      hashedUA,
-      hashedDevice,
-      ip,
-      userAgent,
-      rawDeviceId,
-    };
-
-    logger.debug(`[DEVICE FINGERPRINT] Collected for IP: ${ip}`);
+    logger.debug(
+      `[DEVICE FINGERPRINT] Captured → IP=${fingerprint.components.ip} | DeviceHash=${fingerprint.deviceHash.slice(
+        0,
+        8
+      )}...`
+    );
 
     next();
   } catch (err: any) {
-    logger.error(`[DEVICE FINGERPRINT] Error collecting fingerprint: ${err.message}`);
-    // Don’t block the request — system can still proceed without fingerprint
+    logger.error(`[DEVICE FINGERPRINT] Failed to process: ${err.message}`);
+    // Failsafe — do not block legitimate requests
     next();
   }
 };
 
-/* ------------------------------------------------------------------------
-   🧩 Optional Helper: Attach fingerprint to logs / audit
------------------------------------------------------------------------- */
+/**
+ * 🧩 Optional Helper — Extract fingerprint metadata for logs/audit
+ */
 export const getFingerprintMetadata = (req: FingerprintedRequest) => {
-  return req.fingerprint
-    ? {
-        ip: req.fingerprint.ip,
-        hashedIp: req.fingerprint.hashedIp,
-        hashedUA: req.fingerprint.hashedUA,
-        hashedDevice: req.fingerprint.hashedDevice,
-        userAgent: req.fingerprint.userAgent,
-      }
-    : { ip: req.ip || "unknown" };
+  if (!req.fingerprint)
+    return { ip: req.ip || "unknown", deviceHash: null, userAgent: req.headers["user-agent"] };
+
+  return {
+    ip: req.fingerprint.components.ip,
+    deviceHash: req.fingerprint.deviceHash,
+    userAgent: req.fingerprint.components.userAgent,
+    platform: req.fingerprint.components.clientPlatform,
+  };
 };
 
 /* ------------------------------------------------------------------------
    🧠 Future Enhancements
-   - Integrate with IP reputation services (AbuseIPDB / Cloudflare Radar)
-   - Add browser fingerprinting via client script (FPJS or custom)
-   - Combine with session anomalies for risk scoring
-   - Save fingerprints in Redis cache for real-time detection
+   - Integrate with IP reputation APIs (AbuseIPDB / Cloudflare)
+   - Attach risk score to fingerprint (session anomaly detection)
+   - Cache fingerprints temporarily in Redis for hot re-use
+   - Use for MFA device trust management
 ------------------------------------------------------------------------ */
