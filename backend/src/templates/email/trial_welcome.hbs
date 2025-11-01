@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en" style="margin:0;padding:0;background:#f5f7fa;">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Welcome to Project Athlete 360</title>
+    <style>
+      body {
+        font-family: "Inter", Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #f5f7fa;
+        color: #1f2937;
+      }
+      .container {
+        max-width: 640px;
+        margin: 40px auto;
+        background: #ffffff;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+      }
+      .header {
+        background: linear-gradient(135deg, #007bff, #00b4d8);
+        padding: 28px 40px;
+        text-align: center;
+        color: #ffffff;
+      }
+      .header img {
+        width: 72px;
+        height: 72px;
+        margin-bottom: 12px;
+      }
+      .content {
+        padding: 40px 45px;
+        line-height: 1.6;
+      }
+      .content h1 {
+        font-size: 26px;
+        color: #111827;
+        margin-bottom: 10px;
+      }
+      .content p {
+        font-size: 16px;
+        color: #374151;
+        margin: 8px 0;
+      }
+      .highlight {
+        font-weight: 600;
+        color: #007bff;
+      }
+      .cta-button {
+        display: inline-block;
+        background: #007bff;
+        color: #ffffff !important;
+        text-decoration: none;
+        padding: 12px 28px;
+        font-size: 15px;
+        font-weight: 600;
+        border-radius: 8px;
+        margin-top: 20px;
+      }
+      .cta-button:hover {
+        background: #005fcc;
+      }
+      .footer {
+        background: #f9fafb;
+        padding: 25px 40px;
+        font-size: 13px;
+        text-align: center;
+        color: #6b7280;
+        border-top: 1px solid #e5e7eb;
+      }
+      .footer a {
+        color: #007bff;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- Header -->
+      <div class="header">
+        <img src="https://pa360.net/logo.png" alt="Project Athlete 360" />
+        <h2>Welcome to Project Athlete 360</h2>
+      </div>
+
+      <!-- Content -->
+      <div class="content">
+        <h1>Hello {{name}},</h1>
+        <p>
+          Welcome aboard! 🎉 You’ve officially started your <span class="highlight">Free Trial</span> with 
+          <strong>Project Athlete 360</strong> — a platform built to empower athletes, coaches, and institutions to grow through science, technology, and community.
+        </p>
+
+        <p>
+          For the next <strong>{{trialDays}} days</strong>, you’ll have full access to your institution dashboard, training analytics, and growth tools.
+          Use this time to explore, connect with your athletes, and experience how data can redefine your performance journey.
+        </p>
+
+        <p>
+          As your trial progresses, we’ll share tips and insights to help you get the most out of PA360.
+          And don’t worry — we’ll notify you before your trial ends so you can easily upgrade to keep your data and progress safe.
+        </p>
+
+        <p style="margin-top: 30px;">
+          <a href="{{dashboardLink}}" class="cta-button">Go to Your Dashboard</a>
+        </p>
+
+        <p style="margin-top: 25px;">
+          Together, let’s fix Indian sport. 💪  
+          <br /><br />
+          — The <strong>Project Athlete 360</strong> Team
+        </p>
+      </div>
+
+      <!-- Footer -->
+      <div class="footer">
+        <p>
+          You’re receiving this email because you signed up for a Project Athlete 360 trial.<br />
+          If you didn’t initiate this, please contact us immediately at 
+          <a href="mailto:support@pa360.net">support@pa360.net</a>.
+        </p>
+        <p style="margin-top: 12px;">
+          &copy; {{year}} Project Athlete 360. All rights reserved.<br />
+          <a href="https://pa360.net">pa360.net</a> • 
+          <a href="https://projectathlete360.com">projectathlete360.com</a>
+        </p>
+      </div>
+    </div>
+  </body>
+</html>
