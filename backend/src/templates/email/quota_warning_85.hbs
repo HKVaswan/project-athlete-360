@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Important: 85% Quota Reached</title>
+    <style>
+      body {
+        background-color: #fef8f6;
+        font-family: "Inter", Arial, sans-serif;
+        color: #1b1b1b;
+        margin: 0;
+        padding: 0;
+      }
+      .container {
+        max-width: 600px;
+        background: #ffffff;
+        margin: 40px auto;
+        border-radius: 14px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+        overflow: hidden;
+        border-top: 5px solid #f77f00;
+      }
+      .header {
+        background-color: #f77f00;
+        color: #fff;
+        padding: 24px;
+        text-align: center;
+        font-size: 21px;
+        font-weight: 700;
+      }
+      .content {
+        padding: 30px;
+      }
+      .cta-button {
+        display: inline-block;
+        padding: 13px 26px;
+        background-color: #d62828;
+        color: #fff;
+        text-decoration: none;
+        border-radius: 6px;
+        font-weight: 600;
+        margin-top: 16px;
+      }
+      .footer {
+        text-align: center;
+        font-size: 13px;
+        color: #777;
+        padding: 22px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <div class="header">
+        ⚠️ Usage Limit Alert — 85% Reached
+      </div>
+
+      <div class="content">
+        <p>Hello {{institutionName}},</p>
+
+        <p>Your usage has now reached <strong>85%</strong> of your plan limit ({{used}} of {{limit}}).</p>
+
+        <p>This means uploads or analytics data might soon be temporarily paused if you reach your cap.</p>
+
+        <p>To ensure seamless athlete management and avoid disruptions, we recommend upgrading your plan today.</p>
+
+        <a href="{{upgradeLink}}" class="cta-button">Upgrade My Plan</a>
+
+        <p style="margin-top: 28px;">You’re doing great — keep your institution running without interruptions.</p>
+
+        <p>— Project Athlete 360 Team</p>
+      </div>
+
+      <div class="footer">
+        This alert was automatically sent when your account exceeded 85% usage.<br />
+        © {{year}} Project Athlete 360 — All rights reserved.
+      </div>
+    </div>
+  </body>
+</html>
