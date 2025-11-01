@@ -4,66 +4,75 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>You're Invited to Join Project Athlete 360</title>
+  <title>Coach Invitation — Project Athlete 360</title>
   <style>
     body {
       font-family: "Inter", Arial, sans-serif;
-      background: #f7f8fa;
+      background-color: #f7f9fb;
       color: #222;
       margin: 0;
       padding: 0;
     }
     .container {
-      max-width: 600px;
+      max-width: 640px;
       margin: 40px auto;
       background: #ffffff;
-      border-radius: 14px;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+      border-radius: 16px;
       overflow: hidden;
+      box-shadow: 0 5px 18px rgba(0, 0, 0, 0.07);
     }
     .header {
-      background: linear-gradient(135deg, #1a73e8, #0a3d91);
+      background: linear-gradient(135deg, #0056d2, #0091ff);
       color: #fff;
+      padding: 32px 24px;
       text-align: center;
-      padding: 32px 20px;
     }
     .header h1 {
-      margin: 0;
       font-size: 22px;
-      letter-spacing: 0.5px;
+      margin: 0;
+      letter-spacing: 0.4px;
     }
     .body {
-      padding: 30px 40px;
+      padding: 36px 40px;
+      line-height: 1.65;
     }
     .body h2 {
-      color: #0a3d91;
-      margin-bottom: 10px;
+      font-size: 20px;
+      color: #0056d2;
+      margin-bottom: 8px;
     }
     .body p {
-      line-height: 1.6;
+      font-size: 15px;
+      margin: 10px 0;
+      color: #333;
+    }
+    .body ul {
+      margin: 12px 0 12px 20px;
       color: #333;
     }
     .cta {
       text-align: center;
-      margin: 30px 0;
+      margin: 36px 0;
     }
     .cta a {
-      background: #1a73e8;
-      color: white;
+      background: #007bff;
+      color: #fff;
       text-decoration: none;
-      padding: 12px 24px;
+      padding: 12px 28px;
       border-radius: 8px;
       font-weight: 600;
       display: inline-block;
+      letter-spacing: 0.3px;
+      transition: all 0.2s ease;
     }
     .cta a:hover {
-      background: #0a3d91;
+      background: #004aad;
     }
     .footer {
-      background: #f2f4f8;
-      color: #666;
+      background: #f1f4f9;
       text-align: center;
       font-size: 13px;
+      color: #555;
       padding: 16px;
     }
   </style>
@@ -72,34 +81,42 @@
 <body>
   <div class="container">
     <div class="header">
-      <h1>Invitation to Join Project Athlete 360</h1>
+      <h1>Invitation to Join as Coach</h1>
     </div>
 
     <div class="body">
-      <h2>Hello Coach,</h2>
+      <h2>Hi Coach {{recipientName}},</h2>
+
       <p>
-        <strong>{{inviter}}</strong> has invited you to join their institution on
-        <strong>Project Athlete 360</strong> — the platform empowering sports growth through science, technology, and community.
+        <strong>{{inviter}}</strong> has invited you to join <strong>Project Athlete 360</strong> —
+        a platform designed to empower coaches like you with smarter tools to guide, manage, and elevate athletes.
       </p>
 
       <p>
-        By joining as a <strong>coach</strong>, you’ll be able to manage athletes, track performance, share resources, and contribute to India’s evolving sports ecosystem.
+        As a verified <strong>Coach</strong>, you’ll gain access to:
       </p>
+
+      <ul>
+        <li>Comprehensive athlete tracking and performance insights</li>
+        <li>Institution-level collaboration tools</li>
+        <li>Smart resource sharing and communication modules</li>
+        <li>Data-driven growth systems for every athlete you guide</li>
+      </ul>
 
       <div class="cta">
         <a href="{{link}}" target="_blank">Accept Invitation</a>
       </div>
 
-      <p style="font-size: 14px; color: #666; margin-top: 24px;">
-        This link is unique to you and will expire in <strong>{{expiry}} hours</strong>.  
-        If you weren’t expecting this, you can safely ignore this email.
+      <p style="font-size: 14px; color: #666;">
+        Your invitation link will expire in <strong>{{expiry}} hours</strong>.  
+        If this wasn’t expected, you can safely ignore this message.
       </p>
     </div>
 
     <div class="footer">
       <p>
-        © {{year}} Project Athlete 360 | #FixIndianSport  
-        <br />Built for athletes, by athletes.
+        © {{year}} Project Athlete 360 — Empowering Coaches. Transforming Athletes.  
+        <br />#ProjectAthlete360 • #FixIndianSport
       </p>
     </div>
   </div>
