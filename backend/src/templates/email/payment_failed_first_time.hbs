@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Payment Unsuccessful — Let’s Try Again</title>
+  <style>
+    body {
+      font-family: 'Inter', Arial, sans-serif;
+      background: #f8fafc;
+      color: #222;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 640px;
+      margin: 40px auto;
+      background: #ffffff;
+      border-radius: 14px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.07);
+      overflow: hidden;
+    }
+    .header {
+      background: linear-gradient(135deg, #0f6fff, #0044cc);
+      color: #fff;
+      text-align: center;
+      padding: 30px 20px;
+    }
+    .content {
+      padding: 36px 32px;
+      text-align: left;
+    }
+    h1 {
+      font-size: 22px;
+      margin-bottom: 16px;
+      color: #111;
+    }
+    p {
+      font-size: 15px;
+      line-height: 1.7;
+      margin: 0 0 18px;
+      color: #333;
+    }
+    .btn {
+      display: inline-block;
+      background: #0f6fff;
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 600;
+      text-decoration: none;
+      margin-top: 10px;
+    }
+    .highlight {
+      background: #f0f7ff;
+      border-left: 4px solid #0f6fff;
+      padding: 10px 14px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      color: #0a2b5c;
+    }
+    .footer {
+      font-size: 13px;
+      color: #777;
+      text-align: center;
+      padding: 26px;
+      background: #f3f5f7;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>Payment Unsuccessful — Let’s Try Again</h2>
+    </div>
+    <div class="content">
+      <h1>We couldn’t complete your payment</h1>
+      <p>Hi {{adminName}},</p>
+      <p>It looks like your recent payment attempt for the <strong>{{planName}}</strong> plan didn’t go through.</p>
+
+      <div class="highlight">
+        Don’t worry — this happens sometimes due to network or bank verification delays.  
+        Your account setup is still reserved for you!
+      </div>
+
+      <p>Please retry your payment below to confirm your registration and activate all platform features instantly.</p>
+
+      <a href="{{retryLink}}" class="btn">Retry Payment</a>
+
+      <p>If you continue facing issues, you can try a different payment method or contact our support team at 
+        <a href="mailto:support@pa360.net">support@pa360.net</a>.
+      </p>
+
+      <p>We’re excited to have you onboard with Project Athlete 360 — let’s help your athletes grow smarter, stronger, and better!</p>
+
+      <p>Warm regards,<br>
+      <strong>The Project Athlete 360 Team</strong></p>
+    </div>
+
+    <div class="footer">
+      © {{currentYear}} Project Athlete 360. All rights reserved.<br/>
+      You’re receiving this because you started registration for a plan on Project Athlete 360.
+    </div>
+  </div>
+</body>
+</html>
