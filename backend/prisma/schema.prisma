@@ -1,11 +1,17 @@
 // prisma/schema.prisma
-// Enterprise-grade Prisma schema for Project Athlete 360
-// PostgreSQL is assumed. Set DATABASE_URL in .env before migrating.
-//
-// Commands:
-//  - npx prisma generate
-//  - npx prisma migrate dev --name init
-//
+// -------------------------------------------------------------------------
+// 🧠 Enterprise-Grade Schema for Project Athlete 360
+// Database: PostgreSQL
+// -------------------------------------------------------------------------
+// Features:
+//  - Invitation & Onboarding Flow
+//  - Role-based Access Control (RBAC)
+//  - Subscription + Billing + Invoices
+//  - Trial Abuse Prevention (hashed fingerprint tracking)
+//  - Audit Log with immutable chain
+//  - IP Blocking, System Alerts, Email Logs
+//  - Scalable institution model
+// -------------------------------------------------------------------------
 
 generator client {
   provider = "prisma-client-js"
@@ -15,9 +21,11 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  // Adjust connection limit in deployment config if needed
 }
 
+//
+// Enums
+//
 enum Role {
   ATHLETE
   COACH
@@ -43,134 +51,190 @@ enum InvoiceStatus {
   VOID
 }
 
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
 enum Attendance {
   PRESENT
   ABSENT
   EXCUSED
 }
 
+//
+// Core Models
+//
+
 model User {
-  id             String        @id @default(uuid())
-  username       String        @unique
-  email          String?       @unique
+  id             String          @id @default(uuid())
+  username       String          @unique
+  email          String?         @unique
   passwordHash   String
   name           String?
-  role           Role          @default(ATHLETE)
-  institution    Institution?  @relation(fields: [institutionId], references: [id])
+  role           Role            @default(ATHLETE)
+  institution    Institution?    @relation(fields: [institutionId], references: [id])
   institutionId  String?
   athlete        Athlete?
   coach          Coach?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
   loginSessions  LoginSession[]
   refreshTokens  RefreshToken[]
   notifications  Notification[]
-  // safe metadata
-  meta           Json?         // for extensibility
+  invitations    Invitation[]    @relation("InvitedBy")
+  acceptedInvites Invitation[]   @relation("AcceptedBy")
+  auditLogs      AuditLog[]
+  meta           Json?
 }
 
 model Institution {
-  id                  String         @id @default(uuid())
+  id                  String            @id @default(uuid())
   name                String
-  code                String         @unique                 // short code used for invites
-  domain              String?        @unique
-  createdAt           DateTime       @default(now())
-  updatedAt           DateTime       @updatedAt
+  code                String            @unique
+  domain              String?           @unique
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
   users               User[]
   coaches             CoachInstitution[]
   athletes            Athlete[]
+  invitations         Invitation[]
   subscriptions       Subscription[]
   usage               InstitutionUsage?
   paymentMethods      PaymentMethod[]
   invoices            Invoice[]
   systemBackups       SystemBackup[]
-  // plan history: via Subscription relation
+  trialAbuseLogs      TrialAbuseLog[]
   meta                Json?
+
   @@index([code])
 }
 
+//
+// Athlete & Coach
+//
+
 model Athlete {
-  id           String    @id @default(uuid())
-  user         User      @relation(fields: [userId], references: [id])
-  userId       String    @unique
-  athleteCode  String    @unique
-  name         String
-  dob          DateTime?
-  sport        String?
-  gender       String?
-  contactInfo  String?
-  approved     Boolean   @default(false)
-  institution  Institution? @relation(fields: [institutionId], references: [id])
-  institutionId String?
-  sessions     Session[]
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  meta         Json?
+  id             String        @id @default(uuid())
+  user           User          @relation(fields: [userId], references: [id])
+  userId         String        @unique
+  athleteCode    String        @unique
+  name           String
+  dob            DateTime?
+  sport          String?
+  gender         String?
+  contactInfo    String?
+  approved       Boolean       @default(false)
+  institution    Institution?  @relation(fields: [institutionId], references: [id])
+  institutionId  String?
+  sessions       Session[]
+  analytics      AthleteAnalytics?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  meta           Json?
   @@index([athleteCode])
 }
 
 model Coach {
-  id          String    @id @default(uuid())
-  user        User      @relation(fields: [userId], references: [id])
-  userId      String    @unique
-  coachCode   String    @unique
-  name        String?
-  institutions CoachInstitution[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  meta        Json?
+  id             String              @id @default(uuid())
+  user           User                @relation(fields: [userId], references: [id])
+  userId         String              @unique
+  coachCode      String              @unique
+  name           String?
+  institutions   CoachInstitution[]
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  meta           Json?
 }
 
 model CoachInstitution {
-  id            String      @id @default(uuid())
-  coach         Coach       @relation(fields: [coachId], references: [id])
-  coachId       String
-  institution   Institution @relation(fields: [institutionId], references: [id])
-  institutionId String
-  createdAt     DateTime    @default(now())
-
+  id             String      @id @default(uuid())
+  coach          Coach       @relation(fields: [coachId], references: [id])
+  coachId        String
+  institution    Institution @relation(fields: [institutionId], references: [id])
+  institutionId  String
+  createdAt      DateTime    @default(now())
   @@unique([coachId, institutionId])
 }
 
+//
+// Sessions & Performance
+//
+
 model Session {
-  id             String    @id @default(uuid())
-  athlete        Athlete   @relation(fields: [athleteId], references: [id])
-  athleteId      String
-  coachId        String?   // denormalised reference
-  attendance     Attendance?
-  performanceScore Float?  // normalized score
-  notes          String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  meta           Json?
+  id              String      @id @default(uuid())
+  athlete         Athlete     @relation(fields: [athleteId], references: [id])
+  athleteId       String
+  coachId         String?
+  attendance      Attendance?
+  performanceScore Float?
+  notes           String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  meta            Json?
   @@index([athleteId])
   @@index([createdAt])
 }
 
+//
+// Invitations (robust, tokenized, tracked)
+//
+
+model Invitation {
+  id              String        @id @default(uuid())
+  email           String
+  role            Role
+  tokenHash       String
+  invitedBy       User          @relation("InvitedBy", fields: [invitedById], references: [id])
+  invitedById     String
+  institution     Institution   @relation(fields: [institutionId], references: [id])
+  institutionId   String
+  acceptedBy      User?         @relation("AcceptedBy", fields: [acceptedById], references: [id])
+  acceptedById    String?
+  status          InvitationStatus @default(PENDING)
+  message         String?
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  revokedAt       DateTime?
+  revokeReason    String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([email])
+  @@index([status])
+  @@index([tokenHash])
+}
+
+//
+// Security & Authentication
+//
+
 model RefreshToken {
-  id         String   @id @default(uuid())
-  user       User     @relation(fields: [userId], references: [id])
-  userId     String
-  tokenHash  String   // hashed token
-  deviceInfo String?
-  issuedAt   DateTime @default(now())
-  expiresAt  DateTime
-  revoked    Boolean  @default(false)
-  createdAt  DateTime @default(now())
+  id          String   @id @default(uuid())
+  user        User     @relation(fields: [userId], references: [id])
+  userId      String
+  tokenHash   String
+  deviceInfo  String?
+  issuedAt    DateTime @default(now())
+  expiresAt   DateTime
+  revoked     Boolean  @default(false)
+  createdAt   DateTime @default(now())
 
   @@index([userId])
   @@index([tokenHash])
 }
 
 model LoginSession {
-  id         String   @id @default(uuid())
-  user       User     @relation(fields: [userId], references: [id])
-  userId     String
-  ipAddress  String?
-  userAgent  String?
-  loggedInAt DateTime @default(now())
-  createdAt  DateTime @default(now())
-  meta       Json?
+  id          String   @id @default(uuid())
+  user        User     @relation(fields: [userId], references: [id])
+  userId      String
+  ipAddress   String?
+  userAgent   String?
+  loggedInAt  DateTime @default(now())
+  meta        Json?
+  createdAt   DateTime @default(now())
 }
 
 //
@@ -178,136 +242,149 @@ model LoginSession {
 //
 
 model Plan {
-  id                  String   @id @default(uuid())
-  sku                 String   @unique                // machine-friendly
-  name                String
-  description         String?
-  priceMonthlyCents   Int      @default(0)            // in cents
-  storageLimitBytes   BigInt   @default(0)            // hard cap per institution
-  videoLimitPerMonth  Int      @default(0)            // count of video uploads per month
-  athletesPerCoach    Int      @default(50)           // default limits
-  coachesPerInstitution Int    @default(10)
-  features            Json?
-  isDefault           Boolean  @default(false)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  subscriptions       Subscription[]
+  id                    String    @id @default(uuid())
+  sku                   String    @unique
+  name                  String
+  description           String?
+  priceMonthlyCents     Int       @default(0)
+  storageLimitBytes     BigInt    @default(0)
+  videoLimitPerMonth    Int       @default(0)
+  athletesPerCoach      Int       @default(50)
+  coachesPerInstitution Int       @default(10)
+  features              Json?
+  isDefault             Boolean   @default(false)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  subscriptions         Subscription[]
   @@index([sku])
 }
 
 model Subscription {
-  id                String             @id @default(uuid())
-  institution       Institution        @relation(fields: [institutionId], references: [id])
-  institutionId     String
-  plan              Plan               @relation(fields: [planId], references: [id])
-  planId            String
-  status            SubscriptionStatus @default(TRIALING)
-  startDate         DateTime           @default(now())
-  endDate           DateTime?
-  nextBillingDate   DateTime?
-  paymentProvider   String?             // stripe, razorpay, etc.
-  providerCustomerId String?            // provider's customer id
-  providerSubscriptionId String?        // provider subscription id
-  usedFreeTrial     Boolean             @default(false)
-  autoRenew         Boolean             @default(true)
-  canceledAt        DateTime?
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-
-  invoices          Invoice[]
+  id                      String             @id @default(uuid())
+  institution              Institution        @relation(fields: [institutionId], references: [id])
+  institutionId            String
+  plan                     Plan               @relation(fields: [planId], references: [id])
+  planId                   String
+  status                   SubscriptionStatus @default(TRIALING)
+  startDate                DateTime           @default(now())
+  endDate                  DateTime?
+  nextBillingDate          DateTime?
+  paymentProvider          String?
+  providerCustomerId       String?
+  providerSubscriptionId   String?
+  usedFreeTrial            Boolean            @default(false)
+  autoRenew                Boolean            @default(true)
+  canceledAt               DateTime?
+  invoices                 Invoice[]
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
   @@index([institutionId])
   @@index([status])
 }
 
 model PaymentMethod {
-  id                 String       @id @default(uuid())
-  institution        Institution  @relation(fields: [institutionId], references: [id])
+  id                 String      @id @default(uuid())
+  institution        Institution @relation(fields: [institutionId], references: [id])
   institutionId      String
-  provider           String       // stripe, razorpay
-  providerPaymentId  String       // card id on provider
+  provider           String
+  providerPaymentId  String
   cardBrand          String?
   last4              String?
   expMonth           Int?
   expYear            Int?
-  enabled            Boolean      @default(true)
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
-
+  enabled            Boolean     @default(true)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
   @@index([institutionId])
 }
 
 model Invoice {
-  id                String       @id @default(uuid())
-  institution       Institution  @relation(fields: [institutionId], references: [id])
-  institutionId     String
-  subscription      Subscription? @relation(fields: [subscriptionId], references: [id])
-  subscriptionId    String?
-  amountCents       Int
-  currency          String       @default("INR")
-  status            InvoiceStatus @default(PENDING)
-  dueDate           DateTime?
-  providerInvoiceId String?
-  metadata          Json?
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
-
+  id                 String       @id @default(uuid())
+  institution        Institution  @relation(fields: [institutionId], references: [id])
+  institutionId      String
+  subscription       Subscription? @relation(fields: [subscriptionId], references: [id])
+  subscriptionId     String?
+  amountCents        Int
+  currency           String       @default("INR")
+  status             InvoiceStatus @default(PENDING)
+  dueDate            DateTime?
+  providerInvoiceId  String?
+  metadata           Json?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
   @@index([institutionId])
   @@index([status])
 }
 
 //
-// Usage & Quotas
+// Usage Tracking
 //
 
 model InstitutionUsage {
-  institution   Institution @relation(fields: [institutionId], references: [id])
-  institutionId String       @id
-  storageBytes  BigInt       @default(0)     // current storage (in bytes)
-  videoCountMonth Int        @default(0)
-  athletesCount Int          @default(0)
-  coachesCount  Int          @default(0)
+  institution      Institution @relation(fields: [institutionId], references: [id])
+  institutionId    String      @id
+  storageBytes     BigInt      @default(0)
+  videoCountMonth  Int         @default(0)
+  athletesCount    Int         @default(0)
+  coachesCount     Int         @default(0)
   lastReconciledAt DateTime?
-  updatedAt     DateTime     @updatedAt
-  meta          Json?
+  updatedAt        DateTime    @updatedAt
+  meta             Json?
 }
 
 //
-// Trial & Anti-abuse
+// Security + Anti-Abuse
 //
 
-model TrialAudit {
-  id           String    @id @default(uuid())
-  institution  Institution? @relation(fields: [institutionId], references: [id])
-  institutionId String?
-  fingerprint  String    // hashed device fingerprint / email hash / phone hash
-  ip           String?
-  createdAt    DateTime  @default(now())
+model TrialAbuseLog {
+  id              String     @id @default(uuid())
+  userId          String?
+  institution     Institution? @relation(fields: [institutionId], references: [id])
+  institutionId   String?
+  hashedIp        String
+  hashedUA        String?
+  hashedDevice    String?
+  hashedEmailDomain String?
+  createdAt       DateTime   @default(now())
+  @@index([hashedIp])
+  @@index([institutionId])
+}
 
-  @@index([fingerprint])
-  @@index([createdAt])
+model BlockedIP {
+  id          String   @id @default(uuid())
+  ipHash      String   @unique
+  reason      String?
+  blockedById String?
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime?
+}
+
+model SystemAlert {
+  id          String   @id @default(uuid())
+  title       String
+  message     String
+  severity    String   @default("medium")
+  category    String?
+  metadata    Json?
+  resolved    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model EmailLog {
+  id          String   @id @default(uuid())
+  to          String
+  subject     String
+  status      String   @default("SENT")
+  provider    String?
+  error       String?
+  createdAt   DateTime @default(now())
+  meta        Json?
 }
 
 //
-// Backups
+// Audit Log (Immutable Chain)
 //
 
-model SystemBackup {
-  id        String   @id @default(uuid())
-  key       String   // s3 key
-  sizeBytes BigInt
-  checksum  String
-  status    String   // uploaded, verified, failed, archived
-  createdAt DateTime @default(now())
-
-  institution Institution? @relation(fields: [institutionId], references: [id])
-  institutionId String?
-  meta      Json?
-}
-
-//
-// Audit log (immutable chain)
-//
 model AuditLog {
   id           String   @id @default(uuid())
   actorId      String?
@@ -320,53 +397,53 @@ model AuditLog {
   chainHash    String
   previousHash String?
   createdAt    DateTime @default(now())
-
   @@index([actorId])
   @@index([action])
   @@index([createdAt])
 }
 
 //
-// Notifications (simple)
+// Notifications
 //
-model Notification {
-  id           String   @id @default(uuid())
-  user         User     @relation(fields: [userId], references: [id])
-  userId       String
-  type         String
-  title        String
-  body         String
-  meta         Json?
-  status       String   @default("pending")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
 
+model Notification {
+  id          String   @id @default(uuid())
+  user        User     @relation(fields: [userId], references: [id])
+  userId      String
+  type        String
+  title       String
+  body        String
+  meta        Json?
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
   @@index([userId])
   @@index([type])
 }
 
 //
-// Misc analytics tables (examples)
+// Analytics
 //
+
 model AthleteAnalytics {
-  athleteId   String  @id
-  avgScore    Float?
+  athleteId      String   @id
+  avgScore       Float?
   attendanceRate Float?
-  updatedAt   DateTime @updatedAt
+  updatedAt      DateTime @updatedAt
 }
 
 model InstitutionAnalytics {
-  institutionId String @id
+  institutionId  String   @id
   avgPerformance Float?
   attendanceRate Float?
-  updatedAt DateTime @updatedAt
+  updatedAt      DateTime @updatedAt
 }
 
 model PlatformAnalytics {
-  id           Int     @id @default(1)
-  totalAthletes Int
+  id                Int     @id @default(1)
+  totalAthletes     Int
   totalInstitutions Int
-  totalSessions Int
-  avgPerformance Float?
-  updatedAt DateTime @updatedAt
+  totalSessions     Int
+  avgPerformance    Float?
+  updatedAt         DateTime @updatedAt
 }
