@@ -1,24 +1,39 @@
+/**
+ * src/controllers/auth.controller.ts
+ * ---------------------------------------------------------------------------
+ * Authentication Controller — Enterprise-Grade
+ * ---------------------------------------------------------------------------
+ * Features:
+ *  - MFA for Admin/SuperAdmin
+ *  - Institution-level linking (plan-aware)
+ *  - Session versioning (auto token invalidation on password reset/logout-all)
+ *  - Role-aware registration (Athlete/Coach public; Admins internal only)
+ *  - Centralized audit logging
+ *  - Institution plan quota validation
+ * ---------------------------------------------------------------------------
+ */
+
 import { Request, Response } from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { randomUUID } from "crypto";
 import prisma from "../prismaClient";
 import logger from "../logger";
-import { Errors, sendErrorResponse, ApiError } from "../utils/errors";
+import { Errors, sendErrorResponse } from "../utils/errors";
 import { config } from "../config";
 import { auditService } from "../lib/audit";
 import { generateMfaToken, verifyMfaCode } from "../services/mfa.service";
 import { AuthenticatedRequest } from "../middleware/auth.middleware";
+import { quotaService } from "../services/quota.service";
 
-/* -----------------------------------------------------------------------
-   🧩 Utility Helpers
-------------------------------------------------------------------------*/
+/* ---------------------------------------------------------------------------
+   🔧 Utility Generators
+--------------------------------------------------------------------------- */
 const generateAthleteCode = () => `ATH-${Math.floor(1000 + Math.random() * 9000)}`;
 const generateCoachCode = () => `COACH-${Math.floor(1000 + Math.random() * 9000)}`;
 const generateInstitutionCode = () => `INST-${Math.floor(1000 + Math.random() * 9000)}`;
 
 /**
- * Sanitize user object for safe API response
+ * Sanitize user object for API responses
  */
 const sanitizeUser = (user: any) => ({
   id: user.id,
@@ -32,7 +47,7 @@ const sanitizeUser = (user: any) => ({
 });
 
 /**
- * Generate JWT access + refresh tokens
+ * Generate access and refresh tokens with versioning & impersonation
  */
 const generateTokens = (user: any, mfaVerified = false, impersonatedBy?: string) => {
   const payload = {
@@ -55,17 +70,16 @@ const generateTokens = (user: any, mfaVerified = false, impersonatedBy?: string)
   return { accessToken, refreshToken };
 };
 
-/* -----------------------------------------------------------------------
-   🔐 Register (Athlete / Coach only)
-------------------------------------------------------------------------*/
+/* ---------------------------------------------------------------------------
+   🧩 Register (Athlete / Coach)
+--------------------------------------------------------------------------- */
 export const register = async (req: Request, res: Response) => {
   try {
-    const { username, password, name, email, dob, gender, role, sport, institutionCode, coachCode } = req.body;
+    const { username, password, name, email, dob, gender, role, sport, institutionCode } = req.body;
 
     if (!username || !password || !role) throw Errors.Validation("Username, password and role are required");
-
     if (!["athlete", "coach"].includes(role)) {
-      throw Errors.Forbidden("Public registration allowed only for athletes and coaches");
+      throw Errors.Forbidden("Public registration is only allowed for athletes and coaches");
     }
 
     const existing = await prisma.user.findFirst({ where: { OR: [{ username }, { email }] } });
@@ -73,6 +87,9 @@ export const register = async (req: Request, res: Response) => {
 
     const institution = await prisma.institution.findUnique({ where: { code: institutionCode } });
     if (!institution) throw Errors.BadRequest("Invalid institution code");
+
+    // Enforce institution plan user limits
+    await quotaService.ensureWithinQuota(institution.id, role === "athlete" ? "athletes" : "coaches");
 
     const passwordHash = await bcrypt.hash(password, 12);
 
@@ -99,7 +116,7 @@ export const register = async (req: Request, res: Response) => {
           sport,
           contactInfo: email,
           institutionId: institution.id,
-          approved: false,
+          approved: false, // Awaiting approval by institution admin
         },
       });
     }
@@ -115,7 +132,7 @@ export const register = async (req: Request, res: Response) => {
 
     res.status(201).json({
       success: true,
-      message: "Registration successful (pending approval if required)",
+      message: "Registration successful. Pending admin approval if required.",
       data: { user: sanitizeUser(user), ...tokens },
     });
   } catch (err: any) {
@@ -124,28 +141,34 @@ export const register = async (req: Request, res: Response) => {
   }
 };
 
-/* -----------------------------------------------------------------------
-   🔑 Login (MFA Support for Admin / Super Admin)
-------------------------------------------------------------------------*/
+/* ---------------------------------------------------------------------------
+   🔑 Login (MFA + Institution Checks + Session Version)
+--------------------------------------------------------------------------- */
 export const login = async (req: Request, res: Response) => {
   try {
     const { identifier, password, mfaCode } = req.body;
-    if (!identifier || !password) throw Errors.Validation("Username/email and password required");
+    if (!identifier || !password) throw Errors.Validation("Username/email and password are required");
 
     const user = await prisma.user.findFirst({
       where: { OR: [{ username: identifier }, { email: identifier }] },
-      include: { athlete: true },
+      include: { athlete: true, institution: true },
     });
-    if (!user) throw Errors.Auth("Invalid credentials");
 
+    if (!user) throw Errors.Auth("Invalid credentials");
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) throw Errors.Auth("Invalid credentials");
 
-    if (user.role === "athlete" && user.athlete && !user.athlete.approved) {
-      throw Errors.Forbidden("Athlete account pending approval by coach/admin");
+    // Check if institution is active and not suspended
+    if (user.institution && user.role !== "super_admin" && !user.institution.active) {
+      throw Errors.Forbidden("Institution account is inactive or suspended");
     }
 
-    // Super Admin requires MFA
+    // Check athlete approval
+    if (user.role === "athlete" && user.athlete && !user.athlete.approved) {
+      throw Errors.Forbidden("Athlete account pending approval by institution admin");
+    }
+
+    // MFA requirement for admin/super_admin
     if (["admin", "super_admin"].includes(user.role)) {
       if (!mfaCode) {
         const challenge = await generateMfaToken(user.id);
@@ -159,41 +182,31 @@ export const login = async (req: Request, res: Response) => {
 
       const verified = await verifyMfaCode(user.id, mfaCode);
       if (!verified) throw Errors.Auth("Invalid or expired MFA code");
-
-      const tokens = generateTokens(user, true);
-      await auditService.log({
-        actorId: user.id,
-        actorRole: user.role,
-        action: "USER_LOGIN",
-        details: { mfa: true, ip: req.ip },
-      });
-
-      return res.json({
-        success: true,
-        message: "Login successful (MFA verified)",
-        data: { user: sanitizeUser(user), ...tokens },
-      });
     }
 
-    // Normal login
-    const tokens = generateTokens(user);
+    const tokens = generateTokens(user, !!mfaCode);
+
     await auditService.log({
       actorId: user.id,
       actorRole: user.role,
       action: "USER_LOGIN",
-      details: { ip: req.ip },
+      details: { mfa: !!mfaCode, ip: req.ip },
     });
 
-    res.json({ success: true, message: "Login successful", data: { user: sanitizeUser(user), ...tokens } });
+    res.json({
+      success: true,
+      message: "Login successful",
+      data: { user: sanitizeUser(user), ...tokens },
+    });
   } catch (err: any) {
     logger.error(`[AUTH] Login failed: ${err.message}`);
     sendErrorResponse(res, err);
   }
 };
 
-/* -----------------------------------------------------------------------
-   🔄 Refresh Token
-------------------------------------------------------------------------*/
+/* ---------------------------------------------------------------------------
+   🔄 Refresh Token (Session-aware)
+--------------------------------------------------------------------------- */
 export const refreshToken = async (req: Request, res: Response) => {
   try {
     const { token } = req.body;
@@ -217,33 +230,43 @@ export const refreshToken = async (req: Request, res: Response) => {
   }
 };
 
-/* -----------------------------------------------------------------------
-   👤 Me
-------------------------------------------------------------------------*/
+/* ---------------------------------------------------------------------------
+   👤 Me (with institution & quota details)
+--------------------------------------------------------------------------- */
 export const me = async (req: AuthenticatedRequest, res: Response) => {
   try {
     if (!req.user) throw Errors.Auth("Unauthorized");
 
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
-      include: { athlete: true },
+      include: {
+        athlete: true,
+        institution: { select: { id: true, name: true, planTier: true, active: true } },
+      },
     });
-
     if (!user) throw Errors.NotFound("User not found");
+
+    const usage = user.institution
+      ? await quotaService.getInstitutionUsage(user.institution.id)
+      : null;
 
     res.json({
       success: true,
-      data: sanitizeUser(user),
-      athleteProfile: user.athlete ?? null,
+      data: {
+        user: sanitizeUser(user),
+        athleteProfile: user.athlete ?? null,
+        institution: user.institution ?? null,
+        usage,
+      },
     });
   } catch (err: any) {
     sendErrorResponse(res, err);
   }
 };
 
-/* -----------------------------------------------------------------------
-   🚪 Logout
-------------------------------------------------------------------------*/
+/* ---------------------------------------------------------------------------
+   🚪 Logout (Audit + Token invalidation support)
+--------------------------------------------------------------------------- */
 export const logout = async (req: AuthenticatedRequest, res: Response) => {
   try {
     if (req.user) {
@@ -257,7 +280,7 @@ export const logout = async (req: AuthenticatedRequest, res: Response) => {
 
     res.json({
       success: true,
-      message: "Logout successful. Token invalidated client-side.",
+      message: "Logout successful. Tokens invalidated client-side.",
     });
   } catch (err: any) {
     sendErrorResponse(res, err);
