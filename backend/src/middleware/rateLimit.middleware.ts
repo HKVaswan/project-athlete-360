@@ -1,20 +1,19 @@
+// src/middleware/rateLimit.middleware.ts
 /**
- * src/middleware/rateLimit.middleware.ts
+ * 🚦 Enterprise-Grade Rate Limiting Middleware (Final Hardened Version)
  * --------------------------------------------------------------------------
- * 🚦 Enterprise-Grade Rate Limiting Middleware (Updated)
- *
- * Features:
- * - Redis + in-memory fallback (for horizontal + single instance scaling)
+ * - Redis + in-memory fallback (horizontal scaling)
  * - Sliding window algorithm
- * - Per-role dynamic limits (SuperAdmin, InstitutionAdmin, Coach, Athlete, Public)
- * - Emits rate limit headers for client transparency
- * - Logs and audits repeated offenders (via auditService)
- * - Designed to integrate with intrusion detection middleware
+ * - Dynamic per-role limits
+ * - IP escalation & temporary block
+ * - Integration with trialAuditService (for abuse tracking)
+ * - Skips trusted system routes (super admin or internal worker)
  * --------------------------------------------------------------------------
  */
 
 import { Request, Response, NextFunction } from "express";
 import { auditService } from "../services/audit.service";
+import { trialAuditService } from "../services/trialAudit.service";
 import { logger } from "../logger";
 
 type RateLimitOpts = {
@@ -29,7 +28,7 @@ type RateLimitOpts = {
 const DEFAULTS: Required<
   Pick<RateLimitOpts, "windowMs" | "max" | "message" | "keyGenerator" | "skip" | "trustProxy">
 > = {
-  windowMs: 15 * 60 * 1000, // 15 min
+  windowMs: 15 * 60 * 1000,
   max: 100,
   message: { message: "Too many requests, please try again later." },
   keyGenerator: (req: Request) => req.ip || req.socket.remoteAddress || "unknown",
@@ -38,10 +37,9 @@ const DEFAULTS: Required<
 };
 
 type WindowRecord = { timestamps: number[] };
-
 const inMemoryStore = new Map<string, WindowRecord>();
 
-// Optional Redis setup
+// Optional Redis
 let redisClient: any = null;
 const tryInitRedis = (() => {
   let attempted = false;
@@ -51,16 +49,15 @@ const tryInitRedis = (() => {
     const url = process.env.REDIS_URL;
     if (!url) return;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const IORedis = require("ioredis");
       redisClient = new IORedis(url, { maxRetriesPerRequest: null });
       redisClient.on("error", (err: any) => {
-        console.warn("[rateLimit] Redis error, falling back to in-memory:", err?.message);
+        logger.warn("[RateLimit] Redis error → fallback to memory:", err?.message);
         redisClient = null;
       });
-      console.info("[rateLimit] Connected to Redis for rate limiting.");
+      logger.info("[RateLimit] Connected to Redis.");
     } catch {
-      console.info("[rateLimit] Redis not available; using in-memory limiter.");
+      logger.info("[RateLimit] Redis not available, using in-memory limiter.");
       redisClient = null;
     }
   };
@@ -68,43 +65,31 @@ const tryInitRedis = (() => {
 
 /* --------------------------------------------------------------------------
    🧮 Role-based Limits
-   - These define different windows and max requests per role for security.
 --------------------------------------------------------------------------- */
-const ROLE_LIMITS: Record<
-  string,
-  { windowMs: number; max: number; message?: string }
-> = {
-  superadmin: { windowMs: 30_000, max: 200, message: "SuperAdmin rate limit hit." },
-  institution_admin: { windowMs: 60_000, max: 100 },
+const ROLE_LIMITS: Record<string, { windowMs: number; max: number }> = {
+  super_admin: { windowMs: 30_000, max: 9999 },
+  admin: { windowMs: 60_000, max: 200 },
   coach: { windowMs: 60_000, max: 80 },
   athlete: { windowMs: 60_000, max: 60 },
   public: { windowMs: 60_000, max: 40 },
 };
 
 /* --------------------------------------------------------------------------
-   🧰 Helper: Headers + Cleanup
+   🔐 Temporary IP Ban (Escalation)
 --------------------------------------------------------------------------- */
-function setHeaders(res: Response, max: number, remaining: number, reset: number) {
-  res.setHeader("X-RateLimit-Limit", String(max));
-  res.setHeader("X-RateLimit-Remaining", String(Math.max(0, remaining)));
-  res.setHeader("X-RateLimit-Reset", String(reset));
+async function isIPBlocked(ip: string): Promise<boolean> {
+  if (!redisClient) return false;
+  const blocked = await redisClient.get(`block:${ip}`);
+  return !!blocked;
 }
 
-function cleanupMemoryStore(windowMs: number) {
-  if (inMemoryStore.size > 5000) {
-    const cutoff = Date.now() - windowMs * 2;
-    setImmediate(() => {
-      for (const [k, v] of inMemoryStore.entries()) {
-        if (!v.timestamps.length || v.timestamps[v.timestamps.length - 1] < cutoff) {
-          inMemoryStore.delete(k);
-        }
-      }
-    });
-  }
+async function blockIP(ip: string, reason = "Excessive requests") {
+  if (!redisClient) return;
+  await redisClient.setex(`block:${ip}`, 600, reason); // 10 minutes block
 }
 
 /* --------------------------------------------------------------------------
-   🧱 Core Middleware
+   🧱 Middleware Core
 --------------------------------------------------------------------------- */
 export const rateLimit = (opts?: RateLimitOpts) => {
   const config = { ...DEFAULTS, ...(opts || {}) };
@@ -124,41 +109,46 @@ export const rateLimit = (opts?: RateLimitOpts) => {
 
       const user = (req as any).user;
       const role = user?.role?.toLowerCase?.() || "public";
-      const limits = ROLE_LIMITS[role] || ROLE_LIMITS["public"];
+      if (role === "super_admin") return next(); // exempt
 
-      const windowMs = limits.windowMs || config.windowMs;
-      const max = limits.max || config.max;
-      const message = limits.message || config.message;
-
+      const limits = ROLE_LIMITS[role] || ROLE_LIMITS.public;
+      const windowMs = limits.windowMs;
+      const max = limits.max;
       const now = Date.now();
       const windowStart = now - windowMs;
 
-      const key = `rl:${keyGen(req)}:${role}:${req.baseUrl || req.path}`;
+      const ip = keyGen(req);
+      if (await isIPBlocked(ip)) {
+        res.status(429).json({ message: "Temporarily blocked due to repeated abuse." });
+        return;
+      }
 
-      // Redis mode (preferred)
+      const key = `rl:${ip}:${role}:${req.baseUrl || req.path}`;
+
+      // Redis mode
       if (redisClient) {
         try {
           await redisClient.zremrangebyscore(key, 0, windowStart);
           await redisClient.zadd(key, now, String(now));
           await redisClient.expire(key, Math.ceil(windowMs / 1000) + 5);
           const count = await redisClient.zcard(key);
-
           const remaining = max - count;
           const reset = Math.floor((now + windowMs) / 1000);
 
           setHeaders(res, max, remaining, reset);
 
           if (count > max) {
-            await handleLimitExceeded(req, res, role, key, message, max);
+            await handleLimitExceeded(req, res, role, ip, key, max);
             return;
           }
+
           return next();
         } catch (err: any) {
-          logger.warn(`[RateLimit] Redis failed → fallback to memory: ${err.message}`);
+          logger.warn(`[RateLimit] Redis failed → fallback: ${err.message}`);
         }
       }
 
-      // In-memory fallback
+      // Memory fallback
       let record = inMemoryStore.get(key);
       if (!record) record = { timestamps: [] };
       record.timestamps = record.timestamps.filter((t) => t > windowStart);
@@ -170,15 +160,14 @@ export const rateLimit = (opts?: RateLimitOpts) => {
       const reset = Math.floor((now + windowMs) / 1000);
 
       setHeaders(res, max, remaining, reset);
-
       if (count > max) {
-        await handleLimitExceeded(req, res, role, key, message, max);
+        await handleLimitExceeded(req, res, role, ip, key, max);
         return;
       }
 
       cleanupMemoryStore(windowMs);
       next();
-    } catch (err) {
+    } catch (err: any) {
       logger.error(`[RateLimit] Unexpected error: ${err.message}`);
       next();
     }
@@ -192,46 +181,77 @@ async function handleLimitExceeded(
   req: Request,
   res: Response,
   role: string,
+  ip: string,
   key: string,
-  message: string | object,
   max: number
 ) {
   const user = (req as any).user;
-  const ip = req.ip || req.headers["x-forwarded-for"];
+  logger.warn(`[RateLimit] 🚫 ${role} exceeded limit from IP=${ip} key=${key}`);
 
-  logger.warn(`[RateLimit] 🚫 ${role} exceeded limit → key=${key}`);
-
-  // Log to audit system (superadmins can review this)
   await auditService.log({
     actorId: user?.id || "anonymous",
     actorRole: role,
-    ip: String(ip),
+    ip,
     action: "RATE_LIMIT_EXCEEDED",
-    details: {
-      route: req.originalUrl,
-      limit: max,
-      key,
-    },
+    details: { route: req.originalUrl, limit: max },
   });
 
-  res.status(429).json(
-    typeof message === "string" ? { message } : message || {
-      message: "Too many requests. Please try again later.",
+  // Log abuse attempts for trial or public users
+  if (role === "public" || role === "athlete") {
+    await trialAuditService.recordAbuseAttempt({
+      ip,
+      endpoint: req.originalUrl,
+      type: "rate_limit",
+      timestamp: new Date(),
+    });
+  }
+
+  // Temporary block escalation
+  if (redisClient) {
+    const keyAbuse = `abuseCount:${ip}`;
+    const count = await redisClient.incr(keyAbuse);
+    await redisClient.expire(keyAbuse, 600); // 10 min window
+    if (count >= 3) {
+      await blockIP(ip, "Repeated rate-limit hits");
+      logger.warn(`[RateLimit] 🔒 IP temporarily blocked: ${ip}`);
     }
-  );
+  }
+
+  res.status(429).json({ message: "Too many requests. Please try again later." });
+}
+
+/* --------------------------------------------------------------------------
+   🧰 Helpers
+--------------------------------------------------------------------------- */
+function setHeaders(res: Response, max: number, remaining: number, reset: number) {
+  res.setHeader("X-RateLimit-Limit", String(max));
+  res.setHeader("X-RateLimit-Remaining", String(Math.max(0, remaining)));
+  res.setHeader("X-RateLimit-Reset", String(reset));
+}
+
+function cleanupMemoryStore(windowMs: number) {
+  if (inMemoryStore.size > 5000) {
+    const cutoff = Date.now() - windowMs * 2;
+    setImmediate(() => {
+      for (const [k, v] of inMemoryStore.entries()) {
+        if (!v.timestamps.length || v.timestamps[v.timestamps.length - 1] < cutoff)
+          inMemoryStore.delete(k);
+      }
+    });
+  }
 }
 
 /* --------------------------------------------------------------------------
    🚀 Preconfigured Variants
 --------------------------------------------------------------------------- */
 export const publicRateLimit = (opts?: Partial<RateLimitOpts>) =>
-  rateLimit({ ...opts, windowMs: opts?.windowMs ?? 15 * 60 * 1000, max: opts?.max ?? 80 });
+  rateLimit({ ...opts, windowMs: 15 * 60 * 1000, max: 80 });
 
 export const strictRateLimit = (opts?: Partial<RateLimitOpts>) =>
-  rateLimit({ ...opts, windowMs: opts?.windowMs ?? 60 * 1000, max: opts?.max ?? 20 });
+  rateLimit({ ...opts, windowMs: 60 * 1000, max: 20 });
 
 export const adminRateLimit = (opts?: Partial<RateLimitOpts>) =>
-  rateLimit({ ...opts, windowMs: opts?.windowMs ?? 30 * 1000, max: opts?.max ?? 200 });
+  rateLimit({ ...opts, windowMs: 30 * 1000, max: 200 });
 
 export const superAdminRateLimit = (opts?: Partial<RateLimitOpts>) =>
-  rateLimit({ ...opts, windowMs: opts?.windowMs ?? 30 * 1000, max: opts?.max ?? 300 });
+  rateLimit({ ...opts, windowMs: 30 * 1000, max: 300 });
