@@ -1,0 +1,118 @@
+<!-- templates/email/invitation_admin.hbs -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Institution Invitation — Project Athlete 360</title>
+  <style>
+    body {
+      font-family: "Inter", Arial, sans-serif;
+      background-color: #f9fafc;
+      margin: 0;
+      padding: 0;
+      color: #222;
+    }
+    .container {
+      max-width: 640px;
+      margin: 40px auto;
+      background: #ffffff;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+    }
+    .header {
+      background: linear-gradient(135deg, #004aad, #007bff);
+      color: #fff;
+      padding: 30px 20px;
+      text-align: center;
+    }
+    .header h1 {
+      font-size: 22px;
+      margin: 0;
+    }
+    .body {
+      padding: 36px 40px;
+      line-height: 1.65;
+    }
+    .body h2 {
+      font-size: 20px;
+      color: #004aad;
+      margin-bottom: 10px;
+    }
+    .body p {
+      font-size: 15px;
+      color: #333;
+      margin: 12px 0;
+    }
+    .cta {
+      text-align: center;
+      margin: 36px 0 20px 0;
+    }
+    .cta a {
+      background: #007bff;
+      color: #fff;
+      text-decoration: none;
+      padding: 12px 28px;
+      border-radius: 8px;
+      font-weight: 600;
+      display: inline-block;
+      letter-spacing: 0.3px;
+    }
+    .cta a:hover {
+      background: #004aad;
+    }
+    .footer {
+      background: #f1f4f9;
+      text-align: center;
+      font-size: 13px;
+      color: #555;
+      padding: 16px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Project Athlete 360 — Admin Invitation</h1>
+    </div>
+
+    <div class="body">
+      <h2>Hello {{recipientName}},</h2>
+
+      <p>
+        <strong>{{inviter}}</strong> has invited your institution to join <strong>Project Athlete 360</strong> — 
+        a modern platform built to empower sports organizations with athlete management, 
+        data insights, and transparent sports growth systems.
+      </p>
+
+      <p>
+        As an <strong>Institution Admin</strong>, you’ll be able to:
+      </p>
+      <ul style="margin-left: 18px; color: #333;">
+        <li>Manage your coaches and athletes securely</li>
+        <li>Monitor analytics and growth data</li>
+        <li>Access training resources and plans</li>
+        <li>Set up institutional billing and plans</li>
+      </ul>
+
+      <div class="cta">
+        <a href="{{link}}" target="_blank">Accept Invitation</a>
+      </div>
+
+      <p style="font-size: 14px; color: #666;">
+        This invitation link is valid for <strong>{{expiry}} hours</strong>.  
+        If you did not request this invitation, please ignore this message.
+      </p>
+    </div>
+
+    <div class="footer">
+      <p>
+        © {{year}} Project Athlete 360 — Empowering Indian Sports Administration  
+        <br />#ProjectAthlete360 • #FixIndianSport
+      </p>
+    </div>
+  </div>
+</body>
+</html>
