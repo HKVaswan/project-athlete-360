@@ -1,28 +1,19 @@
 /**
  * src/services/reconciliation.service.ts
  * ---------------------------------------------------------------------------
- * 🔍 Reconciliation Service
+ * 🔍 Enterprise Reconciliation Service
  *
- * Responsibilities:
- *  - Periodically reconcile payment transactions with external providers.
- *  - Detect mismatches in payment status, amount, or missing records.
- *  - Automatically fix discrepancies (configurable).
- *  - Generate reconciliation reports and alerts for Super Admin.
- *
- * Features:
- *  - Supports Stripe & Razorpay
- *  - Auto-correction with audit trails
- *  - Super Admin alerting and Slack/webhook support (optional)
- *  - Fault-tolerant job batching (for large data volumes)
+ * Ensures financial consistency between local DB and payment providers.
+ * Detects & auto-corrects mismatched or missing transactions.
  * ---------------------------------------------------------------------------
  */
 
 import { prisma } from "../prismaClient";
 import { logger } from "../logger";
-import { stripeAdapter } from "./stripe.adapter";
-import { razorpayAdapter } from "./razorpay.adapter";
+import { stripeAdapter } from "./billingAdapters/stripe.adapter";
+import { razorpayAdapter } from "./billingAdapters/razorpay.adapter";
 import { createSuperAdminAlert } from "./superAdminAlerts.service";
-import { config } from "../config";
+import { auditService } from "./audit.service";
 
 interface ReconciliationSummary {
   provider: "stripe" | "razorpay";
@@ -38,33 +29,50 @@ interface ReconciliationSummary {
 }
 
 export class ReconciliationService {
+  private static batchSize = 200;
+
   /**
-   * 🧾 Run reconciliation across all providers.
+   * 🚀 Run full reconciliation process for all payment providers
    */
   static async runFullReconciliation(): Promise<ReconciliationSummary[]> {
-    logger.info(`[RECONCILE] 🚀 Starting full reconciliation process...`);
+    logger.info("[RECONCILE] 🔍 Starting enterprise reconciliation...");
 
     const results: ReconciliationSummary[] = [];
 
-    // Reconcile Stripe
     try {
-      const stripeResult = await this.reconcileStripe();
-      results.push(stripeResult);
+      results.push(await this.reconcileStripe());
     } catch (err: any) {
       logger.error("[RECONCILE] ❌ Stripe reconciliation failed", { err });
+      await createSuperAdminAlert({
+        title: "Stripe Reconciliation Error",
+        message: err.message,
+        severity: "high",
+      });
     }
 
-    // Reconcile Razorpay
     try {
-      const razorResult = await this.reconcileRazorpay();
-      results.push(razorResult);
+      results.push(await this.reconcileRazorpay());
     } catch (err: any) {
       logger.error("[RECONCILE] ❌ Razorpay reconciliation failed", { err });
+      await createSuperAdminAlert({
+        title: "Razorpay Reconciliation Error",
+        message: err.message,
+        severity: "high",
+      });
     }
 
+    await prisma.reconciliationReport.create({
+      data: {
+        executedAt: new Date(),
+        summary: results,
+        mismatchedCount: results.reduce((acc, r) => acc + r.mismatched, 0),
+        correctedCount: results.reduce((acc, r) => acc + r.corrected, 0),
+      },
+    });
+
     await createSuperAdminAlert({
-      title: "Reconciliation Complete",
-      message: `Reconciliation summary: ${results.map(r => `${r.provider}: ${r.mismatched} mismatches`).join(", ")}`,
+      title: "Reconciliation Completed",
+      message: `Results: ${results.map(r => `${r.provider}: ${r.mismatched} mismatched`).join(", ")}`,
       category: "billing",
       severity: results.some(r => r.mismatched > 0) ? "medium" : "low",
     });
@@ -72,55 +80,61 @@ export class ReconciliationService {
     return results;
   }
 
-  /**
-   * 💳 Stripe Reconciliation
-   */
+  /* ---------------------------------------------------------------------- */
+  /* 🧾 STRIPE */
+  /* ---------------------------------------------------------------------- */
   private static async reconcileStripe(): Promise<ReconciliationSummary> {
-    logger.info(`[RECONCILE] 🧾 Reconciling Stripe payments...`);
+    logger.info("[RECONCILE] 🔎 Reconciling Stripe...");
 
-    const localPayments = await prisma.billingTransaction.findMany({
-      where: { provider: "stripe" },
-    });
-
+    const total = await prisma.billingTransaction.count({ where: { provider: "stripe" } });
+    let offset = 0;
     let mismatched = 0;
     let corrected = 0;
     const details: ReconciliationSummary["details"] = [];
 
-    for (const tx of localPayments) {
-      try {
-        const remote = await stripeAdapter.fetchPayment(tx.transactionId);
-        if (!remote) continue;
+    while (offset < total) {
+      const localPayments = await prisma.billingTransaction.findMany({
+        where: { provider: "stripe" },
+        skip: offset,
+        take: this.batchSize,
+      });
 
-        // Compare critical fields
-        const localStatus = tx.status;
-        const remoteStatus = remote.status;
-        const localAmount = tx.amountPaid;
-        const remoteAmount = remote.amount / 100;
+      for (const tx of localPayments) {
+        try {
+          const remote = await stripeAdapter.fetchPayment(tx.transactionId);
+          if (!remote) continue;
 
-        if (localStatus !== remoteStatus || localAmount !== remoteAmount) {
-          mismatched++;
-          const actionTaken = await this.resolveDiscrepancy("stripe", tx.id, {
-            localStatus,
-            remoteStatus,
-            localAmount,
-            remoteAmount,
-          });
-          if (actionTaken === "corrected") corrected++;
+          const localStatus = tx.status;
+          const remoteStatus = remote.status;
+          const localAmount = tx.amountPaid;
+          const remoteAmount = remote.amount / 100;
 
-          details.push({
-            transactionId: tx.transactionId,
-            reason: `Mismatch: local(${localStatus}/${localAmount}) vs remote(${remoteStatus}/${remoteAmount})`,
-            actionTaken,
-          });
+          if (localStatus !== remoteStatus || localAmount !== remoteAmount) {
+            mismatched++;
+            const actionTaken = await this.resolveDiscrepancy("stripe", tx.id, {
+              localStatus,
+              remoteStatus,
+              localAmount,
+              remoteAmount,
+            });
+            if (actionTaken === "corrected") corrected++;
+
+            details.push({
+              transactionId: tx.transactionId,
+              reason: `Local(${localStatus}/${localAmount}) vs Remote(${remoteStatus}/${remoteAmount})`,
+              actionTaken,
+            });
+          }
+        } catch (err: any) {
+          logger.warn(`[RECONCILE] ⚠️ Stripe transaction skipped ${tx.transactionId}`, { err });
         }
-      } catch (err: any) {
-        logger.warn(`[RECONCILE] ⚠️ Stripe transaction ${tx.transactionId} skipped`, { err });
       }
+      offset += this.batchSize;
     }
 
     return {
       provider: "stripe",
-      checked: localPayments.length,
+      checked: total,
       mismatched,
       corrected,
       unresolved: mismatched - corrected,
@@ -128,54 +142,61 @@ export class ReconciliationService {
     };
   }
 
-  /**
-   * 💰 Razorpay Reconciliation
-   */
+  /* ---------------------------------------------------------------------- */
+  /* 💰 RAZORPAY */
+  /* ---------------------------------------------------------------------- */
   private static async reconcileRazorpay(): Promise<ReconciliationSummary> {
-    logger.info(`[RECONCILE] 💰 Reconciling Razorpay payments...`);
+    logger.info("[RECONCILE] 💰 Reconciling Razorpay...");
 
-    const localPayments = await prisma.billingTransaction.findMany({
-      where: { provider: "razorpay" },
-    });
-
+    const total = await prisma.billingTransaction.count({ where: { provider: "razorpay" } });
+    let offset = 0;
     let mismatched = 0;
     let corrected = 0;
     const details: ReconciliationSummary["details"] = [];
 
-    for (const tx of localPayments) {
-      try {
-        const remote = await razorpayAdapter.fetchPayment(tx.transactionId);
-        if (!remote) continue;
+    while (offset < total) {
+      const localPayments = await prisma.billingTransaction.findMany({
+        where: { provider: "razorpay" },
+        skip: offset,
+        take: this.batchSize,
+      });
 
-        const localStatus = tx.status;
-        const remoteStatus = remote.status;
-        const localAmount = tx.amountPaid;
-        const remoteAmount = remote.amount / 100;
+      for (const tx of localPayments) {
+        try {
+          const remote = await razorpayAdapter.fetchPayment(tx.transactionId);
+          if (!remote) continue;
 
-        if (localStatus !== remoteStatus || localAmount !== remoteAmount) {
-          mismatched++;
-          const actionTaken = await this.resolveDiscrepancy("razorpay", tx.id, {
-            localStatus,
-            remoteStatus,
-            localAmount,
-            remoteAmount,
-          });
-          if (actionTaken === "corrected") corrected++;
+          const localStatus = tx.status;
+          const remoteStatus = remote.status;
+          const localAmount = tx.amountPaid;
+          const remoteAmount = remote.amount / 100;
 
-          details.push({
-            transactionId: tx.transactionId,
-            reason: `Mismatch: local(${localStatus}/${localAmount}) vs remote(${remoteStatus}/${remoteAmount})`,
-            actionTaken,
-          });
+          if (localStatus !== remoteStatus || localAmount !== remoteAmount) {
+            mismatched++;
+            const actionTaken = await this.resolveDiscrepancy("razorpay", tx.id, {
+              localStatus,
+              remoteStatus,
+              localAmount,
+              remoteAmount,
+            });
+            if (actionTaken === "corrected") corrected++;
+
+            details.push({
+              transactionId: tx.transactionId,
+              reason: `Local(${localStatus}/${localAmount}) vs Remote(${remoteStatus}/${remoteAmount})`,
+              actionTaken,
+            });
+          }
+        } catch (err: any) {
+          logger.warn(`[RECONCILE] ⚠️ Razorpay transaction skipped ${tx.transactionId}`, { err });
         }
-      } catch (err: any) {
-        logger.warn(`[RECONCILE] ⚠️ Razorpay transaction ${tx.transactionId} skipped`, { err });
       }
+      offset += this.batchSize;
     }
 
     return {
       provider: "razorpay",
-      checked: localPayments.length,
+      checked: total,
       mismatched,
       corrected,
       unresolved: mismatched - corrected,
@@ -183,36 +204,52 @@ export class ReconciliationService {
     };
   }
 
-  /**
-   * 🛠️ Resolve discrepancies (auto-correct or mark for review)
-   */
+  /* ---------------------------------------------------------------------- */
+  /* 🛠️ Resolve Mismatch */
+  /* ---------------------------------------------------------------------- */
   private static async resolveDiscrepancy(
     provider: "stripe" | "razorpay",
     transactionId: string,
     info: any
   ): Promise<"corrected" | "flagged"> {
     try {
-      // Auto-correct if remote payment was successful but local isn’t
-      if (info.remoteStatus === "succeeded" && info.localStatus !== "succeeded") {
-        await prisma.billingTransaction.update({
-          where: { id: transactionId },
-          data: {
-            status: "succeeded",
-            amountPaid: info.remoteAmount,
-            reconciledAt: new Date(),
-          },
-        });
-        logger.info(`[RECONCILE] ✅ Auto-corrected ${provider} transaction ${transactionId}`);
-        return "corrected";
-      }
+      return await prisma.$transaction(async tx => {
+        if (info.remoteStatus === "succeeded" && info.localStatus !== "succeeded") {
+          await tx.billingTransaction.update({
+            where: { id: transactionId },
+            data: {
+              status: "succeeded",
+              amountPaid: info.remoteAmount,
+              reconciledAt: new Date(),
+            },
+          });
 
-      // Flag for manual review otherwise
-      await prisma.billingTransaction.update({
-        where: { id: transactionId },
-        data: { flagged: true },
+          await auditService.record({
+            actorId: "system",
+            actorRole: "system",
+            action: "AUTO_CORRECT_PAYMENT",
+            details: { provider, transactionId, info },
+          });
+
+          logger.info(`[RECONCILE] ✅ Auto-corrected ${provider} transaction ${transactionId}`);
+          return "corrected";
+        }
+
+        await tx.billingTransaction.update({
+          where: { id: transactionId },
+          data: { flagged: true },
+        });
+
+        await auditService.record({
+          actorId: "system",
+          actorRole: "system",
+          action: "FLAG_PAYMENT_DISCREPANCY",
+          details: { provider, transactionId, info },
+        });
+
+        logger.warn(`[RECONCILE] ⚠️ Flagged ${provider} transaction ${transactionId}`);
+        return "flagged";
       });
-      logger.warn(`[RECONCILE] ⚠️ Flagged ${provider} transaction ${transactionId} for review`);
-      return "flagged";
     } catch (err: any) {
       logger.error(`[RECONCILE] ❌ Failed to resolve discrepancy for ${transactionId}`, { err });
       return "flagged";
