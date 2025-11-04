@@ -197,3 +197,113 @@ export const uploadBackupToCloud = async (backupPath: string) => {
     return { ...result, checksum };
   } catch (err: any) {
     logger.error(`[BACKUP:${jobId}] ❌ Upload failed: ${err.message}`);
+    await addNotificationJob({
+      type: "criticalAlert",
+      title: "Backup Upload Failure",
+      message: err.message,
+      severity: "high",
+    });
+
+    await auditService.record({
+      actorId: "system",
+      actorRole: "SYSTEM",
+      action: "BACKUP_UPLOAD_FAILED",
+      details: { error: err.message },
+    });
+
+    throw err;
+  }
+};
+
+/* ──────────────────────────────────────────────── */
+/* 🧹 Local backup cleanup with retention policy    */
+/* ──────────────────────────────────────────────── */
+export const cleanupOldBackups = async (retentionDays = 7) => {
+  ensureBackupDir();
+  const now = Date.now();
+  let deletedCount = 0;
+
+  try {
+    const files = fs.readdirSync(BACKUP_DIR);
+    for (const file of files) {
+      const filePath = path.join(BACKUP_DIR, file);
+      const stats = fs.statSync(filePath);
+      if (now - stats.mtimeMs > retentionDays * 24 * 60 * 60 * 1000) {
+        fs.unlinkSync(filePath);
+        deletedCount++;
+      }
+    }
+
+    if (deletedCount > 0) {
+      logger.info(`[BACKUP] 🧹 Deleted ${deletedCount} old backups`);
+      await addNotificationJob({
+        type: "info",
+        title: "Old Backups Cleaned",
+        message: `${deletedCount} backups removed after ${retentionDays} days`,
+      });
+    }
+  } catch (err: any) {
+    logger.error(`[BACKUP] ⚠️ Cleanup failed: ${err.message}`);
+  }
+};
+
+/* ──────────────────────────────────────────────── */
+/* 🪄 Full Backup Pipeline                         */
+/* ──────────────────────────────────────────────── */
+export const runFullBackup = async () => {
+  const jobId = crypto.randomUUID();
+  logger.info(`[BACKUP:${jobId}] 🚀 Starting backup pipeline...`);
+
+  try {
+    const backupPath = await createDatabaseBackup();
+    const cloudResult = await uploadBackupToCloud(backupPath);
+    await cleanupOldBackups(7);
+
+    await addNotificationJob({
+      type: "info",
+      title: "Database Backup Completed",
+      message: `Backup uploaded successfully.\nKey: ${cloudResult.key}\nChecksum: ${cloudResult.checksum}`,
+    });
+
+    await auditService.record({
+      actorId: "system",
+      actorRole: "SYSTEM",
+      action: "BACKUP_COMPLETED",
+      details: { key: cloudResult.key, checksum: cloudResult.checksum },
+    });
+
+    logger.info(`[BACKUP:${jobId}] ✅ Backup pipeline completed successfully.`);
+  } catch (err: any) {
+    logger.error(`[BACKUP:${jobId}] ❌ Backup pipeline failed: ${err.message}`);
+    await addNotificationJob({
+      type: "criticalAlert",
+      title: "Backup Pipeline Failure",
+      message: err.message,
+      severity: "high",
+    });
+  }
+};
+
+/* ──────────────────────────────────────────────── */
+/* 🧩 Super Admin Restore (placeholder)             */
+/* ──────────────────────────────────────────────── */
+export const restoreDatabaseBackup = async (backupKey: string, actorRole?: string) => {
+  if (actorRole !== "SUPER_ADMIN") {
+    throw new Error("Unauthorized: Only Super Admins can trigger restore.");
+  }
+
+  if (!process.env.ALLOW_DB_RESTORE) {
+    throw new Error("Database restoration is disabled for safety.");
+  }
+
+  logger.warn(`[RESTORE] ⚠️ Restore initiated for: ${backupKey}`);
+
+  await auditService.record({
+    actorId: "system",
+    actorRole: "SUPER_ADMIN",
+    action: "RESTORE_INITIATED",
+    details: { backupKey },
+  });
+
+  return { success: true, message: "Restore placeholder (use restoreClient.ts in production)" };
+};
