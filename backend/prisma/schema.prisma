@@ -1,26 +1,18 @@
 // prisma/schema.prisma
 // -------------------------------------------------------------------------
-// 🧠 Enterprise-Grade Schema for Project Athlete 360
-// Database: PostgreSQL
-// -------------------------------------------------------------------------
-// Features:
-//  - Invitation & Onboarding Flow
-//  - Role-based Access Control (RBAC)
-//  - Subscription + Billing + Invoices
-//  - Trial Abuse Prevention (hashed fingerprint tracking)
-//  - Audit Log with immutable chain
-//  - IP Blocking, System Alerts, Email Logs
-//  - Scalable institution model
+// Enterprise-Grade Schema for Project Athlete 360
+// PostgreSQL assumed (set DATABASE_URL in .env)
 // -------------------------------------------------------------------------
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   previewFeatures = ["clientExtensions"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  // connectionLimit may be tuned in deployment environment
 }
 
 //
@@ -64,30 +56,49 @@ enum Attendance {
   EXCUSED
 }
 
+enum BillingProvider {
+  STRIPE
+  RAZORPAY
+  MANUAL
+}
+
+enum BillingTransactionStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+  FLAGGED
+}
+
 //
 // Core Models
 //
 
 model User {
-  id             String          @id @default(uuid())
-  username       String          @unique
-  email          String?         @unique
-  passwordHash   String
-  name           String?
-  role           Role            @default(ATHLETE)
-  institution    Institution?    @relation(fields: [institutionId], references: [id])
-  institutionId  String?
-  athlete        Athlete?
-  coach          Coach?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  loginSessions  LoginSession[]
-  refreshTokens  RefreshToken[]
-  notifications  Notification[]
-  invitations    Invitation[]    @relation("InvitedBy")
-  acceptedInvites Invitation[]   @relation("AcceptedBy")
-  auditLogs      AuditLog[]
-  meta           Json?
+  id              String        @id @default(uuid())
+  username        String        @unique
+  email           String?       @unique
+  passwordHash    String
+  name            String?
+  role            Role          @default(ATHLETE)
+  institution     Institution?  @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+  institutionId   String?
+  athlete         Athlete?
+  coach           Coach?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  loginSessions   LoginSession[]
+  refreshTokens   RefreshToken[]
+  notifications   Notification[]
+  invitations     Invitation[]  @relation("InvitedBy")
+  acceptedInvites Invitation[]  @relation("AcceptedBy")
+  auditLogs       AuditLog[]
+  meta            Json?
+  // soft delete pattern (if needed)
+  deleted         Boolean       @default(false)
+  deletedAt       DateTime?
+  @@index([email])
+  @@index([role])
 }
 
 model Institution {
@@ -107,9 +118,11 @@ model Institution {
   invoices            Invoice[]
   systemBackups       SystemBackup[]
   trialAbuseLogs      TrialAbuseLog[]
+  presignedUploads    PresignedUpload[]
+  billingTransactions BillingTransaction[]
   meta                Json?
-
   @@index([code])
+  @@index([domain])
 }
 
 //
@@ -118,7 +131,7 @@ model Institution {
 
 model Athlete {
   id             String        @id @default(uuid())
-  user           User          @relation(fields: [userId], references: [id])
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId         String        @unique
   athleteCode    String        @unique
   name           String
@@ -127,19 +140,22 @@ model Athlete {
   gender         String?
   contactInfo    String?
   approved       Boolean       @default(false)
-  institution    Institution?  @relation(fields: [institutionId], references: [id])
+  institution    Institution?  @relation(fields: [institutionId], references: [id], onDelete: SetNull)
   institutionId  String?
   sessions       Session[]
   analytics      AthleteAnalytics?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   meta           Json?
+  deleted        Boolean       @default(false)
+  deletedAt      DateTime?
   @@index([athleteCode])
+  @@index([institutionId])
 }
 
 model Coach {
   id             String              @id @default(uuid())
-  user           User                @relation(fields: [userId], references: [id])
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId         String              @unique
   coachCode      String              @unique
   name           String?
@@ -147,16 +163,21 @@ model Coach {
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
   meta           Json?
+  deleted        Boolean             @default(false)
+  deletedAt      DateTime?
+  @@index([coachCode])
 }
 
 model CoachInstitution {
   id             String      @id @default(uuid())
-  coach          Coach       @relation(fields: [coachId], references: [id])
+  coach          Coach       @relation(fields: [coachId], references: [id], onDelete: Cascade)
   coachId        String
-  institution    Institution @relation(fields: [institutionId], references: [id])
+  institution    Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
   institutionId  String
   createdAt      DateTime    @default(now())
+
   @@unique([coachId, institutionId])
+  @@index([institutionId])
 }
 
 //
@@ -165,7 +186,7 @@ model CoachInstitution {
 
 model Session {
   id              String      @id @default(uuid())
-  athlete         Athlete     @relation(fields: [athleteId], references: [id])
+  athlete         Athlete     @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   athleteId       String
   coachId         String?
   attendance      Attendance?
@@ -183,24 +204,24 @@ model Session {
 //
 
 model Invitation {
-  id              String        @id @default(uuid())
+  id              String            @id @default(uuid())
   email           String
   role            Role
   tokenHash       String
-  invitedBy       User          @relation("InvitedBy", fields: [invitedById], references: [id])
+  invitedBy       User              @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: Cascade)
   invitedById     String
-  institution     Institution   @relation(fields: [institutionId], references: [id])
+  institution     Institution       @relation(fields: [institutionId], references: [id], onDelete: Cascade)
   institutionId   String
-  acceptedBy      User?         @relation("AcceptedBy", fields: [acceptedById], references: [id])
+  acceptedBy      User?             @relation("AcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
   acceptedById    String?
-  status          InvitationStatus @default(PENDING)
+  status          InvitationStatus  @default(PENDING)
   message         String?
   expiresAt       DateTime
   acceptedAt      DateTime?
   revokedAt       DateTime?
   revokeReason    String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   @@index([email])
   @@index([status])
@@ -213,7 +234,7 @@ model Invitation {
 
 model RefreshToken {
   id          String   @id @default(uuid())
-  user        User     @relation(fields: [userId], references: [id])
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId      String
   tokenHash   String
   deviceInfo  String?
@@ -228,13 +249,14 @@ model RefreshToken {
 
 model LoginSession {
   id          String   @id @default(uuid())
-  user        User     @relation(fields: [userId], references: [id])
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId      String
   ipAddress   String?
   userAgent   String?
   loggedInAt  DateTime @default(now())
   meta        Json?
   createdAt   DateTime @default(now())
+  @@index([userId])
 }
 
 //
@@ -261,15 +283,15 @@ model Plan {
 
 model Subscription {
   id                      String             @id @default(uuid())
-  institution              Institution        @relation(fields: [institutionId], references: [id])
+  institution              Institution        @relation(fields: [institutionId], references: [id], onDelete: Cascade)
   institutionId            String
-  plan                     Plan               @relation(fields: [planId], references: [id])
+  plan                     Plan               @relation(fields: [planId], references: [id], onDelete: Restrict)
   planId                   String
   status                   SubscriptionStatus @default(TRIALING)
   startDate                DateTime           @default(now())
   endDate                  DateTime?
   nextBillingDate          DateTime?
-  paymentProvider          String?
+  paymentProvider          BillingProvider?
   providerCustomerId       String?
   providerSubscriptionId   String?
   usedFreeTrial            Boolean            @default(false)
@@ -284,9 +306,9 @@ model Subscription {
 
 model PaymentMethod {
   id                 String      @id @default(uuid())
-  institution        Institution @relation(fields: [institutionId], references: [id])
+  institution        Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
   institutionId      String
-  provider           String
+  provider           BillingProvider
   providerPaymentId  String
   cardBrand          String?
   last4              String?
@@ -300,9 +322,9 @@ model PaymentMethod {
 
 model Invoice {
   id                 String       @id @default(uuid())
-  institution        Institution  @relation(fields: [institutionId], references: [id])
+  institution        Institution  @relation(fields: [institutionId], references: [id], onDelete: Cascade)
   institutionId      String
-  subscription       Subscription? @relation(fields: [subscriptionId], references: [id])
+  subscription       Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
   subscriptionId     String?
   amountCents        Int
   currency           String       @default("INR")
@@ -317,11 +339,48 @@ model Invoice {
 }
 
 //
+// Billing Transactions & Events (for reconciliation/audit)
+//
+
+model BillingTransaction {
+  id              String                     @id @default(uuid())
+  provider        BillingProvider
+  transactionId   String                     @unique
+  institution     Institution?               @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+  institutionId   String?
+  amountPaid      Float
+  currency        String                     @default("INR")
+  status          BillingTransactionStatus
+  reconciledAt    DateTime?
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+  flagged         Boolean                    @default(false)
+  metadata        Json?
+  billingEvents   BillingEvent[]
+  @@index([provider])
+  @@index([institutionId])
+  @@index([status])
+}
+
+model BillingEvent {
+  id            String   @id @default(uuid())
+  eventId       String   @unique
+  type          String
+  provider      BillingProvider
+  billingTx     BillingTransaction?   @relation(fields: [billingTransactionId], references: [id], onDelete: SetNull)
+  billingTransactionId String?
+  payload       Json?
+  createdAt     DateTime @default(now())
+  @@index([provider])
+  @@index([eventId])
+}
+
+//
 // Usage Tracking
 //
 
 model InstitutionUsage {
-  institution      Institution @relation(fields: [institutionId], references: [id])
+  institution      Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
   institutionId    String      @id
   storageBytes     BigInt      @default(0)
   videoCountMonth  Int         @default(0)
@@ -333,21 +392,22 @@ model InstitutionUsage {
 }
 
 //
-// Security + Anti-Abuse
+// Trial & Anti-abuse
 //
 
 model TrialAbuseLog {
-  id              String     @id @default(uuid())
-  userId          String?
-  institution     Institution? @relation(fields: [institutionId], references: [id])
-  institutionId   String?
-  hashedIp        String
-  hashedUA        String?
-  hashedDevice    String?
+  id                String     @id @default(uuid())
+  userId            String?
+  institution       Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+  institutionId     String?
+  hashedIp          String
+  hashedUA          String?
+  hashedDevice      String?
   hashedEmailDomain String?
-  createdAt       DateTime   @default(now())
+  createdAt         DateTime   @default(now())
   @@index([hashedIp])
   @@index([institutionId])
+  @@index([createdAt])
 }
 
 model BlockedIP {
@@ -357,6 +417,16 @@ model BlockedIP {
   blockedById String?
   createdAt   DateTime @default(now())
   expiresAt   DateTime?
+  resolved    Boolean  @default(false)
+  meta        Json?
+}
+
+model IPReputation {
+  id        String   @id @default(uuid())
+  ipHash    String   @unique
+  score     Int      @default(0)
+  lastSeen  DateTime @default(now())
+  meta      Json?
 }
 
 model SystemAlert {
@@ -368,6 +438,7 @@ model SystemAlert {
   metadata    Json?
   resolved    Boolean  @default(false)
   createdAt   DateTime @default(now())
+  resolvedAt  DateTime?
 }
 
 model EmailLog {
@@ -379,6 +450,32 @@ model EmailLog {
   error       String?
   createdAt   DateTime @default(now())
   meta        Json?
+}
+
+//
+// Backups & Key Management
+//
+
+model SystemBackup {
+  id          String   @id @default(uuid())
+  key         String
+  sizeBytes   BigInt
+  checksum    String
+  status      String
+  institution Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+  institutionId String?
+  createdAt   DateTime @default(now())
+  meta        Json?
+}
+
+model KeyBackup {
+  id            String   @id @default(uuid())
+  backupId      String   @unique
+  jwtSecret     String   // encrypted storage recommended (or stored in secrets manager)
+  encryptionKey String
+  createdAt     DateTime @default(now())
+  meta          Json?
+  // retention policy implemented at worker/service level
 }
 
 //
@@ -403,22 +500,24 @@ model AuditLog {
 }
 
 //
-// Notifications
+// File Uploads / Presigned URLs
 //
 
-model Notification {
-  id          String   @id @default(uuid())
-  user        User     @relation(fields: [userId], references: [id])
-  userId      String
-  type        String
-  title       String
-  body        String
-  meta        Json?
-  status      String   @default("pending")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  @@index([userId])
-  @@index([type])
+model PresignedUpload {
+  id            String      @id @default(uuid())
+  institution   Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+  institutionId String?
+  fileKey       String      @unique
+  fileUrl       String?
+  fileSize      BigInt?
+  fileType      String?
+  createdBy     String?
+  createdAt     DateTime    @default(now())
+  expiresAt     DateTime
+  used          Boolean     @default(false)
+  meta          Json?
+  @@index([institutionId])
+  @@index([fileKey])
 }
 
 //
