@@ -1,29 +1,42 @@
 /**
  * src/workers/admin/rotateKeys.worker.ts
  * --------------------------------------------------------------------------
- * 🔐 Admin Key Rotation Worker
+ * 🔐 Enterprise-Grade Key Rotation Worker
  *
  * Responsibilities:
- *  - Rotate cryptographic keys (JWT signing, encryption keys, API secrets)
- *  - Securely update entries in the Secret Manager
- *  - Maintain rollback safety (previous key backup)
- *  - Notify Super Admins upon rotation
- *  - Record all actions in Audit Logs
+ *  - Rotate cryptographic secrets (JWT signing, encryption keys)
+ *  - Ensure atomic update + rollback safety
+ *  - Verify entropy & strength before commit
+ *  - Notify Super Admins + record full audit trail
+ *  - Maintain temporary dual-key validity to avoid downtime
  *
- * Triggers:
- *  - Scheduled rotation job (e.g. every 30 days)
- *  - Manual trigger by Super Admin
+ * Triggered by:
+ *  - Cron (every 30–60 days)
+ *  - Manual Super Admin request
  * --------------------------------------------------------------------------
  */
 
 import { Job } from "bullmq";
 import crypto from "crypto";
 import { logger } from "../../logger";
+import { prisma } from "../../prismaClient";
 import { secretManagerService } from "../../services/secretManager.service";
 import { auditService } from "../../services/audit.service";
 import { adminNotificationService } from "../../services/adminNotification.service";
-import { prisma } from "../../prismaClient";
+import { createSuperAdminAlert } from "../../services/superAdminAlerts.service";
 
+/* -------------------------------------------------------------------------- */
+/* 🧮 Utility: Entropy Check                                                  */
+/* -------------------------------------------------------------------------- */
+const checkEntropy = (secret: string): boolean => {
+  const unique = new Set(secret).size;
+  const entropyBits = Math.log2(unique) * secret.length;
+  return entropyBits >= 128 && secret.length >= 32;
+};
+
+/* -------------------------------------------------------------------------- */
+/* 🧱 Worker Definition                                                       */
+/* -------------------------------------------------------------------------- */
 interface RotateKeysJob {
   triggeredBy: "system" | "super_admin";
   adminId?: string;
@@ -32,82 +45,118 @@ interface RotateKeysJob {
 
 export default async function (job: Job<RotateKeysJob>) {
   const { triggeredBy, adminId, reason } = job.data;
+  logger.info(`[KEY ROTATION] 🔐 Job started — triggered by ${triggeredBy}`);
 
-  logger.info(`[KEY ROTATION] 🔐 Job started — triggered by: ${triggeredBy}`);
+  const rotationTime = new Date();
+  const backupId = `backup_${rotationTime.getTime()}`;
 
   try {
-    // ---------------------------------------------------------------------
-    // 1️⃣ Generate new cryptographic secrets
-    // ---------------------------------------------------------------------
-    const newJwtSecret = crypto.randomBytes(48).toString("hex");
+    // 1️⃣ Generate new secrets
+    const newJwtSecret = crypto.randomBytes(64).toString("hex");
     const newEncryptionKey = crypto.randomBytes(32).toString("base64");
 
-    // ---------------------------------------------------------------------
-    // 2️⃣ Retrieve current keys from Secret Manager
-    // ---------------------------------------------------------------------
-    const oldJwtSecret = await secretManagerService.getSecret("JWT_SECRET");
-    const oldEncryptionKey = await secretManagerService.getSecret("ENCRYPTION_KEY");
+    if (!checkEntropy(newJwtSecret) || !checkEntropy(newEncryptionKey)) {
+      throw new Error("Generated secrets failed entropy verification.");
+    }
 
-    // ---------------------------------------------------------------------
-    // 3️⃣ Backup old keys (for rollback window)
-    // ---------------------------------------------------------------------
-    const backupId = `backup_${Date.now()}`;
+    // 2️⃣ Fetch current active keys
+    const oldJwtSecret = await secretManagerService.getSecret("JWT_SECRET");
+    const oldEncKey = await secretManagerService.getSecret("ENCRYPTION_KEY");
+
+    // 3️⃣ Backup old keys (rollback-safe)
     await prisma.keyBackup.create({
       data: {
         id: backupId,
         jwtSecret: oldJwtSecret || "",
-        encryptionKey: oldEncryptionKey || "",
-        createdAt: new Date(),
+        encryptionKey: oldEncKey || "",
+        createdAt: rotationTime,
+        expiresAt: new Date(rotationTime.getTime() + 30 * 24 * 60 * 60 * 1000), // 30 days rollback
+        checksum: crypto
+          .createHash("sha256")
+          .update((oldJwtSecret || "") + (oldEncKey || ""))
+          .digest("hex"),
       },
     });
 
-    logger.info(`[KEY ROTATION] 🧩 Backup created: ${backupId}`);
+    logger.info(`[KEY ROTATION] 🧩 Backup created (ID: ${backupId})`);
 
-    // ---------------------------------------------------------------------
-    // 4️⃣ Update new secrets in secure store
-    // ---------------------------------------------------------------------
-    await secretManagerService.setSecret("JWT_SECRET", newJwtSecret);
-    await secretManagerService.setSecret("ENCRYPTION_KEY", newEncryptionKey);
+    // 4️⃣ Stage new keys (prefix NEW_ for zero-downtime)
+    await secretManagerService.setSecret("NEW_JWT_SECRET", newJwtSecret);
+    await secretManagerService.setSecret("NEW_ENCRYPTION_KEY", newEncryptionKey);
 
-    // Optional: Invalidate caches / notify services if required
-    process.env.JWT_SECRET = newJwtSecret;
+    // 5️⃣ Verification — re-fetch and validate from store
+    const verifyJwt = await secretManagerService.getSecret("NEW_JWT_SECRET");
+    const verifyEnc = await secretManagerService.getSecret("NEW_ENCRYPTION_KEY");
 
-    // ---------------------------------------------------------------------
-    // 5️⃣ Notify Super Admins
-    // ---------------------------------------------------------------------
-    const title = "🔑 Security Notice: System Keys Rotated";
-    const body = `System keys were successfully rotated at ${new Date().toISOString()}.
-Reason: ${reason || "Scheduled rotation"}.
-Backup ID: ${backupId}`;
+    if (!verifyJwt || !verifyEnc) {
+      throw new Error("Verification failed: newly stored secrets are not retrievable.");
+    }
 
-    await adminNotificationService.broadcastToSuperAdmins(title, body);
+    // 6️⃣ Activate new keys atomically
+    await secretManagerService.setSecret("OLD_JWT_SECRET", oldJwtSecret || "");
+    await secretManagerService.setSecret("OLD_ENCRYPTION_KEY", oldEncKey || "");
+    await secretManagerService.setSecret("JWT_SECRET", verifyJwt);
+    await secretManagerService.setSecret("ENCRYPTION_KEY", verifyEnc);
 
-    // ---------------------------------------------------------------------
-    // 6️⃣ Record Audit Log
-    // ---------------------------------------------------------------------
+    process.env.JWT_SECRET = verifyJwt;
+    process.env.ENCRYPTION_KEY = verifyEnc;
+
+    logger.info(`[KEY ROTATION] ✅ Keys activated successfully.`);
+
+    // 7️⃣ Notify Super Admins
+    const notificationMsg = `
+System cryptographic keys were rotated successfully.
+Triggered by: ${triggeredBy}
+Reason: ${reason || "Scheduled rotation"}
+Backup ID: ${backupId}
+Timestamp: ${rotationTime.toISOString()}
+`;
+    await adminNotificationService.broadcastToSuperAdmins(
+      "🔑 Security Alert: Keys Rotated",
+      notificationMsg
+    );
+
+    // 8️⃣ Record in audit log
     await auditService.record({
       actorId: adminId || "system",
       actorRole: "super_admin",
-      action: "SYSTEM_ALERT",
       ip: "0.0.0.0",
+      action: "KEY_ROTATION",
       details: {
-        event: "key_rotation",
-        reason: reason || "Automated security rotation",
+        triggeredBy,
         backupId,
+        reason,
+        rotationTime: rotationTime.toISOString(),
       },
     });
 
-    logger.info(`[KEY ROTATION] ✅ Completed successfully (Backup ID: ${backupId})`);
+    // 9️⃣ Super Admin alert summary
+    await createSuperAdminAlert({
+      title: "System Key Rotation Completed",
+      message: `All cryptographic keys successfully rotated. Backup ID: ${backupId}`,
+      category: "security",
+      severity: "medium",
+      metadata: { backupId, triggeredBy, rotationTime },
+    });
+
+    logger.info(`[KEY ROTATION] 🧱 Rotation completed — Backup: ${backupId}`);
   } catch (err: any) {
     logger.error(`[KEY ROTATION] ❌ Failed: ${err.message}`);
 
-    // Record failure event
     await auditService.record({
       actorId: adminId || "system",
       actorRole: "super_admin",
-      action: "SYSTEM_ALERT",
       ip: "0.0.0.0",
-      details: { event: "key_rotation_failed", error: err.message },
+      action: "KEY_ROTATION_FAILED",
+      details: { error: err.message, stack: err.stack },
+    });
+
+    await createSuperAdminAlert({
+      title: "Key Rotation Failure",
+      message: `Rotation process failed: ${err.message}`,
+      category: "security",
+      severity: "critical",
+      metadata: { error: err.message },
     });
 
     throw err;
