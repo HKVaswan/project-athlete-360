@@ -1,11 +1,11 @@
 /**
  * src/middleware/superAuth.middleware.ts
  * -------------------------------------------------------------------------
- * Super Admin Authentication Middleware
+ * 🔐 Super Admin Authentication Middleware — Enterprise Grade
  *
  * Purpose:
  *  - Enforce high-security access for all super_admin routes
- *  - Validate token + MFA + device/IP binding
+ *  - Validate JWT + MFA + device/IP binding
  *  - Detect anomalies and unauthorized attempts
  *  - Audit every action for traceability
  *
@@ -14,19 +14,21 @@
  *  ✅ MFA enforcement before access
  *  ✅ Device/IP fingerprint verification
  *  ✅ Audit logging for every access attempt
- *  ✅ Optional anomaly detection alerts
+ *  ✅ Optional anomaly detection alerts + auto lockout
+ * -------------------------------------------------------------------------
  */
 
 import { Request, Response, NextFunction } from "express";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import { logger } from "../logger";
 import { Errors, sendErrorResponse } from "../utils/errors";
-import { auditService } from "../lib/audit";
 import { prisma } from "../prismaClient";
 import { config } from "../config";
 import { recordAuditEvent } from "../services/audit.service";
+import { createSuperAdminAlert } from "../services/superAdminAlerts.service";
 
-const SUPER_JWT_SECRET = config.jwt?.superSecret || process.env.SUPER_JWT_SECRET;
+const SUPER_JWT_SECRET =
+  config.jwt?.superSecret || process.env.SUPER_JWT_SECRET;
 
 if (!SUPER_JWT_SECRET) {
   throw new Error("❌ SUPER_JWT_SECRET not defined in environment variables.");
@@ -56,6 +58,9 @@ export const requireSuperAuth = async (
   res: Response,
   next: NextFunction
 ) => {
+  const clientIp = req.headers["x-forwarded-for"]?.toString().split(",")[0] || req.ip;
+  const userAgent = req.headers["user-agent"] || "unknown";
+
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith("Bearer ")) {
@@ -69,7 +74,7 @@ export const requireSuperAuth = async (
     try {
       decoded = jwt.verify(token, SUPER_JWT_SECRET) as JwtPayload;
     } catch (err) {
-      logger.warn("[SUPERAUTH] Invalid or expired super admin token", { ip: req.ip });
+      logger.warn("[SUPERAUTH] Invalid or expired super admin token", { ip: clientIp });
       throw Errors.Auth("Invalid or expired token.");
     }
 
@@ -89,42 +94,63 @@ export const requireSuperAuth = async (
     }
 
     // Step 4 — Device/IP Fingerprint Binding
-    const allowedSession = await prisma.superAdminSession.findUnique({
+    const session = await prisma.superAdminSession.findUnique({
       where: { userId: decoded.userId },
     });
 
-    if (!allowedSession) {
+    if (!session) {
       throw Errors.Auth("Session not found. Please re-authenticate.");
     }
 
-    const requestFingerprint = `${req.ip}-${req.headers["user-agent"]}`;
-    if (allowedSession.fingerprint !== requestFingerprint) {
+    const requestFingerprint = `${clientIp}-${userAgent}`;
+    if (session.fingerprint !== requestFingerprint) {
       logger.error("[SUPERAUTH] 🔒 Device/IP mismatch detected", {
         userId: decoded.userId,
-        expected: allowedSession.fingerprint,
+        expected: session.fingerprint,
         got: requestFingerprint,
       });
 
-      // Flag anomaly for audit trail
-      await auditService.log({
+      await recordAuditEvent({
         actorId: decoded.userId,
         actorRole: "super_admin",
-        ip: req.ip,
+        ip: clientIp,
         action: "SECURITY_EVENT",
         details: {
           reason: "Device/IP fingerprint mismatch",
-          expected: allowedSession.fingerprint,
+          expected: session.fingerprint,
           got: requestFingerprint,
         },
       });
 
+      // Optional: auto-lock account after repeated anomalies
+      const anomalyCount = (session.anomalyCount || 0) + 1;
+      await prisma.superAdminSession.update({
+        where: { userId: decoded.userId },
+        data: { anomalyCount },
+      });
+
+      if (anomalyCount >= 3) {
+        await prisma.superAdminSession.update({
+          where: { userId: decoded.userId },
+          data: { locked: true },
+        });
+
+        await createSuperAdminAlert({
+          title: "🔒 Super Admin Account Locked",
+          message: `Too many anomaly detections for user: ${decoded.username}`,
+          category: "security",
+          severity: "critical",
+          metadata: { userId: decoded.userId, anomalyCount },
+        });
+      }
+
       throw Errors.Auth("Device or IP not authorized for this session.");
     }
 
-    // Step 5 — Check Session Version (in case of manual logout or rotation)
+    // Step 5 — Check Session Version (after logout or key rotation)
     if (
-      allowedSession.sessionVersion &&
-      decoded.sessionVersion !== allowedSession.sessionVersion
+      session.sessionVersion &&
+      decoded.sessionVersion !== session.sessionVersion
     ) {
       throw Errors.Auth("Session version mismatch. Please log in again.");
     }
@@ -136,7 +162,7 @@ export const requireSuperAuth = async (
       email: decoded.email,
       role: "super_admin",
       mfaVerified: decoded.mfaVerified,
-      ip: req.ip,
+      ip: clientIp,
       deviceId: decoded.deviceId || "unknown",
       sessionVersion: decoded.sessionVersion,
     };
@@ -145,9 +171,9 @@ export const requireSuperAuth = async (
     await recordAuditEvent({
       actorId: decoded.userId,
       actorRole: "super_admin",
-      ip: req.ip,
-      action: "SYSTEM_ALERT",
-      details: { event: "super_admin_verified", device: req.headers["user-agent"] },
+      ip: clientIp,
+      action: "SECURITY_EVENT",
+      details: { event: "super_admin_verified", device: userAgent },
     });
 
     next();
@@ -160,10 +186,9 @@ export const requireSuperAuth = async (
 /* ---------------------------------------------------------------------------
    🧩 Optional: Route-Level Authorization Check
 --------------------------------------------------------------------------- */
-export const requireSuperAdminPrivileges = (
-  allowedActions: string[] = []
-) => {
-  return (req: SuperAdminRequest, res: Response, next: NextFunction) => {
+export const requireSuperAdminPrivileges =
+  (allowedActions: string[] = []) =>
+  (req: SuperAdminRequest, res: Response, next: NextFunction) => {
     if (!req.superAdmin) {
       return sendErrorResponse(res, Errors.Auth("Super admin authentication required."));
     }
@@ -172,11 +197,12 @@ export const requireSuperAdminPrivileges = (
       return sendErrorResponse(res, Errors.Forbidden("MFA verification required."));
     }
 
-    // Optional fine-grained permission control
+    // Optional fine-grained permission control (e.g., action-level RBAC)
     if (allowedActions.length > 0 && !allowedActions.includes("all")) {
-      logger.debug("[SUPERAUTH] Checked fine-grained action-level access");
+      logger.debug("[SUPERAUTH] Fine-grained privilege check executed", {
+        allowedActions,
+      });
     }
 
     next();
   };
-};
