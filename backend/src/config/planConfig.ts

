@@ -1,0 +1,232 @@
+/**
+ * src/config/planConfig.ts
+ * -------------------------------------------------------------------------
+ * 💳 Plan Configuration & Billing Policy
+ *
+ * Defines:
+ *  - All subscription plan tiers (Free, Pro, Enterprise)
+ *  - Feature entitlements, usage limits, and overage handling
+ *  - Trial period policy and one-trial-per-user enforcement
+ *  - Legal and compliance metadata for billing disclosures
+ *  - Versioning for future plan migrations
+ *
+ * Integrated Services:
+ *  - billing.service.ts
+ *  - trialAudit.service.ts
+ *  - quota.service.ts
+ *  - plans.service.ts
+ * -------------------------------------------------------------------------
+ */
+
+import { z } from "zod";
+import { logger } from "../logger";
+
+/* -------------------------------------------------------------------------
+   🧩 Plan Version & Metadata
+------------------------------------------------------------------------- */
+export const PLAN_VERSION = "2025.1";
+
+export const LEGAL_METADATA = {
+  currency: "INR",
+  jurisdiction: "India",
+  gstApplicable: true,
+  refundPolicy: {
+    trialRefund: "Not applicable (trial is free)",
+    paidRefund: "Refunds only for double charges or compliance issues.",
+    autoRenew: "Auto-renewal can be disabled anytime via dashboard.",
+  },
+  contact: {
+    supportEmail: "billing@projectathlete360.com",
+    legalEmail: "legal@projectathlete360.com",
+  },
+};
+
+/* -------------------------------------------------------------------------
+   🧮 Plan Schema (Validation)
+------------------------------------------------------------------------- */
+const PlanFeatureSchema = z.object({
+  maxAthletes: z.number(),
+  maxCoaches: z.number(),
+  maxTeams: z.number(),
+  storageGB: z.number(),
+  aiCredits: z.number(),
+  apiAccess: z.boolean(),
+  analytics: z.boolean(),
+  prioritySupport: z.boolean(),
+  walRetentionDays: z.number(),
+  customBranding: z.boolean(),
+});
+
+export type PlanFeature = z.infer<typeof PlanFeatureSchema>;
+
+export interface PlanDefinition {
+  id: string;
+  name: string;
+  pricePerMonth: number;
+  pricePerYear: number;
+  trialDays: number;
+  features: PlanFeature;
+  allowOverage: boolean;
+  overageRate?: {
+    perAthlete?: number;
+    perGB?: number;
+  };
+  legal?: {
+    tosUrl: string;
+    refundPolicy: string;
+  };
+}
+
+/* -------------------------------------------------------------------------
+   💼 Plan Definitions (Core Plans)
+------------------------------------------------------------------------- */
+export const PLAN_DEFINITIONS: Record<string, PlanDefinition> = {
+  FREE: {
+    id: "FREE",
+    name: "Free Starter Plan",
+    pricePerMonth: 0,
+    pricePerYear: 0,
+    trialDays: 0,
+    allowOverage: false,
+    features: {
+      maxAthletes: 2,
+      maxCoaches: 1,
+      maxTeams: 1,
+      storageGB: 1,
+      aiCredits: 50,
+      apiAccess: false,
+      analytics: false,
+      prioritySupport: false,
+      walRetentionDays: 1,
+      customBranding: false,
+    },
+    legal: {
+      tosUrl: "https://projectathlete360.com/legal/terms",
+      refundPolicy: "Free plan — no billing or refund applicable.",
+    },
+  },
+
+  PRO: {
+    id: "PRO",
+    name: "Professional Plan",
+    pricePerMonth: 1499,
+    pricePerYear: 14999,
+    trialDays: 14,
+    allowOverage: true,
+    overageRate: {
+      perAthlete: 50,
+      perGB: 25,
+    },
+    features: {
+      maxAthletes: 50,
+      maxCoaches: 5,
+      maxTeams: 10,
+      storageGB: 50,
+      aiCredits: 5000,
+      apiAccess: true,
+      analytics: true,
+      prioritySupport: true,
+      walRetentionDays: 7,
+      customBranding: true,
+    },
+    legal: {
+      tosUrl: "https://projectathlete360.com/legal/terms",
+      refundPolicy:
+        "Refunds processed only for duplicate or invalid charges, reviewed manually within 10 business days.",
+    },
+  },
+
+  ENTERPRISE: {
+    id: "ENTERPRISE",
+    name: "Enterprise Suite",
+    pricePerMonth: 9999,
+    pricePerYear: 99999,
+    trialDays: 21,
+    allowOverage: true,
+    overageRate: {
+      perAthlete: 30,
+      perGB: 15,
+    },
+    features: {
+      maxAthletes: 500,
+      maxCoaches: 50,
+      maxTeams: 100,
+      storageGB: 500,
+      aiCredits: 50000,
+      apiAccess: true,
+      analytics: true,
+      prioritySupport: true,
+      walRetentionDays: 30,
+      customBranding: true,
+    },
+    legal: {
+      tosUrl: "https://projectathlete360.com/legal/enterprise-terms",
+      refundPolicy:
+        "Enterprise contracts governed by SLA; refund and overage rules per contract.",
+    },
+  },
+};
+
+/* -------------------------------------------------------------------------
+   🔍 Helper Utilities
+------------------------------------------------------------------------- */
+
+/**
+ * Get plan definition by ID
+ */
+export function getPlanDefinition(planId: string): PlanDefinition {
+  const plan = PLAN_DEFINITIONS[planId];
+  if (!plan) {
+    logger.error(`[PLAN CONFIG] Unknown plan ID: ${planId}`);
+    throw new Error(`Invalid plan ID: ${planId}`);
+  }
+  return plan;
+}
+
+/**
+ * Validate plan integrity (run at startup)
+ */
+export function validatePlanConfig(): void {
+  Object.values(PLAN_DEFINITIONS).forEach((plan) => {
+    try {
+      PlanFeatureSchema.parse(plan.features);
+    } catch (err: any) {
+      logger.error(`[PLAN CONFIG] Invalid features for ${plan.id}: ${err.message}`);
+      throw err;
+    }
+  });
+
+  logger.info(`[PLAN CONFIG] ✅ Loaded ${Object.keys(PLAN_DEFINITIONS).length} plans (v${PLAN_VERSION})`);
+}
+
+/**
+ * Check if plan supports a given feature
+ */
+export function hasFeature(planId: string, feature: keyof PlanFeature): boolean {
+  const plan = getPlanDefinition(planId);
+  return Boolean(plan.features[feature]);
+}
+
+/**
+ * Compute plan overage costs
+ */
+export function calculateOverage(planId: string, usage: { athletes: number; storageGB: number }) {
+  const plan = getPlanDefinition(planId);
+  if (!plan.allowOverage) return 0;
+
+  let cost = 0;
+  if (usage.athletes > plan.features.maxAthletes && plan.overageRate?.perAthlete) {
+    cost += (usage.athletes - plan.features.maxAthletes) * plan.overageRate.perAthlete;
+  }
+  if (usage.storageGB > plan.features.storageGB && plan.overageRate?.perGB) {
+    cost += (usage.storageGB - plan.features.storageGB) * plan.overageRate.perGB;
+  }
+
+  return cost;
+}
+
+/* -------------------------------------------------------------------------
+   🚀 Initialization (at app startup)
+------------------------------------------------------------------------- */
+validatePlanConfig();
+logger.info("[PLAN CONFIG] Plan configuration initialized successfully.");
