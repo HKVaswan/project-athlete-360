@@ -3,28 +3,31 @@
  * ---------------------------------------------------------------------
  * 🔬 Integration Test — Full Backup → Restore → Verification
  *
- * Goals:
- *  - Run real backup job (using backup worker/client)
- *  - Restore to a fresh or in-memory database instance
- *  - Verify data integrity and checksum
- *  - Ensure metadata and audit logs are properly recorded
+ * Objective:
+ *   End-to-end test that ensures the system can:
+ *     - Run real backup jobs (via backup worker/client)
+ *     - Upload/download backup from storage (S3 or local)
+ *     - Simulate database wipe (disaster)
+ *     - Fully restore data and verify checksums
+ *     - Validate audit entries and metadata consistency
  *
- * Simulates realistic production behaviour safely in test mode.
+ * Designed to mirror production backup–restore pipelines safely in test mode.
  * ---------------------------------------------------------------------
  */
 
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import { prisma } from "../../../src/prismaClient";
 import { runFullBackup } from "../../../src/lib/backupClient";
 import { restoreFromCloudBackup } from "../../../src/lib/restoreClient";
 import { uploadToS3, downloadFromS3 } from "../../../src/utils/storage";
 import { logger } from "../../../src/logger";
 
-jest.setTimeout(120000); // allow up to 2min (for archive + restore)
+jest.setTimeout(120000); // Allow 2 minutes for full cycle
 
 /* ---------------------------------------------------------------------
-   🧱 Test Setup Utilities
+   🧱 Setup Utilities
 ------------------------------------------------------------------------*/
 const TMP_DIR = path.join(__dirname, "../../tmp");
 if (!fs.existsSync(TMP_DIR)) fs.mkdirSync(TMP_DIR, { recursive: true });
@@ -38,6 +41,7 @@ async function seedTestData() {
       role: "athlete",
     },
   });
+
   await prisma.athleteProfile.create({
     data: {
       id: "athlete-1",
@@ -54,29 +58,43 @@ async function clearTestData() {
 }
 
 /* ---------------------------------------------------------------------
+   🧮 Helper: Compute Integrity Checksum
+------------------------------------------------------------------------*/
+function computeChecksum(payload: any): string {
+  return crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+}
+
+/* ---------------------------------------------------------------------
    🧪 Test Suite
 ------------------------------------------------------------------------*/
 describe("🧩 Backup → Restore → Verification", () => {
   let backupFileKey: string | null = null;
+  let preBackupChecksum = "";
 
   beforeAll(async () => {
-    logger.info("[TEST] Seeding initial data...");
+    logger.info("[TEST] 🧩 Seeding initial data...");
+    await clearTestData();
     await seedTestData();
   });
 
   afterAll(async () => {
     await prisma.$disconnect();
-    logger.info("[TEST] Prisma disconnected.");
+    logger.info("[TEST] 🧹 Prisma disconnected.");
   });
 
   /* -----------------------------------------------------------------
      1️⃣ Perform Backup
   ----------------------------------------------------------------- */
-  test("should create a backup successfully", async () => {
+  test("should create a full backup successfully", async () => {
+    const user = await prisma.user.findFirst({ where: { id: "test-user-1" } });
+    const athlete = await prisma.athleteProfile.findFirst({ where: { userId: "test-user-1" } });
+
+    preBackupChecksum = computeChecksum({ user, athlete });
+
     const backupPath = await runFullBackup();
     expect(fs.existsSync(backupPath)).toBe(true);
 
-    // Upload to mock S3 (replace with local storage in CI)
+    // Upload to mock S3 (can be swapped with local filesystem)
     const s3Resp = await uploadToS3({
       filePath: backupPath,
       bucket: "test-backups",
@@ -88,15 +106,17 @@ describe("🧩 Backup → Restore → Verification", () => {
     const dbEntry = await prisma.backup.findFirst({
       where: { fileName: path.basename(backupPath) },
     });
-    expect(dbEntry?.status).toBe("SUCCESS");
 
-    logger.info(`[TEST] ✅ Backup created & uploaded: ${backupFileKey}`);
+    expect(dbEntry?.status).toBe("SUCCESS");
+    expect(backupFileKey).toBeTruthy();
+
+    logger.info(`[TEST] ✅ Backup created and uploaded: ${backupFileKey}`);
   });
 
   /* -----------------------------------------------------------------
-     2️⃣ Simulate Data Loss
+     2️⃣ Simulate Data Loss (Disaster)
   ----------------------------------------------------------------- */
-  test("should clear user data to simulate DB failure", async () => {
+  test("should simulate catastrophic data loss", async () => {
     await clearTestData();
 
     const userCount = await prisma.user.count();
@@ -105,13 +125,13 @@ describe("🧩 Backup → Restore → Verification", () => {
     expect(userCount).toBe(0);
     expect(athleteCount).toBe(0);
 
-    logger.info("[TEST] 🧹 Database cleared successfully.");
+    logger.info("[TEST] 💥 Simulated data loss completed.");
   });
 
   /* -----------------------------------------------------------------
      3️⃣ Restore from Backup
   ----------------------------------------------------------------- */
-  test("should restore database from the backup successfully", async () => {
+  test("should restore database successfully from cloud/local backup", async () => {
     expect(backupFileKey).toBeTruthy();
 
     const restoredFile = await downloadFromS3({
@@ -129,26 +149,38 @@ describe("🧩 Backup → Restore → Verification", () => {
     expect(userCount).toBeGreaterThan(0);
     expect(athleteCount).toBeGreaterThan(0);
 
-    logger.info("[TEST] ✅ Database restored successfully from backup.");
+    logger.info("[TEST] ✅ Restore operation completed successfully.");
   });
 
   /* -----------------------------------------------------------------
-     4️⃣ Verify Integrity
+     4️⃣ Verify Data Integrity
   ----------------------------------------------------------------- */
-  test("should verify restored data integrity and checksum", async () => {
-    const user = await prisma.user.findFirst({ where: { id: "test-user-1" } });
+  test("should confirm integrity and checksum match after restore", async () => {
+    const user = await prisma.user.findUnique({ where: { id: "test-user-1" } });
     const athlete = await prisma.athleteProfile.findFirst({ where: { userId: "test-user-1" } });
+
+    const postRestoreChecksum = computeChecksum({ user, athlete });
 
     expect(user?.email).toBe("athlete@test.com");
     expect(athlete?.sport).toBe("Track");
+    expect(postRestoreChecksum).toBe(preBackupChecksum);
 
-    const checksum = require("crypto")
-      .createHash("sha256")
-      .update(JSON.stringify({ user, athlete }))
-      .digest("hex");
+    logger.info(`[TEST] 🔐 Integrity verified. Checksum: ${postRestoreChecksum}`);
+  });
 
-    expect(checksum.length).toBe(64);
+  /* -----------------------------------------------------------------
+     5️⃣ Metadata Verification
+  ----------------------------------------------------------------- */
+  test("should verify backup metadata and audit logs exist", async () => {
+    const backupLogs = await prisma.backup.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 1,
+    });
 
-    logger.info(`[TEST] 🧩 Integrity checksum verified: ${checksum}`);
+    expect(backupLogs.length).toBeGreaterThan(0);
+    expect(backupLogs[0].status).toBe("SUCCESS");
+    expect(backupLogs[0].fileName).toContain(".enc");
+
+    logger.info("[TEST] 📊 Backup metadata and audit logs verified.");
   });
 });
