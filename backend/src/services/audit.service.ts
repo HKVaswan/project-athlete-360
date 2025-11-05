@@ -1,20 +1,21 @@
 /**
  * src/services/audit.service.ts
  * ----------------------------------------------------------------------
- * Audit Service (Enterprise-Grade)
+ * 🛡️ Enterprise-Grade Audit Service v2
  *
  * Responsibilities:
- *  - Unified interface for logging all critical system events
- *  - Stores immutable audit chains (tamper-resistant)
- *  - Integrates with database and analytics
- *  - Auto-detects suspicious or privileged actions
- *  - Supports AI-based anomaly detection (future-ready)
+ *  - Immutable audit log chain (tamper-resistant)
+ *  - Asynchronous, fault-tolerant audit event queue
+ *  - Chain verification for data integrity
+ *  - Suspicious action detection & auto alert integration
+ *  - Future-ready for AI-driven anomaly analysis
  * ----------------------------------------------------------------------
  */
 
 import { prisma } from "../prismaClient";
 import { logger } from "../logger";
 import crypto from "crypto";
+import { superAdminAlertsService } from "./superAdminAlerts.service";
 
 /* -----------------------------------------------------------------------
    🧩 Types
@@ -46,54 +47,73 @@ export interface RecordAuditParams {
 }
 
 /* -----------------------------------------------------------------------
-   🧱 Core Service
+   ⚙️ Audit Service Implementation
 ------------------------------------------------------------------------*/
 class AuditService {
+  private queue: RecordAuditParams[] = [];
+  private isFlushing = false;
+
   /**
-   * Record a single audit event in immutable chain
+   * 🚀 Queue audit logs for async persistence
    */
   async log(params: RecordAuditParams): Promise<void> {
-    try {
-      const timestamp = new Date().toISOString();
-      const data = {
-        actorId: params.actorId || "system",
-        actorRole: params.actorRole || "system",
-        ip: params.ip || "unknown",
-        action: params.action,
-        entity: params.entity || null,
-        entityId: params.entityId || null,
-        details: params.details || {},
-        metadata: params.metadata || {},
-        timestamp,
-      };
-
-      // Chain integrity
-      const prev = await prisma.auditLog.findFirst({
-        orderBy: { createdAt: "desc" },
-        select: { chainHash: true },
-      });
-      const previousHash = prev?.chainHash || "GENESIS";
-      const chainHash = this.createChainHash(data, previousHash);
-
-      await prisma.auditLog.create({
-        data: { ...data, chainHash, previousHash },
-      });
-
-      // Super Admin event visibility boost
-      if (params.actorRole === "super_admin") {
-        logger.info(
-          `[AUDIT] 🛡️ Super Admin action logged: ${params.action} (${params.actorId})`
-        );
-      } else {
-        logger.debug(`[AUDIT] Event logged: ${params.action} by ${params.actorId}`);
-      }
-    } catch (err: any) {
-      logger.error(`[AUDIT] ❌ Failed to log audit entry: ${err.message}`);
-    }
+    this.queue.push(params);
+    void this.flushQueue(); // Fire and forget
   }
 
   /**
-   * Generate chain hash for immutability
+   * 🧱 Process audit log queue (non-blocking)
+   */
+  private async flushQueue(): Promise<void> {
+    if (this.isFlushing) return;
+    this.isFlushing = true;
+
+    while (this.queue.length > 0) {
+      const entry = this.queue.shift();
+      if (!entry) continue;
+
+      try {
+        const timestamp = new Date().toISOString();
+        const data = {
+          actorId: entry.actorId || "system",
+          actorRole: entry.actorRole || "system",
+          ip: entry.ip || "unknown",
+          action: entry.action,
+          entity: entry.entity || null,
+          entityId: entry.entityId || null,
+          details: entry.details || {},
+          metadata: entry.metadata || {},
+          createdAt: new Date(),
+        };
+
+        // 🔗 Compute chain integrity
+        const prev = await prisma.auditLog.findFirst({
+          orderBy: { createdAt: "desc" },
+          select: { chainHash: true },
+        });
+        const previousHash = prev?.chainHash || "GENESIS";
+        const chainHash = this.createChainHash(data, previousHash);
+
+        await prisma.auditLog.create({
+          data: { ...data, chainHash, previousHash },
+        });
+
+        // Log visibility by role
+        if (entry.actorRole === "super_admin") {
+          logger.info(`[AUDIT] 🧩 Super Admin event logged: ${entry.action}`);
+        } else {
+          logger.debug(`[AUDIT] Logged: ${entry.action} (${entry.actorRole})`);
+        }
+      } catch (err: any) {
+        logger.error(`[AUDIT] ❌ Failed to flush log: ${err.message}`);
+      }
+    }
+
+    this.isFlushing = false;
+  }
+
+  /**
+   * 🔐 Chain hash creation for tamper resistance
    */
   private createChainHash(data: any, previousHash: string): string {
     const str = JSON.stringify(data) + previousHash;
@@ -101,7 +121,37 @@ class AuditService {
   }
 
   /* -----------------------------------------------------------------------
-     🧠 Suspicious Activity Detection
+     🔎 Chain Verification (Run during startup or health check)
+  ------------------------------------------------------------------------*/
+  async verifyChainIntegrity(limit = 500): Promise<{ valid: boolean; brokenAt?: string }> {
+    const logs = await prisma.auditLog.findMany({
+      orderBy: { createdAt: "asc" },
+      take: limit,
+    });
+
+    let prevHash = "GENESIS";
+    for (const log of logs) {
+      const recalculated = this.createChainHash(log, log.previousHash || "GENESIS");
+      if (recalculated !== log.chainHash) {
+        await superAdminAlertsService.dispatchSuperAdminAlert({
+          title: "Audit Chain Corruption Detected",
+          message: `Audit log chain broken at ID: ${log.id}`,
+          category: "security",
+          severity: "critical",
+          metadata: { logId: log.id },
+        });
+        logger.error(`[AUDIT] 🚨 Chain broken at log ${log.id}`);
+        return { valid: false, brokenAt: log.id };
+      }
+      prevHash = log.chainHash;
+    }
+
+    logger.info("[AUDIT] ✅ Chain integrity verified.");
+    return { valid: true };
+  }
+
+  /* -----------------------------------------------------------------------
+     🧠 Suspicious or Privileged Action Detection
   ------------------------------------------------------------------------*/
   async detectSuspicious(): Promise<void> {
     const recent = await prisma.auditLog.findMany({
@@ -124,76 +174,28 @@ class AuditService {
     );
 
     if (flagged.length > 0) {
-      logger.warn(`[AUDIT] ⚠️ ${flagged.length} suspicious events detected`);
-      await prisma.securityAlert.createMany({
-        data: flagged.map((r) => ({
-          type: "auditAnomaly",
-          details: { ...r.details, id: r.id },
-          createdAt: new Date(),
-        })),
+      await superAdminAlertsService.dispatchSuperAdminAlert({
+        title: "Suspicious Admin Activity",
+        message: `${flagged.length} potentially unsafe actions detected.`,
+        category: "security",
+        severity: "high",
+        metadata: { flagged },
       });
+
+      logger.warn(`[AUDIT] ⚠️ ${flagged.length} suspicious events flagged.`);
     }
   }
 
   /* -----------------------------------------------------------------------
-     🗃️  Retrieve Logs (Paginated / Filterable)
-  ------------------------------------------------------------------------*/
-  async getLogs({
-    page = 1,
-    limit = 25,
-    filter,
-  }: {
-    page?: number;
-    limit?: number;
-    filter?: Partial<RecordAuditParams>;
-  }) {
-    const where: any = {};
-
-    if (filter?.actorId) where.actorId = filter.actorId;
-    if (filter?.actorRole) where.actorRole = filter.actorRole;
-    if (filter?.action) where.action = filter.action;
-
-    const [logs, total] = await Promise.all([
-      prisma.auditLog.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        skip: (page - 1) * limit,
-        take: limit,
-        select: {
-          id: true,
-          actorId: true,
-          actorRole: true,
-          ip: true,
-          action: true,
-          entity: true,
-          entityId: true,
-          timestamp: true,
-          chainHash: true,
-          previousHash: true,
-          details: true,
-        },
-      }),
-      prisma.auditLog.count({ where }),
-    ]);
-
-    return {
-      total,
-      page,
-      limit,
-      results: logs,
-    };
-  }
-
-  /* -----------------------------------------------------------------------
-     🧹 Purge Old Logs (with Super Admin validation)
+     🧹 Secure Purge (SuperAdmin only)
   ------------------------------------------------------------------------*/
   async purgeOld(days = 90, actor?: { id: string; role: string }) {
-    const threshold = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     if (actor?.role !== "super_admin") {
-      throw new Error("Only super admin can purge audit logs.");
+      throw new Error("Only Super Admins may purge audit logs.");
     }
 
-    const count = await prisma.auditLog.deleteMany({
+    const threshold = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const result = await prisma.auditLog.deleteMany({
       where: { createdAt: { lt: threshold } },
     });
 
@@ -201,37 +203,43 @@ class AuditService {
       actorId: actor.id,
       actorRole: "super_admin",
       action: "ADMIN_OVERRIDE",
-      details: { purgedRecords: count.count, retentionDays: days },
+      details: { purgedRecords: result.count, retentionDays: days },
     });
 
-    logger.info(`[AUDIT] 🧹 Purged ${count.count} old audit records.`);
-    return count.count;
+    logger.info(`[AUDIT] 🧹 ${result.count} records purged by ${actor.id}.`);
+    return result.count;
   }
 
   /* -----------------------------------------------------------------------
-     📈 System Summary for Dashboard
+     📊 Summary for Dashboards
   ------------------------------------------------------------------------*/
   async getSummary() {
     const total = await prisma.auditLog.count();
-    const recent = await prisma.auditLog.findMany({
+    const last5 = await prisma.auditLog.findMany({
       take: 5,
       orderBy: { createdAt: "desc" },
-      select: { id: true, actorId: true, actorRole: true, action: true, timestamp: true },
+      select: {
+        id: true,
+        actorRole: true,
+        action: true,
+        createdAt: true,
+        chainHash: true,
+      },
     });
 
-    const recentSuperAdmin = await prisma.auditLog.count({
+    const totalSuperAdmin = await prisma.auditLog.count({
       where: { actorRole: "super_admin" },
     });
 
     return {
       total,
-      recent,
-      recentSuperAdmin,
+      recent: last5,
+      totalSuperAdmin,
     };
   }
 
   /* -----------------------------------------------------------------------
-     🚨 Record High-Severity Security Event
+     🚨 Record Security Event
   ------------------------------------------------------------------------*/
   async recordSecurityEvent(event: {
     actorId?: string;
@@ -245,36 +253,33 @@ class AuditService {
       actorRole: event.actorRole || "system",
       action: "SECURITY_EVENT",
       details: {
-        severity: event.severity,
         message: event.message,
+        severity: event.severity,
         metadata: event.metadata,
       },
     });
 
     if (event.severity === "high") {
-      await prisma.securityAlert.create({
-        data: {
-          type: "criticalSecurityEvent",
-          details: event,
-        },
+      await superAdminAlertsService.dispatchSuperAdminAlert({
+        title: "Critical Security Event",
+        message: event.message,
+        category: "security",
+        severity: "critical",
+        metadata: event.metadata,
       });
-      logger.warn(`[AUDIT] 🚨 High-severity security event: ${event.message}`);
     }
   }
 }
 
 /* -----------------------------------------------------------------------
-   🚀 Export Singleton
+   🚀 Export Singleton + Helper
 ------------------------------------------------------------------------*/
 export const auditService = new AuditService();
 
-/**
- * Helper for consistent audit logging across modules.
- */
 export const recordAuditEvent = async (entry: RecordAuditParams) => {
   try {
     await auditService.log(entry);
   } catch (err: any) {
-    logger.error(`[AUDIT] Failed to record event: ${err.message}`);
+    logger.error(`[AUDIT] Record failed: ${err.message}`);
   }
 };
