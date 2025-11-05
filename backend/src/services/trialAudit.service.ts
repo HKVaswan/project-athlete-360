@@ -1,17 +1,23 @@
 // src/services/trialAudit.service.ts
 /**
- * Trial Abuse & Invitation Abuse Audit Service (Hardened Version)
- * ---------------------------------------------------------------
- * Detects and prevents:
- *   - Reuse of free trial accounts
- *   - Excessive or repeated invitation abuse (spam or fake onboarding)
- *   - Device/IP-level fraud or cycling
+ * Trial Abuse & Invitation Abuse Audit Service (Enterprise Edition)
+ * -----------------------------------------------------------------
+ * Prevents:
+ *   - Reuse of free trials across devices/IPs/institutions
+ *   - Invitation abuse (spam or fake signups)
+ *   - Device/IP-level fraud or cycling behavior
  *
  * Integrations:
- *   - prisma (trialAbuseLog table)
+ *   - prisma (trialAbuseLog, invitation)
  *   - auditService
- *   - ipBlockService (auto temporary ban)
- *   - superAdminAlertsService (for escalations)
+ *   - ipBlockService
+ *   - superAdminAlertsService
+ *   - logger
+ *
+ * Security:
+ *   - SHA-256 hashed identifiers (privacy-safe)
+ *   - Confidence scoring for false-positive prevention
+ *   - Dynamic alert severity
  */
 
 import crypto from "crypto";
@@ -22,6 +28,13 @@ import { superAdminAlertsService } from "./superAdminAlerts.service";
 import { recordAuditEvent } from "./audit.service";
 import { ipBlockService } from "./ipBlock.service";
 
+/* ----------------------------------------------------------------
+   🔧 Configurable Limits & Constants
+------------------------------------------------------------------ */
+const INVITE_LIMIT_PER_DAY = Number(process.env.INVITE_LIMIT_PER_DAY || 10);
+const TRIAL_MATCH_THRESHOLD = Number(process.env.TRIAL_MATCH_THRESHOLD || 2);
+const BLOCK_DURATION_HOURS = Number(process.env.BLOCK_DURATION_HOURS || 12);
+
 type Fingerprint = {
   ip: string;
   userAgent?: string;
@@ -30,18 +43,17 @@ type Fingerprint = {
   institutionId?: string;
 };
 
-/* ------------------------------------------------------------
-   🔒 Hash utility (privacy-safe)
-------------------------------------------------------------- */
+/* ----------------------------------------------------------------
+   🔒 Hash Utility (privacy-safe)
+------------------------------------------------------------------ */
 const hash = (val?: string) =>
   val ? crypto.createHash("sha256").update(val.trim().toLowerCase()).digest("hex") : null;
 
-/* ------------------------------------------------------------
-   🚨 Detect Trial or Invite Abuse
-------------------------------------------------------------- */
+/* ----------------------------------------------------------------
+   🚨 Detect Trial or Invite Abuse (with scoring)
+------------------------------------------------------------------ */
 export const detectTrialAbuse = async (fingerprint: Fingerprint) => {
   const { ip, userAgent, email, deviceId, institutionId } = fingerprint;
-
   const hashedIp = hash(ip);
   const hashedUA = hash(userAgent);
   const hashedDevice = hash(deviceId);
@@ -58,27 +70,39 @@ export const detectTrialAbuse = async (fingerprint: Fingerprint) => {
       ],
     },
     orderBy: { createdAt: "desc" },
-    take: 10,
+    take: 20,
   });
 
-  if (matches.length > 0) {
-    logger.warn(`[TRIAL AUDIT] ⚠️ Detected ${matches.length} similar past entries for IP ${ip}`);
+  let score = 0;
+  if (matches.some((m) => m.hashedIp === hashedIp)) score += 3;
+  if (matches.some((m) => m.hashedDevice === hashedDevice)) score += 4;
+  if (matches.some((m) => m.hashedEmailDomain === hashedEmailDomain)) score += 2;
+  if (matches.some((m) => m.institutionId === institutionId)) score += 1;
+
+  const severity = score >= 8 ? "critical" : score >= 6 ? "high" : score >= 4 ? "medium" : "low";
+
+  if (matches.length > 0 && score >= 4) {
+    logger.warn(`[TRIAL AUDIT] ⚠️ ${matches.length} similar entries detected. Score: ${score}`);
 
     await recordAuditEvent({
       actorRole: "system",
       action: "TRIAL_ABUSE_DETECTED",
-      details: { ip, matches: matches.length, institutionId },
+      details: { ip, matches: matches.length, institutionId, score },
     });
 
-    // 🔥 Escalate repeated offenders
-    if (matches.length >= 2) {
-      await ipBlockService.blockTemporary(ip, "Repeated trial/invite abuse detected", 3600 * 12);
+    if (score >= 6 || matches.length >= TRIAL_MATCH_THRESHOLD) {
+      await ipBlockService.blockTemporary(
+        ip,
+        "Repeated trial/invite abuse detected",
+        3600 * BLOCK_DURATION_HOURS
+      );
+
       await superAdminAlertsService.sendAlert({
         category: "abuse",
         title: "Trial or Invite Abuse Detected",
-        message: `Detected ${matches.length} similar usage attempts from ${ip}`,
-        severity: "high",
-        metadata: { ip, matches },
+        message: `Detected suspicious trial activity (score: ${score}) from ${ip}`,
+        severity,
+        metadata: { ip, score, matches },
       });
     }
 
@@ -88,9 +112,9 @@ export const detectTrialAbuse = async (fingerprint: Fingerprint) => {
   }
 };
 
-/* ------------------------------------------------------------
-   🧾 Log trial usage (for new legitimate users)
-------------------------------------------------------------- */
+/* ----------------------------------------------------------------
+   🧾 Log Trial Usage (Legitimate Signups)
+------------------------------------------------------------------ */
 export const logTrialUsage = async (userId: string, fingerprint: Fingerprint) => {
   try {
     await prisma.trialAbuseLog.create({
@@ -103,19 +127,18 @@ export const logTrialUsage = async (userId: string, fingerprint: Fingerprint) =>
         hashedEmailDomain: fingerprint.email?.includes("@")
           ? hash(fingerprint.email.split("@")[1])
           : null,
+        eventType: "TRIAL_USAGE",
       },
     });
-
     logger.info(`[TRIAL AUDIT] Logged trial usage for ${userId} from ${fingerprint.ip}`);
   } catch (err: any) {
     logger.error(`[TRIAL AUDIT] Failed to log trial usage: ${err.message}`);
   }
 };
 
-/* ------------------------------------------------------------
-   📬 Record Invitation Attempt (by coach or admin)
-   Prevents invitation spam or repeated fake invites
-------------------------------------------------------------- */
+/* ----------------------------------------------------------------
+   📬 Record Invitation Attempt (Spam & Abuse Control)
+------------------------------------------------------------------ */
 export const recordInviteAttempt = async (data: {
   inviterId: string;
   inviterRole: string;
@@ -131,24 +154,26 @@ export const recordInviteAttempt = async (data: {
     : null;
 
   try {
-    // Count similar invites from same IP within last 24h
     const lastDay = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const recentCount = await prisma.invitation.count({
-      where: {
-        invitedById: data.inviterId,
-        createdAt: { gt: lastDay },
-      },
+      where: { invitedById: data.inviterId, createdAt: { gt: lastDay } },
     });
 
-    if (recentCount >= 10) {
-      await ipBlockService.blockTemporary(data.ip, "Excessive invitation attempts", 3600);
+    if (recentCount >= INVITE_LIMIT_PER_DAY) {
+      await ipBlockService.blockTemporary(
+        data.ip,
+        "Excessive invitation attempts",
+        3600
+      );
+
       await superAdminAlertsService.sendAlert({
         category: "abuse",
         title: "Invitation Abuse Detected",
-        message: `${data.inviterRole} exceeded safe invite limit (10/24h).`,
+        message: `${data.inviterRole} exceeded safe invite limit (${INVITE_LIMIT_PER_DAY}/24h).`,
         severity: "medium",
         metadata: { inviterId: data.inviterId, ip: data.ip, count: recentCount },
       });
+
       throw Errors.Forbidden("You’ve exceeded the safe invitation limit for today.");
     }
 
@@ -168,20 +193,23 @@ export const recordInviteAttempt = async (data: {
   }
 };
 
-/* ------------------------------------------------------------
-   🚷 Enforce one trial per device/network
-------------------------------------------------------------- */
+/* ----------------------------------------------------------------
+   🚷 Enforce One-Trial Policy (Main Entry)
+------------------------------------------------------------------ */
 export const enforceOneTrialPolicy = async (userId: string, fingerprint: Fingerprint) => {
   await detectTrialAbuse(fingerprint);
   await logTrialUsage(userId, fingerprint);
 };
 
-/* ------------------------------------------------------------
-   🧹 Cleanup (cron job)
-------------------------------------------------------------- */
+/* ----------------------------------------------------------------
+   🧹 Cleanup (Maintenance Task)
+------------------------------------------------------------------ */
 export const cleanupOldTrialLogs = async (days = 180) => {
   const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-  const deleted = await prisma.trialAbuseLog.deleteMany({ where: { createdAt: { lt: cutoff } } });
+  const deleted = await prisma.trialAbuseLog.deleteMany({
+    where: { createdAt: { lt: cutoff } },
+  });
+
   if (deleted.count > 0) {
     logger.info(`[TRIAL AUDIT] Cleaned ${deleted.count} old logs`);
   }
