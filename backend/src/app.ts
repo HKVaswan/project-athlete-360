@@ -1,4 +1,21 @@
 // src/app.ts
+/**
+ * src/app.ts
+ * ------------------------------------------------------------------------
+ * Enterprise-grade Express application bootstrap
+ *
+ * Features:
+ *  - Secure defaults (helmet, CORS, compression)
+ *  - Request correlation (request-id)
+ *  - Structured request logging & slow-request monitoring
+ *  - Prometheus metrics endpoint
+ *  - Optional OpenTelemetry / Sentry integration (enabled via config)
+ *  - Rate limiting, JSON size limits, body parsing
+ *  - Health & readiness endpoints
+ *  - Graceful error handling (centralized)
+ * ------------------------------------------------------------------------
+ */
+
 import express, { Application, Request, Response, NextFunction } from "express";
 import helmet from "helmet";
 import cors from "cors";
@@ -6,77 +23,178 @@ import compression from "compression";
 import rateLimit from "express-rate-limit";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
+
 import { config } from "./config";
-import logger from "./logger";
-import { requestLogger } from "./middleware/requestLogger.middleware";
-import { errorHandler } from "./middleware/error.middleware";
+import { logger, morganStream } from "./logger";
 import routes from "./routes";
+import { attachRequestId, requestLogger as structuredRequestLogger, slowRequestMonitor } from "./lib/loggerEnhancer";
+import { errorHandler, notFoundHandler } from "./middleware/error.middleware";
+import { getMetrics } from "./lib/core/metrics";
+import { telemetry } from "./lib/telemetry";
+
+// Optional observability / tracing initializers (best-effort)
+(async function initOptionalIntegrations() {
+  try {
+    if (config.tracing?.enabled) {
+      // dynamic import to keep dependencies optional
+      /* eslint-disable @typescript-eslint/no-var-requires */
+      const { initTracing } = require("./lib/tracing");
+      await initTracing(config.tracing);
+      logger.info("[INIT] Tracing initialized.");
+    }
+  } catch (err: any) {
+    logger.warn("[INIT] Tracing initialization failed (continuing):", err?.message || err);
+  }
+
+  try {
+    if (config.sentry?.dsn) {
+      // dynamic import for Sentry
+      /* eslint-disable @typescript-eslint/no-var-requires */
+      const Sentry = require("@sentry/node");
+      Sentry.init({
+        dsn: config.sentry.dsn,
+        environment: config.nodeEnv,
+        tracesSampleRate: config.sentry.tracesSampleRate ?? 0.0,
+      });
+      logger.info("[INIT] Sentry initialized.");
+    }
+  } catch (err: any) {
+    logger.warn("[INIT] Sentry initialization failed (continuing):", err?.message || err);
+  }
+})();
 
 const app: Application = express();
 
-// ───────────────────────────────
-// 🧱 Security Middleware
-// ───────────────────────────────
-app.use(helmet());
+// ────────────────────────────────────────────────────
+// Security / Network Middleware
+// ────────────────────────────────────────────────────
 app.use(
-  cors({
-    origin: config.CLIENT_URLS, // array or string of allowed origins
-    credentials: true,
+  helmet({
+    contentSecurityPolicy: config.nodeEnv === "production" ? undefined : false,
   })
 );
+
+app.use(
+  cors({
+    origin: config.CLIENT_URLS,
+    credentials: true,
+    optionsSuccessStatus: 200,
+  })
+);
+
 app.use(compression());
 app.use(cookieParser());
 
-// ───────────────────────────────
-// ⚙️ Basic Middleware
-// ───────────────────────────────
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+// ────────────────────────────────────────────────────
+// Body parsers
+// ────────────────────────────────────────────────────
+app.use(express.json({ limit: config.requestBodyLimit || "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: config.requestBodyLimit || "10mb" }));
 
-// Logging: Morgan (HTTP logs) + custom logger (structured)
-app.use(morgan("tiny", { stream: { write: (msg) => logger.info(msg.trim()) } }));
-app.use(requestLogger);
+// ────────────────────────────────────────────────────
+// Request Correlation + Logging
+// ────────────────────────────────────────────────────
+// Attach a stable request id early so it flows through logs/metrics/traces
+app.use(attachRequestId);
 
-// ───────────────────────────────
-// 🚦 Rate Limiting
-// ───────────────────────────────
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 300, // limit each IP to 300 requests per window
+// Morgan -> Winston bridge (keeps access logs)
+app.use(morgan(config.logging?.morganFormat || "combined", { stream: morganStream }));
+
+// Structured per-request logging + slow request monitor
+app.use(structuredRequestLogger);
+app.use(slowRequestMonitor(config.performance?.slowRequestThresholdMs ?? 1200));
+
+// Optional telemetry enrichment middleware (attaches trace info to telemetry)
+app.use((req: Request, _res: Response, next: NextFunction) => {
+  try {
+    // attach minimal telemetry context for exporters
+    (req as any).telemetryContext = {
+      requestId: (req as any).requestId,
+      startAt: Date.now(),
+      route: req.originalUrl,
+      method: req.method,
+    };
+  } catch {}
+  next();
+});
+
+// ────────────────────────────────────────────────────
+// Rate limiting (API-wide; override per-route if needed)
+// ────────────────────────────────────────────────────
+const apiLimiter = rateLimit({
+  windowMs: config.rateLimit?.windowMs ?? 15 * 60 * 1000,
+  max: config.rateLimit?.maxRequests ?? 300,
   standardHeaders: true,
   legacyHeaders: false,
 });
-app.use("/api", limiter);
+app.use("/api", apiLimiter);
 
-// ───────────────────────────────
-// ✅ Health Check
-// ───────────────────────────────
-app.get("/health", (_req: Request, res: Response) => {
+// ────────────────────────────────────────────────────
+// Health / Readiness / Metrics
+// ────────────────────────────────────────────────────
+app.get("/health", (_req: Request, res: Response) =>
   res.status(200).json({
     success: true,
-    message: "Server is healthy 🚀",
-    env: config.NODE_ENV,
-  });
+    env: config.nodeEnv,
+    uptimeSec: process.uptime(),
+    timestamp: new Date().toISOString(),
+  })
+);
+
+app.get("/ready", async (_req: Request, res: Response) => {
+  // perform lightweight readiness checks: DB, storage, queues (if available)
+  const readiness: Record<string, any> = { ok: true };
+  try {
+    // lazy import to avoid cycles if prisma not available during early bootstrap
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { prisma } = require("./prismaClient");
+    await prisma.$queryRaw`SELECT 1`;
+    readiness.db = "ok";
+  } catch (err: any) {
+    readiness.ok = false;
+    readiness.db = "unreachable";
+  }
+
+  res.status(readiness.ok ? 200 : 503).json({ success: readiness.ok, readiness });
 });
 
-// ───────────────────────────────
-// 🚏 API Routes
-// ───────────────────────────────
+// Prometheus metrics endpoint
+app.get("/metrics", async (_req: Request, res: Response) => {
+  try {
+    res.set("Content-Type", (await getMetrics()).contentType || "text/plain; version=0.0.4");
+    const metrics = await getMetrics();
+    res.send(metrics);
+  } catch (err: any) {
+    logger.warn("[METRICS] Failed to collect metrics:", err?.message || err);
+    res.status(500).send("Metrics collection failed");
+  }
+});
+
+// ────────────────────────────────────────────────────
+// Primary API routes (versioned)
+// ────────────────────────────────────────────────────
 app.use("/api", routes);
 
-// ───────────────────────────────
-// ❌ Global Error Handler
-// ───────────────────────────────
-app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-  logger.error(`[UNCAUGHT ERROR]: ${err.stack || err}`);
-  errorHandler(err, req, res, next);
-});
+// ────────────────────────────────────────────────────
+// Catch-all 404 for non-API routes (use notFoundHandler)
+app.use("*", notFoundHandler);
 
-// ───────────────────────────────
-// ⚙️ 404 Handler
-// ───────────────────────────────
-app.use("*", (req: Request, res: Response) => {
-  res.status(404).json({ success: false, message: "Endpoint not found" });
+// ────────────────────────────────────────────────────
+// Centralized Error Handler (must be last)
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  try {
+    // enrich telemetry with error info
+    const ctx = (req as any).telemetryContext;
+    if (ctx) {
+      telemetry.record("errors.request", 1, "counter", {
+        requestId: ctx.requestId,
+        route: ctx.route,
+        method: ctx.method,
+      });
+    }
+  } catch {}
+
+  return errorHandler(err, req, res, next);
 });
 
 export default app;
