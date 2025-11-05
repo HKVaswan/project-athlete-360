@@ -1,33 +1,32 @@
-// src/services/systemHealth.service.ts
 /**
- * systemHealth.service.ts
+ * src/services/systemHealth.service.ts
  * --------------------------------------------------------------------------
- * Enterprise-grade system health service
+ * 🚀 Enterprise-grade System Health Service (v2.0)
  *
  * Responsibilities:
- *  - Health checks for DB (Prisma), Redis/BullMQ queues, background workers,
- *    AI subsystem, storage (S3), and other critical integrations.
- *  - Aggregates status with timestamps, latency, and human-friendly messages.
- *  - Supports retries, timeouts, and soft/hard thresholds.
- *  - Emits alerts (via adminNotification.service / auditService) when critical.
- *  - Periodic monitor that can be scheduled by a worker or started from server.
+ *  - Performs deep health checks for all core subsystems:
+ *    DB (Prisma), Redis/BullMQ, Workers, AI, Storage (S3), and Infra.
+ *  - Aggregates status, latency, and severity with clear summaries.
+ *  - Supports retries, timeouts, and threshold-based alerting.
+ *  - Integrates with auditService, admin notifications, Prometheus & telemetry.
+ *  - Periodic self-monitor for proactive issue detection.
  *
- * Usage:
- *  import { runFullHealthCheck, startPeriodicHealthMonitor } from "src/services/systemHealth.service";
- *
- * Notes:
- *  - Non-blocking: health checks should never crash the app.
- *  - Designed to be called by Super Admin endpoints and readiness/liveness probes.
+ * Design goals:
+ *  - Non-blocking & fault-tolerant (never crashes app)
+ *  - Composable: used by Super Admin API and /health endpoints
+ *  - Cloud-native: ready for Kubernetes probes and CI/CD checks
  */
 
 import prisma from "../prismaClient";
 import { logger } from "../logger";
 import { config } from "../config";
-import { checkWorkerHealth } from "../workers/index"; // health helper exported from workers manager
+import { checkWorkerHealth } from "../workers/index";
 import aiManager, { aiHealthCheck } from "../integrations/ai.bootstrap";
 import { uploadToS3, headObject } from "../lib/s3";
 import { addNotificationJob } from "../workers/notification.worker";
 import { auditService } from "./audit.service";
+import { recordError, workerJobsCount } from "../lib/core/metrics";
+import { telemetry } from "../lib/telemetry";
 
 type ComponentStatus = {
   ok: boolean;
@@ -48,192 +47,169 @@ export type SystemHealthReport = {
   summary: string;
 };
 
-/* Utility: measure elapsed time helper */
-const measure = async <T>(fn: () => Promise<T>, timeoutMs = 5000) => {
+/* ------------------------------------------------------------------------
+   🧭 Helper — Measure execution time with timeout & retry
+------------------------------------------------------------------------ */
+const measure = async <T>(fn: () => Promise<T>, timeoutMs = 5000, retries = 1) => {
   const start = Date.now();
-  const p = fn();
-  // simple timeout wrapper
-  const timeout = new Promise<never>((_, rej) =>
-    setTimeout(() => rej(new Error("timeout")), timeoutMs)
-  );
-  const res = await Promise.race([p, timeout]) as T;
-  const latency = Date.now() - start;
-  return { res, latency };
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const p = fn();
+      const timeout = new Promise<never>((_, rej) =>
+        setTimeout(() => rej(new Error("timeout")), timeoutMs)
+      );
+      await Promise.race([p, timeout]);
+      const latency = Date.now() - start;
+      return { latency, success: true };
+    } catch (err) {
+      if (attempt === retries) throw err;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+  }
+  return { latency: Date.now() - start, success: false };
 };
 
-/* -------------------------------
- * DB health check (Prisma)
- * ------------------------------- */
+/* ------------------------------------------------------------------------
+   🧱 DB Health Check (Prisma)
+------------------------------------------------------------------------ */
 export const checkDatabase = async (): Promise<ComponentStatus> => {
   try {
     const { latency } = await measure(async () => {
-      // Lightweight safe query
-      // Prisma returns a promise; don't use expensive queries here
-      // Use a tiny raw query for speed (SELECT 1)
       await prisma.$queryRaw`SELECT 1`;
     }, config.health.dbTimeoutMs ?? 3000);
 
+    telemetry.record("health.db.latency", latency);
     return { ok: true, latencyMs: latency, message: "Database reachable" };
   } catch (err: any) {
-    logger.error("[HEALTH] DB check failed", { err: err?.message || err });
+    recordError("db_health_check_failed", "critical");
+    logger.error("[HEALTH] DB check failed", { error: err?.message });
     return {
       ok: false,
-      latencyMs: null,
-      message: "Database unreachable or slow",
-      details: { error: err?.message || String(err) },
+      message: "Database unreachable",
       severity: "critical",
+      details: { error: err?.message },
     };
   }
 };
 
-/* -------------------------------
- * Redis / Queues health check
- * ------------------------------- */
+/* ------------------------------------------------------------------------
+   🔁 Redis / Queue Health
+------------------------------------------------------------------------ */
 export const checkRedisAndQueues = async (): Promise<ComponentStatus> => {
   try {
     const result = checkWorkerHealth ? await checkWorkerHealth() : { redis: "unknown" };
-    // interpret basic result
     const redisHealthy = result.redis === "healthy" || result.redis === "ready";
+    telemetry.record("health.redis.status", redisHealthy ? 1 : 0);
+
     const activeWorkers = result.activeWorkers ?? 0;
-    const queues = result.queues || [];
+    const queueNames = result.queues?.map((q: any) => q.name) ?? [];
+
+    queueNames.forEach((name: string) =>
+      workerJobsCount.labels(name).set(result.queues.find((q: any) => q.name === name)?.active || 0)
+    );
 
     return {
-      ok: !!redisHealthy,
-      latencyMs: null,
-      message: `Redis is ${result.redis}. Active workers: ${activeWorkers}`,
-      details: { redisStatus: result.redis, activeWorkers, queues },
+      ok: redisHealthy,
+      message: `Redis: ${result.redis}, Workers: ${activeWorkers}`,
+      details: { redisStatus: result.redis, activeWorkers, queueNames },
       severity: redisHealthy ? "info" : "critical",
     };
   } catch (err: any) {
-    logger.error("[HEALTH] Redis/queues check failed", { err: err?.message || err });
+    recordError("redis_health_check_failed", "critical");
+    logger.error("[HEALTH] Redis/Queues check failed", { error: err?.message });
     return {
       ok: false,
-      message: "Redis/Queue health check failed",
-      details: { error: err?.message || String(err) },
+      message: "Redis or queue system failed",
       severity: "critical",
+      details: { error: err?.message },
     };
   }
 };
 
-/* -------------------------------
- * Worker processes health check
- * ------------------------------- */
+/* ------------------------------------------------------------------------
+   ⚙️ Worker Process Health
+------------------------------------------------------------------------ */
 export const checkWorkers = async (): Promise<ComponentStatus> => {
   try {
-    const result = checkWorkerHealth ? await checkWorkerHealth() : { activeWorkers: 0, queues: [] };
-    const activeWorkers = result.activeWorkers ?? 0;
+    const result = await checkWorkerHealth();
+    const active = result.activeWorkers ?? 0;
     const queues = result.queues ?? [];
+    const ok = active > 0 && queues.length > 0;
 
-    // If no workers but queues exist — degraded
-    const ok = activeWorkers > 0 || queues.length === 0;
+    telemetry.record("health.workers.active", active);
 
     return {
       ok,
-      latencyMs: null,
-      message: `Workers active: ${activeWorkers}, queues: ${queues.length}`,
-      details: { activeWorkers, queues },
+      message: `Workers active: ${active}, queues: ${queues.length}`,
+      details: { active, queues },
       severity: ok ? "info" : "warning",
     };
   } catch (err: any) {
-    logger.error("[HEALTH] Workers check failed", { err });
+    recordError("worker_health_check_failed", "medium");
+    logger.error("[HEALTH] Worker check failed", { error: err?.message });
     return {
       ok: false,
-      message: "Workers health check failed",
-      details: { error: err?.message || String(err) },
-      severity: "critical",
+      message: "Worker subsystem error",
+      severity: "warning",
+      details: { error: err?.message },
     };
   }
 };
 
-/* -------------------------------
- * AI subsystem health check
- * ------------------------------- */
+/* ------------------------------------------------------------------------
+   🧠 AI Subsystem Health
+------------------------------------------------------------------------ */
 export const checkAI = async (): Promise<ComponentStatus> => {
   try {
-    // Use aiHealthCheck helper from bootstrap which returns detailed info
-    const start = Date.now();
-    const res = await aiHealthCheck();
-    const latency = Date.now() - start;
+    const { latency } = await measure(async () => {
+      await aiHealthCheck();
+    }, 5000);
 
-    // res is expected to be map of provider => { healthy: boolean, info }
-    const providers = res || {};
-    const unhealthy = Object.entries(providers).filter(([_, v]: any) => !v.healthy);
-
-    return {
-      ok: unhealthy.length === 0,
-      latencyMs: latency,
-      message: unhealthy.length ? `${unhealthy.length} providers unhealthy` : "AI providers healthy",
-      details: { providers },
-      severity: unhealthy.length ? "warning" : "info",
-    };
+    telemetry.record("health.ai.latency", latency);
+    return { ok: true, latencyMs: latency, message: "AI subsystem operational" };
   } catch (err: any) {
-    logger.error("[HEALTH] AI check failed", { err });
+    recordError("ai_health_check_failed", "warning");
+    logger.warn("[HEALTH] AI subsystem degraded", { error: err?.message });
     return {
       ok: false,
-      latencyMs: null,
-      message: "AI subsystem health check failed",
-      details: { error: err?.message || String(err) },
+      message: "AI subsystem degraded",
       severity: "warning",
+      details: { error: err?.message },
     };
   }
 };
 
-/* -------------------------------
- * Storage (S3) health check
- * ------------------------------- */
+/* ------------------------------------------------------------------------
+   ☁️ Storage Health (S3)
+------------------------------------------------------------------------ */
 export const checkStorage = async (): Promise<ComponentStatus> => {
   try {
-    // perform a metadata/head request on a lightweight key we expect to exist or a small health file
-    const healthKey = config.storage.healthObjectKey || "health_probe.txt";
+    const key = config.storage.healthObjectKey || "health_probe.txt";
+    const { latency } = await measure(async () => {
+      await headObject(key);
+    }, 3000);
 
-    // attempt headObject (adapter returns metadata or throws)
-    const start = Date.now();
-    try {
-      await headObject(healthKey); // should return metadata if exists
-    } catch (err: any) {
-      // if missing, attempt a small safe upload and delete cycle (in sandbox/dev)
-      if (config.nodeEnv !== "production") {
-        const testKey = `health/probe-${Date.now()}.tmp`;
-        await uploadToS3({
-          key: testKey,
-          body: Buffer.from("ok"),
-          contentType: "text/plain",
-        });
-        // optionally delete (implementation-dependent); ignore errors
-      } else {
-        // in production, treat missing health object as warning rather than critical
-        logger.warn("[HEALTH] S3 headObject failed (prod) - key may be missing", { key: healthKey, err: err?.message || err });
-      }
-    }
-    const latency = Date.now() - start;
-
-    return { ok: true, latencyMs: latency, message: "Storage reachable" };
+    telemetry.record("health.storage.latency", latency);
+    return { ok: true, latencyMs: latency, message: "S3 reachable" };
   } catch (err: any) {
-    logger.error("[HEALTH] Storage check failed", { err });
+    recordError("storage_health_check_failed", "critical");
+    logger.error("[HEALTH] Storage unreachable", { error: err?.message });
     return {
       ok: false,
-      latencyMs: null,
-      message: "Object storage unreachable",
-      details: { error: err?.message || String(err) },
+      message: "Storage unreachable",
       severity: "critical",
+      details: { error: err?.message },
     };
   }
 };
 
-/* -------------------------------
- * Aggregate full health report
- * ------------------------------- */
+/* ------------------------------------------------------------------------
+   📊 Aggregate Full Health Report
+------------------------------------------------------------------------ */
 export const runFullHealthCheck = async (): Promise<SystemHealthReport> => {
   const timestamp = new Date().toISOString();
 
-  // Run checks in parallel but keep them isolated
-  const [
-    db,
-    redisQueues,
-    workers,
-    ai,
-    storage,
-  ] = await Promise.allSettled([
+  const results = await Promise.allSettled([
     checkDatabase(),
     checkRedisAndQueues(),
     checkWorkers(),
@@ -241,121 +217,86 @@ export const runFullHealthCheck = async (): Promise<SystemHealthReport> => {
     checkStorage(),
   ]);
 
-  // Helper to normalize Promise.allSettled result
-  const unwrap = (r: PromiseSettledResult<ComponentStatus>) =>
+  const safe = (r: PromiseSettledResult<ComponentStatus>) =>
     r.status === "fulfilled" ? r.value : {
       ok: false,
-      message: "check failed",
-      details: { error: (r as any).reason?.message || String((r as any).reason) },
+      message: "Health check failed",
       severity: "critical",
+      details: { error: (r as any).reason?.message || String((r as any).reason) },
     };
 
-  const dbS = unwrap(db);
-  const redisS = unwrap(redisQueues);
-  const workersS = unwrap(workers);
-  const aiS = unwrap(ai);
-  const storageS = unwrap(storage);
-
-  // Determine overall status
-  const criticalFails = [dbS, redisS, storageS].filter((c) => !c.ok);
-  const warningFails = [workersS, aiS].filter((c) => !c.ok);
-
-  const overall = criticalFails.length > 0 ? "unhealthy" : warningFails.length > 0 ? "degraded" : "healthy";
+  const [db, redisQueues, workers, ai, storage] = results.map(safe);
+  const critical = [db, redisQueues, storage].some((c) => !c.ok);
+  const warning = [workers, ai].some((c) => !c.ok);
+  const overall = critical ? "unhealthy" : warning ? "degraded" : "healthy";
 
   const summary =
     overall === "healthy"
-      ? "All systems operational"
+      ? "✅ All systems operational"
       : overall === "degraded"
-      ? "Partial degradation detected (non-critical components)"
-      : "Critical components failing (immediate attention required)";
+      ? "⚠️ Non-critical degradation detected"
+      : "🚨 Critical system failure — immediate attention required";
 
-  const report: SystemHealthReport = {
-    timestamp,
-    db: dbS,
-    redisQueues: redisS,
-    workers: workersS,
-    ai: aiS,
-    storage: storageS,
-    overall,
-    summary,
-  };
-
-  logger.info("[HEALTH] Full health check executed", { overall, summary });
+  const report = { timestamp, db, redisQueues, workers, ai, storage, overall, summary };
+  telemetry.record("health.overall.status", overall === "healthy" ? 1 : 0);
+  logger.info("[HEALTH] Full check executed", { overall, summary });
 
   return report;
 };
 
-/* -------------------------------
- * Alerting & escalation
- * ------------------------------- */
+/* ------------------------------------------------------------------------
+   🚨 Alert Escalation & Notifications
+------------------------------------------------------------------------ */
 export const evaluateAndAlert = async (report: SystemHealthReport) => {
   try {
-    // If critical -> alert super admins and create audit log
-    if (report.overall === "unhealthy" || (report.db && report.db.severity === "critical") || (report.storage && report.storage.severity === "critical")) {
-      const message = `Critical health issue detected: ${report.summary}`;
-
-      // enqueue admin notification job (super admins are recipients)
+    if (report.overall === "unhealthy") {
+      const message = `🚨 Critical health issue detected: ${report.summary}`;
       await addNotificationJob({
         type: "systemAlert",
-        recipientId: "super-admins", // special handling in worker/repository to resolve recipients
+        recipientId: "super-admins",
         title: "Critical System Alert",
         body: message,
         channel: ["email", "inApp"],
         meta: { report },
       });
-
-      // Audit
       await auditService.log({
         actorId: "system",
         actorRole: "system",
         action: "SYSTEM_ALERT",
         details: { summary: report.summary, overall: report.overall },
       });
-
-      logger.warn("[HEALTH] Critical alert sent to super admins.");
+      logger.warn("[HEALTH] 🚨 Critical alert dispatched.");
     } else if (report.overall === "degraded") {
-      // send lower-priority notifications
       await addNotificationJob({
         type: "systemNotice",
         recipientId: "super-admins",
         title: "System Degraded",
-        body: `System degraded: ${report.summary}`,
+        body: report.summary,
         channel: ["inApp"],
-        meta: { report },
-      });
-
-      await auditService.log({
-        actorId: "system",
-        actorRole: "system",
-        action: "SYSTEM_ALERT",
-        details: { summary: report.summary, overall: report.overall },
       });
     }
   } catch (err: any) {
-    logger.error("[HEALTH] Failed to send alert", { err: err?.message || err });
+    recordError("health_alert_dispatch_failed", "medium");
+    logger.error("[HEALTH] Failed to send alert", { error: err?.message });
   }
 };
 
-/* -------------------------------
- * Periodic monitor
- * ------------------------------- */
+/* ------------------------------------------------------------------------
+   ⏱️ Periodic Monitor
+------------------------------------------------------------------------ */
 let monitorTimer: NodeJS.Timeout | null = null;
 
-export const startPeriodicHealthMonitor = (intervalMs = Number(config.health.checkIntervalMs) || 60_000) => {
-  if (monitorTimer) {
-    logger.warn("[HEALTH] Monitor already running");
-    return;
-  }
-  logger.info(`[HEALTH] Starting periodic health monitor (interval ${intervalMs}ms)`);
+export const startPeriodicHealthMonitor = (intervalMs = 60_000) => {
+  if (monitorTimer) return logger.warn("[HEALTH] Monitor already active.");
+  logger.info(`[HEALTH] 🩺 Starting periodic health monitor (${intervalMs / 1000}s)`);
 
   monitorTimer = setInterval(async () => {
     try {
       const report = await runFullHealthCheck();
-      // Escalate if needed
       await evaluateAndAlert(report);
-      // Optionally export metrics to monitoring pipeline here (Prometheus/Datadog)
-    } catch (err) {
-      logger.error("[HEALTH] Periodic monitor error", { err });
+    } catch (err: any) {
+      recordError("periodic_health_monitor_error", "medium");
+      logger.error("[HEALTH] Periodic monitor error", { error: err?.message });
     }
   }, intervalMs);
 };
@@ -364,24 +305,24 @@ export const stopPeriodicHealthMonitor = () => {
   if (monitorTimer) {
     clearInterval(monitorTimer);
     monitorTimer = null;
-    logger.info("[HEALTH] Periodic health monitor stopped");
+    logger.info("[HEALTH] Periodic monitor stopped.");
   }
 };
 
-/* -------------------------------
- * Simple readiness check (quick)
- * ------------------------------- */
+/* ------------------------------------------------------------------------
+   ⚡ Quick Readiness Check (K8s-friendly)
+------------------------------------------------------------------------ */
 export const quickReadinessCheck = async (): Promise<{ ready: boolean; reason?: string }> => {
   try {
     const db = await checkDatabase();
-    if (!db.ok) return { ready: false, reason: "Database check failed" };
+    if (!db.ok) return { ready: false, reason: "Database not ready" };
 
     const redis = await checkRedisAndQueues();
-    if (!redis.ok) return { ready: false, reason: "Redis/Queues not ready" };
+    if (!redis.ok) return { ready: false, reason: "Redis not ready" };
 
     return { ready: true };
   } catch (err: any) {
-    return { ready: false, reason: err?.message || String(err) };
+    return { ready: false, reason: err?.message };
   }
 };
 
