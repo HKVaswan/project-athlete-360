@@ -1,0 +1,150 @@
+# 💼 Project Athlete 360 – Billing & Refund Policy  
+**Version:** 1.0  
+**Last Updated:** {{ date }}  
+**Owner:** Finance & Compliance Team  
+
+---
+
+## 🧭 Purpose
+
+This policy defines how billing, subscriptions, free trials, overage charges, and refunds are handled on the **Project Athlete 360** platform.  
+It ensures **transparency**, **fair use**, and **legal protection** for both the organization and its users.
+
+---
+
+## 🧾 1. Subscription Billing
+
+### 1.1 Billing Cycles
+- All paid plans renew **automatically** at the end of their billing period (monthly or annually).  
+- Billing occurs in **Indian Rupees (₹)** for Indian users, and **USD ($)** for international customers.  
+- Invoices and receipts are automatically issued via our payment partners (Stripe/Razorpay).  
+
+### 1.2 Payment Methods
+- We accept **credit/debit cards**, **UPI**, and **NetBanking** (via Razorpay/Stripe gateways).  
+- Users are responsible for ensuring valid and active payment methods on file.  
+
+### 1.3 Taxes
+- Applicable **GST** (Goods & Services Tax) is added to all invoices as per Indian regulations.  
+- Business customers can provide **GSTIN** for input credit purposes.  
+
+---
+
+## 🧩 2. Free Trial Policy
+
+### 2.1 Eligibility
+- Each **individual and institution** is eligible for **one free trial** per lifetime.  
+- Our backend systems enforce this using the **trialAudit.service**, preventing trial reuse across:
+  - Email IDs  
+  - IPs  
+  - Devices  
+  - Institutions  
+
+### 2.2 Duration
+- Standard trial duration: **14 days** (unless specified otherwise on the signup page).  
+
+### 2.3 Transition After Trial
+- Upon expiry, users must **upgrade to a paid plan** to continue using premium features.  
+- Data from expired trials is **retained for 30 days** and then securely deleted.
+
+---
+
+## ⚙️ 3. Overage & Usage-Based Billing
+
+### 3.1 Overage Definition
+Overage occurs when an institution or user exceeds allocated:
+- Storage capacity (e.g., GB per plan)
+- API or data request quotas
+- Athlete or coach seat limits
+
+### 3.2 Detection & Enforcement
+- Overage is monitored continuously by the **overage.service.ts** and **planMonitor.worker.ts**.  
+- If sustained usage exceeds limits for **>24 hours**, the system may:
+  1. Notify via email and dashboard warnings.  
+  2. Automatically charge additional usage fees (based on configured overage rates).  
+  3. Enforce temporary feature restrictions if payment fails.  
+
+### 3.3 Transparency
+All plan limits and overage rates are displayed on:
+- [https://projectathlete360.com/pricing](https://projectathlete360.com/pricing)  
+- Within the user dashboard → *Billing > Plan Details*
+
+---
+
+## 💰 4. Refunds
+
+### 4.1 Eligibility for Refund
+Refunds are processed only under the following conditions:
+1. **Duplicate payment** made in error.  
+2. **Technical failure** during billing resulting in unrecognized charge.  
+3. **Cancellation within 7 days** of first subscription (applicable only once per user).  
+
+### 4.2 Non-Refundable Situations
+- Partial use of subscription after the first 7 days.  
+- Downgrade or mid-cycle cancellation.  
+- Account suspension due to policy violation.  
+- Promotional or discounted purchases.
+
+### 4.3 Processing
+- Refunds are handled by the **refund.service.ts**, routed securely via Stripe or Razorpay.  
+- Processing time: **5–10 business days**, depending on the payment gateway.  
+- Users receive email confirmation upon successful refund issuance.
+
+### 4.4 Fraud Prevention
+All refund requests undergo automatic eligibility checks and **admin verification** for high-value transactions (> ₹5,000).  
+
+---
+
+## 🧠 5. Plan Changes & Cancellations
+
+### 5.1 Upgrading
+- Upgrades take effect **immediately**, with prorated charges applied.  
+
+### 5.2 Downgrading
+- Downgrades take effect **at the end of the billing period**.  
+- No credits are issued for unused days in current billing cycle.  
+
+### 5.3 Cancellation
+- Users can cancel anytime from **Billing → Manage Plan**.  
+- Once canceled, auto-renewal stops, but access remains until plan expiry.  
+
+---
+
+## 🔒 6. Security & Compliance
+
+- All billing data is handled via **PCI-DSS compliant** gateways.  
+- Project Athlete 360 does **not** store full card information on its servers.  
+- Refunds and disputes are logged via **audit trails** for compliance verification.  
+- Legal oversight by the **Compliance & Data Protection Office** ensures regulatory alignment (RBI + IT Act 2000).
+
+---
+
+## 📄 7. Policy Updates
+
+Project Athlete 360 reserves the right to modify this billing policy at any time.  
+Any changes will be notified via email and updated on the **Terms of Service** and **Pricing** pages.
+
+---
+
+## 📞 8. Contact
+
+For billing queries or disputes:  
+**Email:** support@projectathlete360.com  
+**Subject Line:** *Billing / Refund Query – [Your Account ID]*  
+
+---
+
+### ✅ Summary Table
+
+| Policy Aspect | Duration / Rule | Automated Enforcement |
+|----------------|-----------------|------------------------|
+| Free Trial | 14 days | trialAudit.service |
+| Trial Reuse | 1 per lifetime | trialAudit.service |
+| Refund Window | 7 days | refund.service |
+| Overage Detection | 24h buffer | overage.service |
+| Refund Review | > ₹5,000 flagged | superAdminAlertsService |
+| Data Retention (Trial) | 30 days | storageMonitor.service |
+
+---
+
+© 2025 Project Athlete 360. All rights reserved.  
+Use of this platform constitutes acceptance of our [Terms of Service](./terms_of_service.md) and this billing policy.
