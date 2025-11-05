@@ -1,102 +1,200 @@
 /**
  * src/lib/core/metrics.ts
  * ------------------------------------------------------------------------
- * Enterprise-grade metrics collection and monitoring utility.
+ * Enterprise-grade observability metrics for Project Athlete 360.
  *
- * Tracks:
- *  - Request performance (latency, errors, throughput)
- *  - API-level usage (per role or endpoint)
- *  - Worker queue stats
- *  - AI prediction activity
- *  - System resource usage (CPU, memory)
- *
- * Exposes Prometheus-compatible metrics for Grafana dashboards.
+ * Features:
+ *  - Prometheus counters/gauges/histograms with sane cardinality
+ *  - API, worker, DB, and system metrics
+ *  - Auto-refreshing system resource gauges
+ *  - TraceId correlation for logs and traces (OpenTelemetry)
+ *  - Safe under clustering or concurrent worker models
+ * ------------------------------------------------------------------------
  */
 
 import client from "prom-client";
 import os from "os";
 import { logger } from "../../logger";
+import { context, trace } from "@opentelemetry/api";
 
-const collectDefaultMetrics = client.collectDefaultMetrics;
-collectDefaultMetrics({ prefix: "pa360_", timeout: 5000 }); // prefix for consistency
+const PREFIX = "pa360_";
 
-// ──────────────────────────────────────────────
-// 🧭 Custom Metrics
-// ──────────────────────────────────────────────
+/* ---------------------------------------------------------------------
+   🔧 Default Metrics
+   ------------------------------------------------------------------- */
+client.collectDefaultMetrics({
+  prefix: PREFIX,
+  timeout: 5000,
+});
 
-// API Request Duration Histogram
+export const register = client.register;
+
+/* ---------------------------------------------------------------------
+   📈 Custom Metrics Definitions
+   ------------------------------------------------------------------- */
+
+// API request metrics
 export const httpRequestDuration = new client.Histogram({
-  name: "pa360_http_request_duration_seconds",
-  help: "HTTP request latency distribution",
-  labelNames: ["method", "route", "status_code"],
+  name: `${PREFIX}http_request_duration_seconds`,
+  help: "HTTP request latency distribution (seconds)",
+  labelNames: ["method", "route", "status_code", "env"],
   buckets: [0.05, 0.1, 0.3, 0.5, 1, 2, 5],
 });
 
-// API Request Count Counter
 export const httpRequestCount = new client.Counter({
-  name: "pa360_http_requests_total",
-  help: "Total number of HTTP requests",
-  labelNames: ["method", "route", "status_code"],
+  name: `${PREFIX}http_requests_total`,
+  help: "Total number of HTTP requests handled",
+  labelNames: ["method", "route", "status_code", "env"],
 });
 
-// Error Counter
 export const errorCount = new client.Counter({
-  name: "pa360_error_count_total",
-  help: "Total number of errors logged",
-  labelNames: ["type", "severity"],
+  name: `${PREFIX}error_count_total`,
+  help: "Number of application errors logged",
+  labelNames: ["type", "severity", "env"],
 });
 
-// Worker Queue Jobs Counter
-export const workerJobsCount = new client.Gauge({
-  name: "pa360_worker_jobs_active",
-  help: "Number of active jobs per queue",
-  labelNames: ["queue_name"],
+export const workerJobDuration = new client.Histogram({
+  name: `${PREFIX}worker_job_duration_seconds`,
+  help: "Histogram of job processing duration per queue",
+  labelNames: ["queue_name", "status", "env"],
+  buckets: [0.1, 0.5, 1, 3, 5, 10, 30, 60],
 });
 
-// AI Activity Counter
+export const dbConnectionGauge = new client.Gauge({
+  name: `${PREFIX}db_connections_active`,
+  help: "Active database connections",
+  labelNames: ["pool_name", "env"],
+});
+
+export const storageUsageGauge = new client.Gauge({
+  name: `${PREFIX}storage_usage_bytes`,
+  help: "Storage usage per institution",
+  labelNames: ["institution_id", "env"],
+});
+
+export const trialAbuseCount = new client.Counter({
+  name: `${PREFIX}trial_abuse_detected_total`,
+  help: "Trial abuse detection events",
+  labelNames: ["institution_id", "env"],
+});
+
 export const aiActivityCount = new client.Counter({
-  name: "pa360_ai_activity_total",
-  help: "Number of AI-related events processed",
-  labelNames: ["type"],
+  name: `${PREFIX}ai_activity_total`,
+  help: "AI events processed (inference, training, etc.)",
+  labelNames: ["type", "env"],
 });
 
-// ──────────────────────────────────────────────
-// 🧠 Helper Functions
-// ──────────────────────────────────────────────
+/* ---------------------------------------------------------------------
+   ⚙️ System Resource Metrics
+   ------------------------------------------------------------------- */
+const systemCpuGauge = new client.Gauge({
+  name: `${PREFIX}system_cpu_load`,
+  help: "1-min CPU load average",
+});
 
+const systemMemoryGauge = new client.Gauge({
+  name: `${PREFIX}system_memory_usage_bytes`,
+  help: "Resident memory usage (bytes)",
+});
+
+setInterval(() => {
+  const cpu = os.loadavg()[0];
+  const mem = process.memoryUsage().rss;
+  systemCpuGauge.set(cpu);
+  systemMemoryGauge.set(mem);
+}, 60_000).unref();
+
+/* ---------------------------------------------------------------------
+   🧠 Helper Functions
+   ------------------------------------------------------------------- */
+
+/**
+ * Records HTTP metrics with trace correlation.
+ */
 export const recordRequestMetrics = (
   method: string,
   route: string,
   statusCode: number,
   durationSec: number
 ) => {
-  httpRequestDuration.labels(method, route, String(statusCode)).observe(durationSec);
-  httpRequestCount.labels(method, route, String(statusCode)).inc();
+  const span = trace.getSpan(context.active());
+  const traceId = span?.spanContext().traceId ?? "none";
+  const env = process.env.NODE_ENV || "unknown";
+
+  httpRequestDuration.labels(method, route, String(statusCode), env).observe(durationSec);
+  httpRequestCount.labels(method, route, String(statusCode), env).inc();
+
+  logger.debug({
+    traceId,
+    method,
+    route,
+    statusCode,
+    durationSec,
+    msg: "Request metrics recorded",
+  });
 };
 
-export const recordError = (type: string, severity: "low" | "medium" | "high" = "medium") => {
-  errorCount.labels(type, severity).inc();
+/**
+ * Records system/application errors for alerting.
+ */
+export const recordError = (
+  type: string,
+  severity: "low" | "medium" | "high" = "medium"
+) => {
+  const env = process.env.NODE_ENV || "unknown";
+  errorCount.labels(type, severity, env).inc();
 };
 
+/**
+ * Records queue/job metrics for worker systems.
+ */
+export const recordWorkerJob = (
+  queue: string,
+  durationSec: number,
+  status: "success" | "failed"
+) => {
+  const env = process.env.NODE_ENV || "unknown";
+  workerJobDuration.labels(queue, status, env).observe(durationSec);
+};
+
+/**
+ * Records active database connections.
+ */
+export const recordDBConnections = (poolName: string, active: number) => {
+  const env = process.env.NODE_ENV || "unknown";
+  dbConnectionGauge.labels(poolName, env).set(active);
+};
+
+/**
+ * Records per-institution storage usage.
+ */
+export const recordStorageUsage = (institutionId: string, bytes: number) => {
+  const env = process.env.NODE_ENV || "unknown";
+  storageUsageGauge.labels(institutionId, env).set(bytes);
+};
+
+/**
+ * Records AI activity events.
+ */
 export const recordAIActivity = (type: string) => {
-  aiActivityCount.labels(type).inc();
+  const env = process.env.NODE_ENV || "unknown";
+  aiActivityCount.labels(type, env).inc();
 };
 
-export const recordWorkerJobs = (queueName: string, activeJobs: number) => {
-  workerJobsCount.labels(queueName).set(activeJobs);
+/**
+ * Records trial abuse detections.
+ */
+export const recordTrialAbuse = (institutionId: string) => {
+  const env = process.env.NODE_ENV || "unknown";
+  trialAbuseCount.labels(institutionId, env).inc();
 };
 
-// ──────────────────────────────────────────────
-// 🌐 Metrics Endpoint Helper
-// ──────────────────────────────────────────────
-
-export const getMetrics = async () => {
-  return await client.register.metrics();
+/* ---------------------------------------------------------------------
+   🌐 Expose Metrics & System Snapshot
+   ------------------------------------------------------------------- */
+export const getMetrics = async (): Promise<string> => {
+  return await register.metrics();
 };
-
-// ──────────────────────────────────────────────
-// ⚙️ Resource Snapshot Utility
-// ──────────────────────────────────────────────
 
 export const getSystemSnapshot = () => {
   const memoryUsage = process.memoryUsage();
@@ -109,28 +207,15 @@ export const getSystemSnapshot = () => {
   };
 };
 
-// ──────────────────────────────────────────────
-// 🔒 Graceful Error Handling
-// ──────────────────────────────────────────────
+/* ---------------------------------------------------------------------
+   🧩 Error Handling Hooks
+   ------------------------------------------------------------------- */
 process.on("uncaughtException", (err) => {
   recordError("uncaught_exception", "high");
-  logger.error("[METRICS] Uncaught exception captured:", err);
+  logger.error("[METRICS] Uncaught exception captured", err);
 });
 
 process.on("unhandledRejection", (err: any) => {
   recordError("unhandled_rejection", "high");
-  logger.error("[METRICS] Unhandled rejection captured:", err);
+  logger.error("[METRICS] Unhandled rejection captured", err);
 });
-
-// ──────────────────────────────────────────────
-// 🧩 Example Express Integration (Optional)
-//
-// import express from "express";
-// import { getMetrics } from "../lib/core/metrics";
-// const router = express.Router();
-// router.get("/metrics", async (_, res) => {
-//   res.set("Content-Type", client.register.contentType);
-//   res.send(await getMetrics());
-// });
-// app.use("/metrics", router);
-// ──────────────────────────────────────────────
