@@ -1,0 +1,122 @@
+name: 🧪 DR Drill — Automated Backup & Restore Validation
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * 0" # Every Sunday at 3 AM UTC (customize as needed)
+
+permissions:
+  contents: read
+
+env:
+  NODE_ENV: test
+  TZ: "Asia/Kolkata"
+
+jobs:
+  drill-backup-restore:
+    name: 🧱 Simulate Full Backup → Restore → Verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:15
+        ports: ["5432:5432"]
+        env:
+          POSTGRES_DB: pa360_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: 🧩 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 📦 Install Dependencies
+        run: npm ci
+
+      - name: 🧠 Setup Environment
+        run: |
+          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/pa360_test" >> .env
+          echo "MASTER_KEY=${{ secrets.MASTER_KEY }}" >> .env
+          echo "BACKUP_ENCRYPTION_KEY=${{ secrets.BACKUP_ENCRYPTION_KEY }}" >> .env
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+          echo "ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}" >> .env
+          echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> .env
+          echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> .env
+          echo "AWS_REGION=ap-south-1" >> .env
+          echo "TEST_BACKUP_BUCKET=pa360-drill-test" >> .env
+
+      - name: 🗃️ Setup Database Schema
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/pa360_test"
+
+      - name: 🧩 Run Backup → Restore Integration Test
+        run: |
+          echo "Running full backup → restore pipeline test..."
+          npm run test:integration -- --runInBand
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/pa360_test"
+
+      - name: 🔐 Run Backup Encryption Test
+        run: |
+          echo "Running encryption validation test..."
+          npm run test:encryption -- --runInBand
+
+      - name: 📊 Generate Restore Drill Report
+        run: |
+          mkdir -p reports
+          echo "-------------------------------------" > reports/restore_drill_report.txt
+          echo "🏗️ Project Athlete 360 - Backup & Restore Drill" >> reports/restore_drill_report.txt
+          echo "Timestamp: $(date -u)" >> reports/restore_drill_report.txt
+          echo "Database: pa360_test" >> reports/restore_drill_report.txt
+          echo "Environment: CI (Ephemeral)" >> reports/restore_drill_report.txt
+          echo "Status: ✅ PASSED" >> reports/restore_drill_report.txt
+          echo "-------------------------------------" >> reports/restore_drill_report.txt
+
+      - name: 📤 Upload Drill Report Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: restore-drill-report
+          path: reports/restore_drill_report.txt
+
+      - name: 🚨 Notify on Failure (Email)
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.SMTP_USER }}
+          password: ${{ secrets.SMTP_PASS }}
+          subject: "❌ [Project Athlete 360] Backup/Restore Drill Failed"
+          body: |
+            Hello Team,
+            The automated backup-restore drill has failed.
+            Please check GitHub Actions logs for more details.
+
+            Regards,
+            CI Bot — Project Athlete 360
+          to: admin@pa360.net
+          from: "ci-bot@pa360.net"
+
+      - name: 💬 Optional: Slack Notification (Success)
+        if: success()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_COLOR: good
+          SLACK_MESSAGE: |
+            ✅ *Backup & Restore Drill Passed Successfully*
+            • Environment: CI (Test DB)
+            • Status: PASS
+            • Timestamp: $(date -u)
