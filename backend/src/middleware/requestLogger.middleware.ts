@@ -1,50 +1,117 @@
+/**
+ * src/middleware/requestLogger.middleware.ts
+ * ---------------------------------------------------------------------------
+ * 🌐 Enterprise Request Logger Middleware
+ *
+ * Integrates with:
+ *  - Winston enterprise logger (structured JSON)
+ *  - OpenTelemetry tracing (traceId + spanId injection)
+ *  - Metrics & Telemetry systems for latency and throughput
+ *
+ * Features:
+ *  - Captures request/response lifecycle with duration
+ *  - Attaches correlation ID (requestId) for all downstream logs
+ *  - Handles user/session metadata for traceability
+ *  - Detects slow requests (> threshold)
+ * ---------------------------------------------------------------------------
+ */
+
 import { Request, Response, NextFunction } from "express";
-import logger from "../logger";
+import { randomUUID } from "crypto";
+import { context, trace } from "@opentelemetry/api";
+import { telemetry } from "../lib/telemetry";
+import { logger } from "../logger";
 
-// Utility: Color codes for console readability
-const colors = {
-  reset: "\x1b[0m",
-  cyan: "\x1b[36m",
-  yellow: "\x1b[33m",
-  green: "\x1b[32m",
-  red: "\x1b[31m",
-  magenta: "\x1b[35m",
-};
+// ───────────────────────────────────────────────
+// ⚙️ Configurable thresholds
+// ───────────────────────────────────────────────
+const SLOW_REQUEST_THRESHOLD_MS = 1000;
 
-// ───────────────────────────────
-// 🛰️ Request Logger Middleware
-// ───────────────────────────────
-export const requestLogger = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+// ───────────────────────────────────────────────
+// 🛰 Middleware Implementation
+// ───────────────────────────────────────────────
+export const requestLogger = (req: Request, res: Response, next: NextFunction) => {
   const start = process.hrtime.bigint();
+  const requestId = randomUUID();
 
-  // Capture original res.send to measure response time
+  // Attach correlation ID to the request
+  (req as any).requestId = requestId;
+  req.headers["x-request-id"] = requestId;
+
+  // Capture trace context (if exists)
+  const activeSpan = trace.getSpan(context.active());
+  const traceContext = activeSpan ? activeSpan.spanContext() : undefined;
+
+  // Store original send to measure latency
   const originalSend = res.send.bind(res);
+
   res.send = (body?: any): Response => {
-    const duration = Number(process.hrtime.bigint() - start) / 1_000_000; // in ms
+    const durationMs = Number(process.hrtime.bigint() - start) / 1_000_000;
+    const status = res.statusCode;
+    const method = req.method;
+    const path = req.originalUrl;
+    const userId = (req as any).user?.id || "unauthenticated";
 
-    const method = `${colors.cyan}${req.method}${colors.reset}`;
-    const url = `${colors.yellow}${req.originalUrl}${colors.reset}`;
-    const statusColor =
-      res.statusCode >= 500
-        ? colors.red
-        : res.statusCode >= 400
-        ? colors.magenta
-        : res.statusCode >= 300
-        ? colors.yellow
-        : colors.green;
+    // Record telemetry metric
+    telemetry.record("http.request.duration.ms", durationMs, "timer", {
+      method,
+      route: path,
+      status: String(status),
+    });
 
-    const logMessage = `${method} ${url} → ${statusColor}${res.statusCode}${colors.reset} (${duration.toFixed(
-      1
-    )}ms)`;
+    // Structured JSON log entry
+    const logEntry = {
+      requestId,
+      traceId: traceContext?.traceId || null,
+      spanId: traceContext?.spanId || null,
+      method,
+      path,
+      status,
+      durationMs: Number(durationMs.toFixed(2)),
+      userId,
+      ip: req.ip,
+      ua: req.headers["user-agent"] || "unknown",
+    };
 
-    if (process.env.NODE_ENV !== "test") logger.http(logMessage);
+    // Categorize log level
+    if (status >= 500) logger.error("[HTTP ERROR]", logEntry);
+    else if (status >= 400) logger.warn("[HTTP WARN]", logEntry);
+    else logger.info("[HTTP OK]", logEntry);
 
+    // Flag slow requests
+    if (durationMs > SLOW_REQUEST_THRESHOLD_MS) {
+      logger.warn("[HTTP SLOW REQUEST]", {
+        ...logEntry,
+        warning: `Request exceeded ${SLOW_REQUEST_THRESHOLD_MS}ms`,
+      });
+    }
+
+    // Return response
     return originalSend(body);
   };
 
   next();
 };
+
+// ───────────────────────────────────────────────
+// 🧠 Optional middleware: attach correlation only
+// (useful for worker → API trace continuity)
+// ───────────────────────────────────────────────
+export const attachCorrelationId = (req: Request, _res: Response, next: NextFunction) => {
+  if (!(req as any).requestId) {
+    (req as any).requestId = randomUUID();
+    req.headers["x-request-id"] = (req as any).requestId;
+  }
+  next();
+};
+
+// ───────────────────────────────────────────────
+// 🧩 Example Express Integration:
+//
+// import express from "express";
+// import { requestLogger } from "../middleware/requestLogger.middleware";
+//
+// const app = express();
+// app.use(requestLogger);
+// app.listen(3000);
+// ───────────────────────────────────────────────
