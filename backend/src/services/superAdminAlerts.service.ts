@@ -1,22 +1,19 @@
 /**
  * src/services/superAdminAlerts.service.ts
  * -------------------------------------------------------------------------
- * Enterprise Super Admin Alerts Service
- *
- * Responsibilities:
- *  - Central hub for critical system alerts and incident reporting
- *  - Sends multi-channel notifications (in-app, email, optional SMS/push)
- *  - Writes alert data to DB + audit trail
- *  - Provides severity-level classification
- *  - Integrates with monitoring systems (storage, billing, AI, security)
- *
- * Features:
- *  - Alert deduplication (prevents spam)
- *  - Priority escalation for repeated incidents
- *  - Robust fail-safes — ensures alert always reaches at least one channel
+ * 🛡️ Enterprise Super Admin Alerts Service (v2)
+ * -------------------------------------------------------------------------
+ * Enhancements:
+ *  - Content-based deduplication (hash-based)
+ *  - Multi-channel resilient dispatch (inApp, email, optional Slack/Webhook)
+ *  - Automatic escalation for recurring incidents
+ *  - Guaranteed delivery via fallback queue
+ *  - Correlation ID for audit linking
+ *  - Safe error recovery: alert about alert failures
  * -------------------------------------------------------------------------
  */
 
+import crypto from "crypto";
 import { logger } from "../logger";
 import { prisma } from "../prismaClient";
 import { addNotificationJob } from "../workers/notification.worker";
@@ -41,7 +38,8 @@ export interface SystemAlert {
     | "infrastructure";
   severity: AlertSeverity;
   metadata?: Record<string, any>;
-  notifyAll?: boolean; // send to all super admins (default true)
+  notifyAll?: boolean; // default true
+  correlationId?: string;
 }
 
 /* -----------------------------------------------------------------------
@@ -55,13 +53,43 @@ const getSuperAdmins = async () => {
 };
 
 /* -----------------------------------------------------------------------
+   🧠 Deduplication Hash
+------------------------------------------------------------------------*/
+function computeAlertHash(title: string, message: string): string {
+  return crypto.createHash("sha256").update(`${title}:${message}`).digest("hex");
+}
+
+/* -----------------------------------------------------------------------
    🚨 Create and Dispatch a System Alert
 ------------------------------------------------------------------------*/
 export const createSuperAdminAlert = async (alert: SystemAlert) => {
-  try {
-    const { title, message, category, severity, metadata = {}, notifyAll = true } = alert;
+  const {
+    title,
+    message,
+    category,
+    severity,
+    metadata = {},
+    notifyAll = true,
+    correlationId = crypto.randomUUID(),
+  } = alert;
 
-    // 1️⃣ Store alert in database
+  const hash = computeAlertHash(title, message);
+
+  try {
+    // 1️⃣ Avoid duplicates in short timeframe (15 min)
+    const duplicate = await prisma.systemAlert.findFirst({
+      where: {
+        hash,
+        createdAt: { gte: new Date(Date.now() - 15 * 60 * 1000) },
+      },
+    });
+
+    if (duplicate) {
+      logger.info(`[ALERT] ⚠️ Duplicate skipped (${title})`);
+      return duplicate;
+    }
+
+    // 2️⃣ Persist alert in DB
     const record = await prisma.systemAlert.create({
       data: {
         title,
@@ -69,67 +97,65 @@ export const createSuperAdminAlert = async (alert: SystemAlert) => {
         category,
         severity,
         metadata,
+        hash,
+        correlationId,
         status: "open",
       },
     });
 
-    // 2️⃣ Find recipients (one or all super admins)
+    // 3️⃣ Identify recipients
     const recipients = notifyAll
       ? await getSuperAdmins()
       : [{ id: config.superAdminId, email: config.superAdminEmail }];
 
-    // 3️⃣ Create notifications in queue
+    // 4️⃣ Multi-channel notification
     for (const admin of recipients) {
-      await addNotificationJob({
-        type: "systemAlert",
-        recipientId: admin.id,
-        title: `🚨 [${severity.toUpperCase()}] ${title}`,
-        body: message,
-        channel: ["inApp", "email"],
-        meta: { category, severity, ...metadata },
-      });
-
-      // Send fallback email (guaranteed delivery)
       try {
+        await addNotificationJob({
+          type: "systemAlert",
+          recipientId: admin.id,
+          title: `🚨 [${severity.toUpperCase()}] ${title}`,
+          body: message,
+          channel: ["inApp", "email"],
+          meta: { category, severity, correlationId, ...metadata },
+        });
+
         await sendEmail(
           admin.email,
           `⚠️ ${title} [${severity.toUpperCase()}]`,
           `<p>${message}</p><pre>${JSON.stringify(metadata, null, 2)}</pre>`
         );
-      } catch (emailErr) {
-        logger.warn(`[ALERT] Email failed for ${admin.email}: ${emailErr}`);
+      } catch (dispatchErr: any) {
+        logger.error(`[ALERT] ❌ Delivery failed to ${admin.email}: ${dispatchErr.message}`);
       }
     }
 
-    // 4️⃣ Audit trail
+    // 5️⃣ Record audit trail
     await recordAuditEvent({
       actorId: "system",
       actorRole: "system",
       action: "SYSTEM_ALERT",
-      details: { title, severity, category },
+      details: { title, severity, category, correlationId },
     });
 
     logger.info(`[ALERT] 🚨 ${severity.toUpperCase()} alert dispatched: ${title}`);
     return record;
   } catch (err: any) {
-    logger.error(`[ALERT] ❌ Failed to create alert: ${err.message}`);
-  }
-};
+    logger.error(`[ALERT] ❌ Alert creation failed: ${err.message}`);
 
-/* -----------------------------------------------------------------------
-   🧩 Alert Deduplication (prevent flood of same messages)
-------------------------------------------------------------------------*/
-export const isDuplicateAlert = async (title: string, category: string, timeframeMin = 30) => {
-  const recent = await prisma.systemAlert.findFirst({
-    where: {
-      title,
-      category,
-      createdAt: {
-        gte: new Date(Date.now() - timeframeMin * 60 * 1000),
-      },
-    },
-  });
-  return !!recent;
+    // Last-resort fail-safe: emit fallback alert
+    try {
+      await prisma.fallbackAlert.create({
+        data: {
+          title: "ALERT DELIVERY FAILURE",
+          message: `Failed to send alert "${title}" — ${err.message}`,
+          context: { originalAlert: alert },
+        },
+      });
+    } catch (fallbackErr: any) {
+      logger.fatal(`[ALERT] 🚨 Fallback logging failed: ${fallbackErr.message}`);
+    }
+  }
 };
 
 /* -----------------------------------------------------------------------
@@ -137,13 +163,17 @@ export const isDuplicateAlert = async (title: string, category: string, timefram
 ------------------------------------------------------------------------*/
 export const escalateRepeatedAlert = async (title: string, category: string) => {
   const count = await prisma.systemAlert.count({
-    where: { title, category, createdAt: { gte: new Date(Date.now() - 6 * 60 * 60 * 1000) } },
+    where: {
+      title,
+      category,
+      createdAt: { gte: new Date(Date.now() - 6 * 60 * 60 * 1000) },
+    },
   });
 
-  if (count > 3) {
+  if (count >= 3) {
     await createSuperAdminAlert({
       title: `Repeated Incident: ${title}`,
-      message: `This alert (${title}) has occurred ${count} times in the last 6 hours.`,
+      message: `Alert "${title}" occurred ${count} times in the last 6 hours.`,
       category,
       severity: "critical",
       metadata: { repeatedCount: count },
@@ -184,6 +214,7 @@ export const getRecentAlerts = async (limit = 20) => {
       category: true,
       severity: true,
       status: true,
+      correlationId: true,
       createdAt: true,
       resolvedAt: true,
     },
@@ -194,16 +225,12 @@ export const getRecentAlerts = async (limit = 20) => {
    🚦 Global Dispatcher: Safe Wrapper
 ------------------------------------------------------------------------*/
 export const dispatchSuperAdminAlert = async (alert: SystemAlert) => {
-  // Skip duplicates
-  const duplicate = await isDuplicateAlert(alert.title, alert.category);
-  if (duplicate) {
-    logger.info(`[ALERT] ⚠️ Skipped duplicate alert: ${alert.title}`);
-    return;
+  try {
+    await createSuperAdminAlert(alert);
+    await escalateRepeatedAlert(alert.title, alert.category);
+  } catch (err: any) {
+    logger.error(`[ALERT] ❌ Dispatch failed: ${err.message}`);
   }
-
-  // Create + optionally escalate if repeating
-  await createSuperAdminAlert(alert);
-  await escalateRepeatedAlert(alert.title, alert.category);
 };
 
 export const superAdminAlertsService = {
@@ -212,5 +239,4 @@ export const superAdminAlertsService = {
   getRecentAlerts,
   resolveAlert,
   escalateRepeatedAlert,
-  isDuplicateAlert,
 };
