@@ -1,40 +1,50 @@
 /**
  * src/workers/queue.monitor.ts
  * --------------------------------------------------------------------
- * Enterprise Queue Monitor Utility
+ * 🚀 Enterprise Queue Monitor Utility
  *
  * Responsibilities:
  *  - Periodically inspects all active queues and workers.
  *  - Detects failed, delayed, or stuck jobs.
  *  - Automatically retries eligible jobs (configurable).
- *  - Reports queue health metrics to logger / analytics.
- *  - Sends alerts for anomalies (future: Slack, Email, etc.).
+ *  - Reports queue health metrics → Prometheus + telemetry.
+ *  - Sends alerts and audit logs for anomalies.
+ *  - Built for distributed & cloud environments.
  */
 
-import { queues, workers } from "./index";
+import { queues } from "./index";
 import { logger } from "../logger";
 import { config } from "../config";
+import { recordWorkerJobs, recordError } from "../lib/core/metrics";
+import { telemetry } from "../lib/telemetry";
+import { auditService } from "../lib/audit";
+import Analytics from "../lib/analytics";
 
-const CHECK_INTERVAL = 60 * 1000; // 1 minute
+const CHECK_INTERVAL_MS = 60 * 1000; // 1 minute
 const MAX_RETRY_ATTEMPTS = 3;
+const ALERT_DELAYED_THRESHOLD = 10;
+const ALERT_FAILED_THRESHOLD = 5;
 
 export class QueueMonitor {
   private timer: NodeJS.Timeout | null = null;
+  private isRunning = false;
 
   /**
-   * Start periodic monitoring of queues
+   * Start the monitoring cycle
    */
   start() {
     if (this.timer) return;
-    logger.info("[QUEUE MONITOR] 🚀 Starting queue monitoring service...");
+    logger.info("[QUEUE MONITOR] 🚀 Queue monitoring service started.");
 
-    this.timer = setInterval(async () => {
-      await this.checkAllQueues();
-    }, CHECK_INTERVAL);
+    this.timer = setInterval(() => {
+      this.checkAllQueues().catch((err) =>
+        logger.error("[QUEUE MONITOR] Unhandled error:", err)
+      );
+    }, CHECK_INTERVAL_MS);
   }
 
   /**
-   * Stop the monitor safely
+   * Stop the monitor gracefully
    */
   stop() {
     if (this.timer) {
@@ -45,41 +55,58 @@ export class QueueMonitor {
   }
 
   /**
-   * Check all registered queues for anomalies
+   * Main check loop
    */
   private async checkAllQueues() {
+    if (this.isRunning) {
+      logger.warn("[QUEUE MONITOR] Previous cycle still running — skipping this tick.");
+      return;
+    }
+
+    this.isRunning = true;
+    logger.info(`[QUEUE MONITOR] 🔍 Inspecting all queues... (${Object.keys(queues).length})`);
+
     for (const [name, queue] of Object.entries(queues)) {
       try {
-        const [activeCount, waitingCount, failedCount, delayedCount] = await Promise.all([
+        const [active, waiting, failed, delayed] = await Promise.all([
           queue.getActiveCount(),
           queue.getWaitingCount(),
           queue.getFailedCount(),
           queue.getDelayedCount(),
         ]);
 
-        const healthStatus = {
-          active: activeCount,
-          waiting: waitingCount,
-          failed: failedCount,
-          delayed: delayedCount,
-        };
+        const health = { active, waiting, failed, delayed };
+        recordWorkerJobs(name, active);
+        telemetry.record(`queue.${name}.active`, active);
+        telemetry.record(`queue.${name}.failed`, failed);
+        telemetry.record(`queue.${name}.delayed`, delayed);
 
-        logger.info(`[QUEUE MONITOR] 📊 ${name} status: ${JSON.stringify(healthStatus)}`);
+        logger.info(`[QUEUE MONITOR] 📊 ${name} → ${JSON.stringify(health)}`);
 
-        if (failedCount > 0) await this.handleFailedJobs(name);
-        if (delayedCount > 10) logger.warn(`[QUEUE MONITOR] ⚠️ ${name} has high delayed jobs count (${delayedCount}).`);
+        // 🚨 Alerts and recovery logic
+        if (failed > ALERT_FAILED_THRESHOLD) {
+          await this.alert(`High failure count in queue: ${name}`, { failed });
+          await this.handleFailedJobs(name);
+        }
+
+        if (delayed > ALERT_DELAYED_THRESHOLD) {
+          await this.alert(`High delayed job count in queue: ${name}`, { delayed });
+        }
       } catch (err: any) {
-        logger.error(`[QUEUE MONITOR] ❌ Failed to inspect queue '${name}': ${err.message}`);
+        recordError("queue_monitor_error", "medium");
+        logger.error(`[QUEUE MONITOR] ❌ Error inspecting ${name}: ${err.message}`);
       }
     }
+
+    this.isRunning = false;
   }
 
   /**
-   * Retry failed jobs safely, respecting attempt limits
+   * Automatically retry failed jobs within attempt limit
    */
   private async handleFailedJobs(queueName: string) {
     const queue = queues[queueName];
-    const failedJobs = await queue.getFailed(0, 50); // fetch first 50 failed jobs
+    const failedJobs = await queue.getFailed(0, 50);
 
     for (const job of failedJobs) {
       try {
@@ -87,35 +114,71 @@ export class QueueMonitor {
           await job.retry();
           logger.info(`[QUEUE MONITOR] 🔁 Retried job ${job.id} (${queueName})`);
         } else {
-          logger.warn(`[QUEUE MONITOR] 🛑 Job ${job.id} exceeded max retries.`);
+          logger.warn(`[QUEUE MONITOR] 🛑 Job ${job.id} exceeded retry limit (${MAX_RETRY_ATTEMPTS}).`);
         }
       } catch (err: any) {
-        logger.error(`[QUEUE MONITOR] ❌ Failed to retry job ${job.id}: ${err.message}`);
+        recordError("queue_job_retry_error", "low");
+        logger.error(`[QUEUE MONITOR] ❌ Retry failed for job ${job.id}: ${err.message}`);
       }
     }
   }
 
   /**
-   * Generate a quick queue health summary
+   * Dispatch alert via analytics + audit trail
+   */
+  private async alert(message: string, data?: Record<string, any>) {
+    logger.warn(`[QUEUE MONITOR] ⚠️ ${message}`, data || {});
+
+    try {
+      await auditService.log({
+        actorId: "system",
+        actorRole: "system",
+        action: "QUEUE_ALERT",
+        details: {
+          message,
+          ...data,
+          timestamp: new Date().toISOString(),
+        },
+      });
+
+      Analytics.telemetry("queue-alert", {
+        message,
+        environment: config.nodeEnv,
+        ...data,
+      });
+    } catch (err: any) {
+      logger.error("[QUEUE MONITOR] ⚠️ Failed to report alert:", err.message);
+    }
+  }
+
+  /**
+   * Summarized queue metrics for dashboards or API
    */
   async getHealthSummary() {
     const summary: Record<string, any> = {};
 
     for (const [name, queue] of Object.entries(queues)) {
       try {
-        const counts = await queue.getJobCounts();
-        summary[name] = counts;
+        summary[name] = await queue.getJobCounts();
       } catch (err: any) {
         summary[name] = { error: err.message };
       }
     }
 
     return {
-      environment: config.nodeEnv,
       timestamp: new Date().toISOString(),
+      environment: config.nodeEnv,
       summary,
     };
   }
 }
 
+// Singleton instance
 export const queueMonitor = new QueueMonitor();
+
+// Optional auto-start in worker mode
+if (process.env.ENABLE_QUEUE_MONITOR === "true") {
+  queueMonitor.start();
+  process.on("SIGTERM", () => queueMonitor.stop());
+  process.on("SIGINT", () => queueMonitor.stop());
+}
