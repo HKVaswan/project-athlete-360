@@ -1,0 +1,179 @@
+/**
+ * src/services/overage.service.ts
+ * --------------------------------------------------------------------------
+ * 💰 Overage Detection & Billing Service (Enterprise Grade)
+ *
+ * Responsibilities:
+ *  - Detect usage that exceeds plan limits (athletes, storage, API calls, etc.)
+ *  - Compute and apply overage charges per policy in planConfig.ts
+ *  - Notify admins and billing service for invoice generation
+ *  - Audit all overage and refund events for traceability
+ *
+ * Integrations:
+ *  - planConfig.ts       → Plan definitions & pricing
+ *  - billing.service.ts  → Invoice generation and charge posting
+ *  - quota.service.ts    → Usage metrics (athlete, storage, etc.)
+ *  - audit.service.ts    → Immutable audit trail
+ *  - adminNotification.service.ts → Super Admin alerts
+ * --------------------------------------------------------------------------
+ */
+
+import { prisma } from "../prismaClient";
+import { logger } from "../logger";
+import { getPlanDefinition, calculateOverage } from "../config/planConfig";
+import { billingService } from "./billing.service";
+import { quotaService } from "./quota.service";
+import { auditService } from "./audit.service";
+import { adminNotificationService } from "./adminNotification.service";
+
+/* ---------------------------------------------------------------------------
+   🧩 Type Definitions
+--------------------------------------------------------------------------- */
+export interface OverageContext {
+  institutionId: string;
+  planId: string;
+  usage: {
+    athletes: number;
+    storageGB: number;
+  };
+  billingCycleStart: Date;
+  billingCycleEnd: Date;
+}
+
+/* ---------------------------------------------------------------------------
+   🧮 Core Service
+--------------------------------------------------------------------------- */
+class OverageService {
+  /**
+   * Evaluate an account’s usage against its subscribed plan.
+   */
+  async checkAndBillOverage(ctx: OverageContext): Promise<{
+    overageAmount: number;
+    details: Record<string, number>;
+  }> {
+    const plan = getPlanDefinition(ctx.planId);
+    logger.info(`[OVERAGE] Checking usage for institution ${ctx.institutionId} (plan: ${plan.id})`);
+
+    const overageAmount = calculateOverage(ctx.planId, ctx.usage);
+    const details = {
+      athletesOver: Math.max(ctx.usage.athletes - plan.features.maxAthletes, 0),
+      storageOver: Math.max(ctx.usage.storageGB - plan.features.storageGB, 0),
+    };
+
+    // No overage
+    if (overageAmount <= 0) {
+      logger.debug(`[OVERAGE] No overage for institution ${ctx.institutionId}`);
+      return { overageAmount: 0, details };
+    }
+
+    // Record in DB (for transparency and analytics)
+    await prisma.overageRecord.create({
+      data: {
+        institutionId: ctx.institutionId,
+        planId: plan.id,
+        amount: overageAmount,
+        details,
+        billingCycleStart: ctx.billingCycleStart,
+        billingCycleEnd: ctx.billingCycleEnd,
+        createdAt: new Date(),
+        status: "PENDING",
+      },
+    });
+
+    // Generate invoice or update subscription
+    await billingService.createOverageInvoice({
+      institutionId: ctx.institutionId,
+      amount: overageAmount,
+      description: `Overage detected (${details.athletesOver} extra athletes, ${details.storageOver}GB over limit).`,
+    });
+
+    // Log audit
+    await auditService.log({
+      actorId: "system",
+      actorRole: "system",
+      action: "SYSTEM_ALERT",
+      details: {
+        event: "overage_billed",
+        institutionId: ctx.institutionId,
+        planId: plan.id,
+        amount: overageAmount,
+        details,
+      },
+    });
+
+    // Notify admin
+    await adminNotificationService.notifyInstitutionAdmins(ctx.institutionId, {
+      subject: "Overage Detected on Your Plan",
+      message: `Your usage has exceeded your current plan limits.\n\nTotal Overage Charge: ₹${overageAmount}\nExtra Athletes: ${details.athletesOver}\nExtra Storage: ${details.storageOver} GB\n\nTo avoid future overages, consider upgrading to a higher plan.`,
+    });
+
+    logger.warn(`[OVERAGE] 💰 Institution ${ctx.institutionId} billed ₹${overageAmount} in overages.`);
+
+    return { overageAmount, details };
+  }
+
+  /**
+   * Routine: check all active institutions for overages (cron job).
+   */
+  async runGlobalOverageCheck(): Promise<void> {
+    logger.info("[OVERAGE] 🔄 Running global overage audit...");
+
+    const activeSubs = await prisma.subscription.findMany({
+      where: { status: "active" },
+      select: {
+        id: true,
+        planId: true,
+        institutionId: true,
+        currentPeriodStart: true,
+        currentPeriodEnd: true,
+      },
+    });
+
+    for (const sub of activeSubs) {
+      try {
+        const usage = await quotaService.getInstitutionUsage(sub.institutionId);
+        await this.checkAndBillOverage({
+          institutionId: sub.institutionId,
+          planId: sub.planId,
+          usage,
+          billingCycleStart: sub.currentPeriodStart,
+          billingCycleEnd: sub.currentPeriodEnd,
+        });
+      } catch (err: any) {
+        logger.error(`[OVERAGE] ❌ Failed for ${sub.institutionId}: ${err.message}`);
+      }
+    }
+
+    logger.info(`[OVERAGE] ✅ Global overage audit completed for ${activeSubs.length} subscriptions.`);
+  }
+
+  /**
+   * Manually forgive or reverse an overage (Super Admin only)
+   */
+  async reverseOverage(overageId: string, adminId: string) {
+    const record = await prisma.overageRecord.findUnique({ where: { id: overageId } });
+    if (!record) throw new Error("Overage record not found");
+
+    await prisma.overageRecord.update({
+      where: { id: overageId },
+      data: { status: "REVERSED" },
+    });
+
+    await auditService.log({
+      actorId: adminId,
+      actorRole: "super_admin",
+      action: "ADMIN_OVERRIDE",
+      details: {
+        event: "overage_reversed",
+        overageId,
+      },
+    });
+
+    logger.info(`[OVERAGE] 🔄 Overage ${overageId} reversed by super admin ${adminId}`);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   🚀 Export Singleton
+--------------------------------------------------------------------------- */
+export const overageService = new OverageService();
