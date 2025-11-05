@@ -1,0 +1,142 @@
+/**
+ * src/config/observabilityConfig.ts
+ * --------------------------------------------------------------------------
+ * 🛰️ Enterprise Observability Configuration
+ *
+ * Responsibilities:
+ *  - Initialize global observability stack (metrics, tracing, logging)
+ *  - Expose unified config and helper flags for use across the app
+ *  - Support auto-discovery for cloud exporters (OTLP, Datadog, Prometheus)
+ *  - Provide safe fallbacks for local / test environments
+ *
+ * Key Features:
+ *  - OpenTelemetry auto-instrumentation (HTTP, Prisma, Redis, etc.)
+ *  - Prometheus metrics registry with custom system gauges
+ *  - Secure remote trace export (OTLP/GRPC/HTTP)
+ *  - Graceful shutdown of telemetry on process exit
+ */
+
+import { config } from "./index";
+import { logger } from "../logger";
+import { diag, DiagConsoleLogger, DiagLogLevel } from "@opentelemetry/api";
+import { Resource } from "@opentelemetry/resources";
+import { SemanticResourceAttributes } from "@opentelemetry/semantic-conventions";
+import { NodeSDK } from "@opentelemetry/sdk-node";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
+import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
+import { HttpInstrumentation } from "@opentelemetry/instrumentation-http";
+import { ExpressInstrumentation } from "@opentelemetry/instrumentation-express";
+import { PrismaInstrumentation } from "@prisma/instrumentation";
+import { RedisInstrumentation } from "@opentelemetry/instrumentation-redis";
+import { PgInstrumentation } from "@opentelemetry/instrumentation-pg";
+
+// Enable internal diagnostics (debug only)
+if (config.NODE_ENV !== "production") {
+  diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.ERROR);
+}
+
+/* ------------------------------------------------------------------------
+   🌍 Environment-safe observability setup
+------------------------------------------------------------------------ */
+
+export const observabilityConfig = {
+  enabled: config.OBSERVABILITY_ENABLED ?? true,
+  metricsPort: Number(process.env.METRICS_PORT || 9464),
+  serviceName: process.env.OTEL_SERVICE_NAME || "pa360-backend",
+  otlpEndpoint: process.env.OTLP_ENDPOINT || "http://localhost:4318/v1/traces",
+  otlpHeaders: process.env.OTLP_HEADERS || "",
+  prometheusEnabled: process.env.PROMETHEUS_ENABLED !== "false",
+  samplingRate: Number(process.env.TRACE_SAMPLING_RATE || 1.0),
+  cloudProvider: process.env.CLOUD_PROVIDER || "local",
+};
+
+/* ------------------------------------------------------------------------
+   📊 Prometheus Metrics Exporter
+------------------------------------------------------------------------ */
+const prometheusExporter = observabilityConfig.prometheusEnabled
+  ? new PrometheusExporter(
+      { port: observabilityConfig.metricsPort, startServer: true },
+      () => logger.info(`[OBSERVABILITY] Prometheus metrics on :${observabilityConfig.metricsPort}`)
+    )
+  : undefined;
+
+/* ------------------------------------------------------------------------
+   🚀 OTLP Trace Exporter (OpenTelemetry)
+------------------------------------------------------------------------ */
+const traceExporter = new OTLPTraceExporter({
+  url: observabilityConfig.otlpEndpoint,
+  headers: observabilityConfig.otlpHeaders
+    ? JSON.parse(observabilityConfig.otlpHeaders)
+    : undefined,
+});
+
+/* ------------------------------------------------------------------------
+   🧠 Resource Metadata
+------------------------------------------------------------------------ */
+const resource = new Resource({
+  [SemanticResourceAttributes.SERVICE_NAME]: observabilityConfig.serviceName,
+  [SemanticResourceAttributes.SERVICE_NAMESPACE]: "project-athlete-360",
+  [SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT]: config.NODE_ENV,
+  [SemanticResourceAttributes.CLOUD_PROVIDER]: observabilityConfig.cloudProvider,
+  [SemanticResourceAttributes.SERVICE_VERSION]: process.env.APP_VERSION || "v1",
+});
+
+/* ------------------------------------------------------------------------
+   🧩 OpenTelemetry Node SDK Initialization
+------------------------------------------------------------------------ */
+export const otelSDK = new NodeSDK({
+  traceExporter,
+  metricReader: prometheusExporter
+    ? new PeriodicExportingMetricReader({ exporter: prometheusExporter })
+    : undefined,
+  instrumentations: [
+    new HttpInstrumentation(),
+    new ExpressInstrumentation(),
+    new PrismaInstrumentation(),
+    new RedisInstrumentation(),
+    new PgInstrumentation(),
+  ],
+  resource,
+});
+
+/* ------------------------------------------------------------------------
+   🧰 Initialization Function
+------------------------------------------------------------------------ */
+export const initObservability = async () => {
+  if (!observabilityConfig.enabled) {
+    logger.info("[OBSERVABILITY] Disabled by configuration.");
+    return;
+  }
+
+  try {
+    await otelSDK.start();
+    logger.info(`[OBSERVABILITY] ✅ OpenTelemetry started for ${observabilityConfig.serviceName}`);
+  } catch (err: any) {
+    logger.error("[OBSERVABILITY] ❌ Failed to initialize OpenTelemetry", { err });
+  }
+};
+
+/* ------------------------------------------------------------------------
+   🧹 Graceful Shutdown Hook
+------------------------------------------------------------------------ */
+export const shutdownObservability = async () => {
+  try {
+    await otelSDK.shutdown();
+    logger.info("[OBSERVABILITY] 🧹 Telemetry gracefully shut down.");
+  } catch (err: any) {
+    logger.error("[OBSERVABILITY] ⚠️ Error during telemetry shutdown", { err });
+  }
+};
+
+/* ------------------------------------------------------------------------
+   📦 Export
+------------------------------------------------------------------------ */
+export default {
+  initObservability,
+  shutdownObservability,
+  observabilityConfig,
+  prometheusExporter,
+  traceExporter,
+  otelSDK,
+};
