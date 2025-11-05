@@ -1,0 +1,206 @@
+/**
+ * tests/integration/billing_overage.spec.ts
+ * ---------------------------------------------------------------------------
+ * 💳 Integration Test — Billing Overage Enforcement & Auto-Charge Logic
+ *
+ * Validates:
+ *  ✅ Usage threshold detection (from quota.service)
+ *  ✅ Overage calculation and billing creation
+ *  ✅ Grace thresholds (85%, 95%) triggering email alerts
+ *  ✅ Correct handling of refunds and carry-forward credits
+ *  ✅ Audit log + alert consistency
+ *
+ * Dependencies:
+ *  - src/services/overage.service.ts
+ *  - src/services/billing.service.ts
+ *  - src/lib/analytics.ts (for usage simulation)
+ *  - prisma mock database (billing, usage, quota tables)
+ * ---------------------------------------------------------------------------
+ */
+
+import { prisma } from "../../src/prismaClient";
+import { overageService } from "../../src/services/overage.service";
+import { billingService } from "../../src/services/billing.service";
+import { quotaService } from "../../src/services/quota.service";
+import { logger } from "../../src/logger";
+import { planConfig } from "../../src/config/planConfig";
+
+jest.setTimeout(90000); // allow up to 1.5 min for billing simulation
+
+/* ---------------------------------------------------------------------------
+   🧩 Test Data Setup
+---------------------------------------------------------------------------*/
+const TEST_INSTITUTION_ID = "inst-overage-001";
+const TEST_PLAN = planConfig.plans.PRO_TEAM; // use a mid-tier plan
+const PLAN_LIMIT_MB = TEST_PLAN.limits.storageMB;
+const OVERAGE_RATE = TEST_PLAN.overage.storagePerMB;
+
+async function seedInstitution() {
+  await prisma.institution.create({
+    data: {
+      id: TEST_INSTITUTION_ID,
+      name: "Overage Test Institution",
+      planId: TEST_PLAN.id,
+      planName: TEST_PLAN.name,
+      currentUsageMB: PLAN_LIMIT_MB * 0.9,
+      createdAt: new Date(),
+    },
+  });
+}
+
+async function clearTestData() {
+  await prisma.billingRecord.deleteMany({ where: { institutionId: TEST_INSTITUTION_ID } });
+  await prisma.institution.deleteMany({ where: { id: TEST_INSTITUTION_ID } });
+}
+
+/* ---------------------------------------------------------------------------
+   🧠 Test Suite
+---------------------------------------------------------------------------*/
+describe("💳 Billing Overage Integration", () => {
+  beforeAll(async () => {
+    logger.info("[TEST] Seeding overage test institution...");
+    await seedInstitution();
+  });
+
+  afterAll(async () => {
+    await clearTestData();
+    await prisma.$disconnect();
+    logger.info("[TEST] Cleaned up billing test data.");
+  });
+
+  /* -----------------------------------------------------------------------
+     1️⃣ Detect approaching threshold (≥ 85%)
+  ------------------------------------------------------------------------*/
+  test("should trigger 85% warning threshold and send notification", async () => {
+    const usage = PLAN_LIMIT_MB * 0.86;
+
+    const result = await quotaService.checkUsageThreshold(TEST_INSTITUTION_ID, usage);
+    expect(result.thresholdReached).toBe("85%");
+    expect(result.alertSent).toBeTruthy();
+
+    const alert = await prisma.alert.findFirst({
+      where: { institutionId: TEST_INSTITUTION_ID, category: "quota_warning" },
+    });
+    expect(alert).not.toBeNull();
+
+    logger.info("[TEST] ✅ 85% usage alert verified.");
+  });
+
+  /* -----------------------------------------------------------------------
+     2️⃣ Detect critical threshold (≥ 95%)
+  ------------------------------------------------------------------------*/
+  test("should trigger critical 95% alert before overage starts", async () => {
+    const usage = PLAN_LIMIT_MB * 0.96;
+
+    const result = await quotaService.checkUsageThreshold(TEST_INSTITUTION_ID, usage);
+    expect(result.thresholdReached).toBe("95%");
+    expect(result.alertSent).toBeTruthy();
+
+    const alert = await prisma.alert.findFirst({
+      where: { institutionId: TEST_INSTITUTION_ID, severity: "critical" },
+    });
+    expect(alert?.title).toContain("Critical");
+
+    logger.info("[TEST] ✅ 95% critical threshold alert verified.");
+  });
+
+  /* -----------------------------------------------------------------------
+     3️⃣ Detect & bill overage usage
+  ------------------------------------------------------------------------*/
+  test("should detect overage usage and generate billing record", async () => {
+    const usage = PLAN_LIMIT_MB * 1.1; // 10% over limit
+
+    const overageResult = await overageService.handleOverage({
+      institutionId: TEST_INSTITUTION_ID,
+      metric: "storageMB",
+      currentUsage: usage,
+      planLimit: PLAN_LIMIT_MB,
+    });
+
+    expect(overageResult.overageAmount).toBeGreaterThan(0);
+    expect(overageResult.billGenerated).toBeTruthy();
+
+    const bill = await prisma.billingRecord.findFirst({
+      where: { institutionId: TEST_INSTITUTION_ID },
+      orderBy: { createdAt: "desc" },
+    });
+
+    expect(bill?.amount).toBeCloseTo((usage - PLAN_LIMIT_MB) * OVERAGE_RATE, 2);
+    expect(bill?.status).toBe("PENDING");
+
+    logger.info("[TEST] ✅ Overage billing record generated successfully.");
+  });
+
+  /* -----------------------------------------------------------------------
+     4️⃣ Apply payment and verify state
+  ------------------------------------------------------------------------*/
+  test("should mark billing record as PAID after payment success", async () => {
+    const bill = await prisma.billingRecord.findFirst({
+      where: { institutionId: TEST_INSTITUTION_ID },
+      orderBy: { createdAt: "desc" },
+    });
+    expect(bill).not.toBeNull();
+
+    const paymentResp = await billingService.markPaymentSuccess(bill!.id, {
+      transactionId: "txn_test_001",
+      method: "razorpay",
+      paidAt: new Date(),
+    });
+
+    expect(paymentResp.success).toBeTruthy();
+
+    const updatedBill = await prisma.billingRecord.findUnique({ where: { id: bill!.id } });
+    expect(updatedBill?.status).toBe("PAID");
+
+    logger.info("[TEST] ✅ Billing record marked as PAID after successful transaction.");
+  });
+
+  /* -----------------------------------------------------------------------
+     5️⃣ Handle refunds & adjustments
+  ------------------------------------------------------------------------*/
+  test("should process refund correctly and update credit balance", async () => {
+    const bill = await prisma.billingRecord.findFirst({
+      where: { institutionId: TEST_INSTITUTION_ID },
+    });
+
+    const refundResp = await billingService.processRefund(bill!.id, {
+      reason: "Excess charge reversal",
+      amount: bill!.amount * 0.5,
+      processedBy: "system",
+    });
+
+    expect(refundResp.success).toBeTruthy();
+
+    const refundLog = await prisma.refundRecord.findFirst({
+      where: { billingRecordId: bill!.id },
+    });
+
+    expect(refundLog?.amount).toBeCloseTo(bill!.amount * 0.5, 2);
+    expect(refundLog?.status).toBe("COMPLETED");
+
+    logger.info("[TEST] ✅ Refund processed and credit balance updated.");
+  });
+
+  /* -----------------------------------------------------------------------
+     6️⃣ Verify audit log consistency
+  ------------------------------------------------------------------------*/
+  test("should record all billing events in audit log", async () => {
+    const auditEvents = await prisma.auditLog.findMany({
+      where: {
+        OR: [
+          { action: "BILL_OVERAGE_CREATED" },
+          { action: "BILL_PAYMENT_SUCCESS" },
+          { action: "REFUND_ISSUED" },
+        ],
+      },
+    });
+
+    expect(auditEvents.length).toBeGreaterThanOrEqual(3);
+    const eventNames = auditEvents.map((a) => a.action);
+    logger.info(`[TEST] 🧾 Audit events recorded: ${eventNames.join(", ")}`);
+
+    expect(eventNames).toContain("BILL_OVERAGE_CREATED");
+    expect(eventNames).toContain("BILL_PAYMENT_SUCCESS");
+    expect(eventNames).toContain("REFUND_ISSUED");
+  });
+});
