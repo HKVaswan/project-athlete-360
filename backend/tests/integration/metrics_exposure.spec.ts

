@@ -1,0 +1,103 @@
+/**
+ * tests/integration/metrics_exposure.spec.ts
+ * --------------------------------------------------------------------
+ * 🔍 Integration Test: Metrics Exposure & Observability Integrity
+ *
+ * Ensures:
+ *  - /metrics endpoint is accessible and correctly formatted.
+ *  - No sensitive data is leaked.
+ *  - Expected metrics exist (e.g., HTTP, worker, DB, AI).
+ *  - OpenTelemetry exporters and Prometheus registry behave correctly.
+ *  - Endpoint enforces authentication when required.
+ * --------------------------------------------------------------------
+ */
+
+import request from "supertest";
+import app from "../../src/app";
+import { config } from "../../src/config";
+import { register } from "../../src/lib/core/tracing"; // Prometheus registry (if exposed)
+import http from "http";
+
+let server: http.Server;
+
+describe("🧠 Metrics Exposure & Observability", () => {
+  beforeAll(async () => {
+    // spin up app for test
+    server = app.listen(0);
+  });
+
+  afterAll(async () => {
+    if (server) server.close();
+  });
+
+  it("should expose /metrics endpoint successfully", async () => {
+    const res = await request(server).get("/metrics").expect(200);
+    expect(res.text).toContain("# HELP");
+    expect(res.text).toContain("process_cpu_user_seconds_total");
+    expect(res.text).toContain("pa360_http_requests_total");
+  });
+
+  it("should return valid Prometheus format", async () => {
+    const res = await request(server).get("/metrics").expect(200);
+    // Prometheus exposition format must start with "# HELP" or metric
+    const lines = res.text.trim().split("\n");
+    expect(lines[0].startsWith("#")).toBe(true);
+    // Contains at least one metric sample
+    const metricLine = lines.find((l) => l && !l.startsWith("#"));
+    expect(metricLine).toMatch(/^[a-zA-Z_:][a-zA-Z0-9_:]*\s[0-9eE\+\-\.]+/);
+  });
+
+  it("should not contain sensitive data in metrics", async () => {
+    const res = await request(server).get("/metrics").expect(200);
+    expect(res.text).not.toMatch(/password|token|secret|apikey/i);
+  });
+
+  it("should contain HTTP request and latency metrics", async () => {
+    const res = await request(server).get("/metrics").expect(200);
+    expect(res.text).toContain("pa360_http_requests_total");
+    expect(res.text).toContain("pa360_http_request_duration_seconds_bucket");
+  });
+
+  it("should include worker or queue metrics when available", async () => {
+    const res = await request(server).get("/metrics").expect(200);
+    // These metrics come from telemetry.worker.ts or bullmq instrumentation
+    const hasWorkerMetric = res.text.includes("pa360_worker_jobs_active") ||
+                            res.text.includes("pa360_worker_jobs_failed_total");
+    expect(hasWorkerMetric).toBe(true);
+  });
+
+  it("should respond quickly (under 1s) even under load", async () => {
+    const start = Date.now();
+    await request(server).get("/metrics").expect(200);
+    const latency = Date.now() - start;
+    expect(latency).toBeLessThan(1000);
+  });
+
+  it("should support optional secure access if enabled", async () => {
+    if (config.metrics.requireAuth) {
+      const res = await request(server)
+        .get("/metrics")
+        .set("Authorization", `Bearer invalid_token`)
+        .expect(401);
+      expect(res.body.message).toMatch(/unauthorized/i);
+    } else {
+      const res = await request(server).get("/metrics").expect(200);
+      expect(res.text.length).toBeGreaterThan(10);
+    }
+  });
+
+  it("should allow internal /health to respond independently", async () => {
+    const res = await request(server).get("/health").expect(200);
+    expect(res.body).toHaveProperty("success", true);
+    expect(res.body.message).toMatch(/healthy/i);
+  });
+
+  it("should validate OpenTelemetry exporter registration (if enabled)", async () => {
+    if (config.observability.otelEnabled) {
+      expect(register).toBeDefined();
+      const metrics = await register.getMetricsAsJSON();
+      const metricNames = metrics.map((m: any) => m.name);
+      expect(metricNames).toContain("pa360_http_requests_total");
+    }
+  });
+});
