@@ -1,0 +1,85 @@
+# --------------------------------------------------------------------------
+# Prometheus Configuration — Project Athlete 360
+# --------------------------------------------------------------------------
+# Version: 1.0
+# Purpose:
+#   Centralized observability and metrics aggregation for the
+#   backend (API + workers) of Project Athlete 360.
+#
+# Key Monitored Targets:
+#   - Backend API metrics (/metrics endpoint)
+#   - Worker/Queue metrics
+#   - Node system metrics (optional node_exporter)
+# --------------------------------------------------------------------------
+
+global:
+  scrape_interval: 15s       # Collect metrics every 15 seconds
+  evaluation_interval: 15s   # Evaluate rules every 15 seconds
+  scrape_timeout: 10s
+
+# --------------------------------------------------------------------------
+# Alerting (optional placeholder — to be wired with Alertmanager)
+# --------------------------------------------------------------------------
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []   # e.g. ["alertmanager:9093"]
+
+# --------------------------------------------------------------------------
+# Rule Files (for alert thresholds)
+# --------------------------------------------------------------------------
+rule_files:
+  - "rules/*.yml"
+
+# --------------------------------------------------------------------------
+# Scrape Configurations
+# --------------------------------------------------------------------------
+scrape_configs:
+  # 🧩 Backend API Metrics
+  - job_name: "backend-api"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets:
+          - "backend:3000"          # backend service
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: "backend"
+
+  # ⚙️ Worker Service Metrics
+  - job_name: "workers"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets:
+          - "worker:4000"           # worker service metrics port
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: "worker"
+
+  # 🧠 Node System Metrics (optional — node_exporter)
+  - job_name: "node-exporter"
+    static_configs:
+      - targets:
+          - "node-exporter:9100"
+
+  # 🌐 PostgreSQL Exporter (optional for DB health)
+  - job_name: "postgres-exporter"
+    static_configs:
+      - targets:
+          - "postgres-exporter:9187"
+
+# --------------------------------------------------------------------------
+# Example Rules (to add later in rules/*.yml):
+#
+# groups:
+#   - name: api_health
+#     rules:
+#       - alert: HighErrorRate
+#         expr: rate(pa360_error_count_total[5m]) > 0.05
+#         for: 5m
+#         labels:
+#           severity: warning
+#         annotations:
+#           summary: "High error rate detected on API"
+# --------------------------------------------------------------------------
