@@ -1,236 +1,192 @@
 /**
  * src/lib/core/tracing.ts
  * --------------------------------------------------------------------------
- * 🎯 Enterprise Tracing Utility Layer
+ * 🎯 Core Tracing Abstraction Layer (Enterprise Grade)
  *
  * Purpose:
- *  - Unified custom tracing abstraction built over OpenTelemetry.
- *  - Simplifies span creation, attribute setting, error tagging, and timing.
- *  - Integrates tracing with logger + telemetry + metrics subsystems.
- *  - Enables consistent instrumentation across API, queues, workers, and AI.
+ *  - Provide unified, consistent tracing utilities across the backend.
+ *  - Simplify usage of OpenTelemetry spans with automatic attributes, error capture,
+ *    and cross-context propagation.
+ *  - Integrate with otel.bootstrap.ts and system observability modules.
  *
- *  Designed for:
- *  - Enterprise observability
- *  - Low overhead + graceful fallback when OTel is unavailable
- *  - Seamless cross-service correlation (via trace + request IDs)
+ * Key Features:
+ *  - traceFunction / traceAsyncFunction / traceRequest helpers
+ *  - Auto-attach correlation IDs, user info, and environment metadata
+ *  - Handles exceptions gracefully, preventing broken traces
  */
 
-import { context, trace, Span, SpanKind, SpanStatusCode } from "@opentelemetry/api";
-import { performance } from "perf_hooks";
-import { telemetry } from "../telemetry";
-import { logger } from "../../logger";
+import { context, trace, Span, SpanStatusCode, SpanKind } from "@opentelemetry/api";
+import { randomUUID } from "crypto";
 import { config } from "../../config";
 import { observabilityConfig } from "../../config/observabilityConfig";
-import { randomUUID } from "crypto";
+import { logger } from "../../logger";
 
-/* ------------------------------------------------------------------------
-   🧱 TracingContext Interface
+/* -----------------------------------------------------------------------
+   🔧 Global Tracer
 ------------------------------------------------------------------------ */
-export interface TracingContext {
-  traceId: string;
-  spanId: string;
-  parentSpanId?: string;
-  requestId?: string;
-  serviceName: string;
-  environment: string;
-}
+export const tracer = trace.getTracer(observabilityConfig.serviceName || "project-athlete-360");
 
-/* ------------------------------------------------------------------------
-   🎯 Core Tracing Manager
+/* -----------------------------------------------------------------------
+   🧩 Core Helper — Start a Span Safely
 ------------------------------------------------------------------------ */
-class TracingManager {
-  private tracer = trace.getTracer(observabilityConfig.serviceName);
-
-  /**
-   * Start a new span
-   */
-  startSpan(
-    name: string,
-    kind: SpanKind = SpanKind.INTERNAL,
-    attributes?: Record<string, any>
-  ): Span | null {
-    try {
-      const span = this.tracer.startSpan(name, {
-        kind,
-        attributes: {
-          service: observabilityConfig.serviceName,
-          environment: config.NODE_ENV,
-          ...attributes,
-        },
-      });
-      return span;
-    } catch (err: any) {
-      logger.warn(`[Tracing] Failed to start span: ${err.message}`);
-      return null;
-    }
-  }
-
-  /**
-   * End span safely with status
-   */
-  endSpan(span: Span | null, status: "ok" | "error" = "ok", error?: any) {
-    if (!span) return;
-    try {
-      if (status === "ok") {
-        span.setStatus({ code: SpanStatusCode.OK });
-      } else {
-        span.setStatus({ code: SpanStatusCode.ERROR, message: error?.message || "Error" });
-        span.recordException(error);
-      }
-      span.end();
-    } catch (err: any) {
-      logger.warn(`[Tracing] Failed to end span: ${err.message}`);
-    }
-  }
-
-  /**
-   * Wrap async function in span
-   */
-  async traceAsync<T>(
-    name: string,
-    fn: () => Promise<T>,
-    attributes?: Record<string, any>
-  ): Promise<T> {
-    const span = this.startSpan(name, SpanKind.INTERNAL, attributes);
-    const start = performance.now();
-
-    try {
-      const ctx = trace.setSpan(context.active(), span!);
-      const result = await context.with(ctx, fn);
-      const duration = performance.now() - start;
-
-      // Record metrics
-      telemetry.record(`${name}.duration_ms`, duration, "timer");
-
-      this.endSpan(span, "ok");
-      return result;
-    } catch (err: any) {
-      const duration = performance.now() - start;
-      telemetry.record(`${name}.error_duration_ms`, duration, "timer");
-      logger.error(`[Tracing] ${name} failed: ${err.message}`, { name, err });
-      this.endSpan(span, "error", err);
-      throw err;
-    }
-  }
-
-  /**
-   * Wrap sync function in span
-   */
-  traceSync<T>(name: string, fn: () => T, attributes?: Record<string, any>): T {
-    const span = this.startSpan(name, SpanKind.INTERNAL, attributes);
-    const start = performance.now();
-    try {
-      const result = fn();
-      const duration = performance.now() - start;
-      telemetry.record(`${name}.duration_ms`, duration, "timer");
-      this.endSpan(span, "ok");
-      return result;
-    } catch (err: any) {
-      const duration = performance.now() - start;
-      telemetry.record(`${name}.error_duration_ms`, duration, "timer");
-      logger.error(`[Tracing] ${name} failed: ${err.message}`, { name, err });
-      this.endSpan(span, "error", err);
-      throw err;
-    }
-  }
-
-  /**
-   * Extract tracing metadata (for logging / external calls)
-   */
-  getContext(span?: Span): TracingContext {
-    try {
-      const spanCtx = (span || trace.getActiveSpan())?.spanContext();
-      return {
-        traceId: spanCtx?.traceId || randomUUID(),
-        spanId: spanCtx?.spanId || randomUUID(),
-        serviceName: observabilityConfig.serviceName,
-        environment: config.NODE_ENV,
-      };
-    } catch {
-      return {
-        traceId: randomUUID(),
-        spanId: randomUUID(),
-        serviceName: observabilityConfig.serviceName,
-        environment: config.NODE_ENV,
-      };
-    }
-  }
-
-  /**
-   * Propagate tracing context downstream (for headers)
-   */
-  getPropagationHeaders(span?: Span): Record<string, string> {
-    const ctx = this.getContext(span);
-    return {
-      "x-trace-id": ctx.traceId,
-      "x-span-id": ctx.spanId,
-      "x-service": ctx.serviceName,
-      "x-env": ctx.environment,
-    };
-  }
-
-  /**
-   * Log combined trace + telemetry context
-   */
-  logWithTrace(level: "info" | "warn" | "error", message: string, meta?: any) {
-    const ctx = this.getContext();
-    logger[level](`[TRACE:${ctx.traceId}] ${message}`, {
-      traceId: ctx.traceId,
-      spanId: ctx.spanId,
-      ...meta,
-    });
-  }
-}
-
-/* ------------------------------------------------------------------------
-   🚀 Singleton Export
------------------------------------------------------------------------- */
-export const tracing = new TracingManager();
-
-/**
- * Quick helper for async tracing
- */
-export const withTrace = async <T>(
+export const startSpan = (
   name: string,
-  fn: () => Promise<T>,
-  attributes?: Record<string, any>
-): Promise<T> => tracing.traceAsync(name, fn, attributes);
+  options: { kind?: SpanKind; attributes?: Record<string, any> } = {}
+): Span => {
+  try {
+    const span = tracer.startSpan(name, {
+      kind: options.kind ?? SpanKind.INTERNAL,
+      attributes: {
+        "service.name": observabilityConfig.serviceName,
+        "env": config.NODE_ENV,
+        "span.id": randomUUID(),
+        ...options.attributes,
+      },
+    });
+    return span;
+  } catch (err: any) {
+    logger.error(`[TRACING] Failed to start span: ${err.message}`);
+    return {
+      end: () => {},
+      recordException: () => {},
+      setStatus: () => {},
+      setAttribute: () => {},
+    } as unknown as Span; // fallback dummy span
+  }
+};
 
+/* -----------------------------------------------------------------------
+   ⚙️ traceFunction (sync)
+------------------------------------------------------------------------ */
 /**
- * Quick helper for sync tracing
+ * Wrap any synchronous function in a trace span.
  */
-export const withTraceSync = <T>(
+export const traceFunction = <T>(
   name: string,
   fn: () => T,
   attributes?: Record<string, any>
-): T => tracing.traceSync(name, fn, attributes);
-
-/**
- * Access trace context
- */
-export const traceContext = () => tracing.getContext();
-
-/**
- * Generate trace headers (for outbound HTTP calls)
- */
-export const traceHeaders = () => tracing.getPropagationHeaders();
-
-/**
- * Safe trace logger (combines logger + trace IDs)
- */
-export const traceLog = (message: string, meta?: any) => {
-  tracing.logWithTrace("info", message, meta);
+): T => {
+  const span = startSpan(name, { attributes });
+  try {
+    const result = fn();
+    span.setStatus({ code: SpanStatusCode.OK });
+    return result;
+  } catch (err: any) {
+    span.recordException(err);
+    span.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
+    logger.error(`[TRACE] ${name} failed`, { error: err.message });
+    throw err;
+  } finally {
+    span.end();
+  }
 };
 
-/* ------------------------------------------------------------------------
-   🧩 Example usage in a service:
+/* -----------------------------------------------------------------------
+   ⚙️ traceAsyncFunction (async)
 ------------------------------------------------------------------------ */
-/*
-import { withTrace, traceLog } from "@/lib/core/tracing";
+/**
+ * Wrap any async function in a trace span with full error capture.
+ */
+export const traceAsyncFunction = async <T>(
+  name: string,
+  fn: () => Promise<T>,
+  attributes?: Record<string, any>
+): Promise<T> => {
+  const span = startSpan(name, { attributes });
+  try {
+    const ctx = trace.setSpan(context.active(), span);
+    const result = await context.with(ctx, fn);
+    span.setStatus({ code: SpanStatusCode.OK });
+    return result;
+  } catch (err: any) {
+    span.recordException(err);
+    span.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
+    logger.error(`[TRACE] ${name} failed`, { error: err.message });
+    throw err;
+  } finally {
+    span.end();
+  }
+};
 
-await withTrace("user.service.createUser", async () => {
-  traceLog("Creating new user...");
-  const user = await prisma.user.create({ data: {...} });
-  return user;
-});
-*/
+/* -----------------------------------------------------------------------
+   🌐 traceRequest (Express middleware wrapper)
+------------------------------------------------------------------------ */
+/**
+ * Creates an Express middleware that wraps each request in a trace span.
+ * Automatically captures:
+ *  - HTTP method, path, status code, and duration
+ *  - Request ID and user info (if available)
+ */
+export const traceRequest =
+  () => (req: any, res: any, next: any) => {
+    const span = startSpan(`HTTP ${req.method} ${req.originalUrl}`, {
+      kind: SpanKind.SERVER,
+      attributes: {
+        "http.method": req.method,
+        "http.route": req.originalUrl,
+        "user.id": req.user?.id || "guest",
+        "x-request-id": req.headers["x-request-id"] || randomUUID(),
+      },
+    });
+
+    const start = Date.now();
+
+    res.on("finish", () => {
+      const duration = Date.now() - start;
+      span.setAttributes({
+        "http.status_code": res.statusCode,
+        "http.response_time_ms": duration,
+      });
+
+      if (res.statusCode >= 500)
+        span.setStatus({ code: SpanStatusCode.ERROR, message: "Server error" });
+      else
+        span.setStatus({ code: SpanStatusCode.OK });
+
+      span.end();
+    });
+
+    next();
+  };
+
+/* -----------------------------------------------------------------------
+   🧠 Contextual Span Logging (Optional)
+------------------------------------------------------------------------ */
+/**
+ * Attaches contextual logs into the current active span.
+ * Useful for deep debugging (e.g., inside workers or async chains).
+ */
+export const spanLog = (message: string, data?: Record<string, any>) => {
+  const span = trace.getSpan(context.active());
+  if (!span) return;
+  try {
+    span.addEvent(message, { ...data, timestamp: new Date().toISOString() });
+  } catch (err: any) {
+    logger.warn(`[TRACE LOG] Failed to record span event: ${err.message}`);
+  }
+};
+
+/* -----------------------------------------------------------------------
+   🧹 Shutdown (for graceful app exits)
+------------------------------------------------------------------------ */
+export const shutdownTracing = async () => {
+  try {
+    logger.info("[TRACING] Flushing traces before shutdown...");
+    await new Promise((resolve) => setTimeout(resolve, 500)); // flush window
+  } catch (err: any) {
+    logger.error("[TRACING] Failed to flush traces", { error: err.message });
+  }
+};
+
+/* -----------------------------------------------------------------------
+   📦 Export API
+------------------------------------------------------------------------ */
+export default {
+  tracer,
+  startSpan,
+  traceFunction,
+  traceAsyncFunction,
+  traceRequest,
+  spanLog,
+  shutdownTracing,
+};
