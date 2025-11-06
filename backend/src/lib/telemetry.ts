@@ -1,178 +1,225 @@
 /**
  * src/lib/telemetry.ts
  * --------------------------------------------------------------------------
- * 🧠 Enterprise-grade Telemetry & Observability Layer
+ * 🌐 Enterprise Telemetry Layer
  *
  * Purpose:
- *  - Unified telemetry for metrics, traces, and logs.
- *  - Integrates seamlessly with Prometheus, OpenTelemetry, Datadog, etc.
- *  - Supports async worker instrumentation and distributed trace correlation.
- *  - Enables unified observability across API + background jobs + AI workers.
- * --------------------------------------------------------------------------
+ *  - Centralized metric + trace capture for the backend.
+ *  - Dual-mode: standalone (internal metrics) or integrated with OpenTelemetry.
+ *  - Tracks key system indicators: latency, errors, throughput, and queue health.
+ *  - Supports async-safe batching, high-precision timers, and service labeling.
+ *  - Exports metrics periodically to console, OTel, or analytics pipeline.
+ *
+ * Design Goals:
+ *  - Minimal performance overhead.
+ *  - No-crash guarantee — telemetry never breaks business logic.
+ *  - Graceful degradation if exporters (e.g., OTLP, Prometheus) are unavailable.
  */
 
 import os from "os";
 import { performance } from "perf_hooks";
-import { EventEmitter } from "events";
-import { context, trace, SpanStatusCode } from "@opentelemetry/api";
-import logger from "../logger";
+import EventEmitter from "events";
+import { logger } from "../logger";
 import { config } from "../config";
+import { trace } from "@opentelemetry/api";
+import { observabilityConfig } from "../config/observabilityConfig";
+import { otelHealthCheck } from "../integrations/otel.bootstrap";
 
 type MetricType = "counter" | "gauge" | "histogram" | "timer";
 
-interface Metric {
+export interface Metric {
   name: string;
-  type: MetricType;
   value: number;
+  type: MetricType;
   labels?: Record<string, string>;
-  traceId?: string;
-  timestamp?: number;
+  timestamp: number;
 }
 
-/**
- * 🚀 Telemetry Core Class
- * Handles metric buffering, trace correlation, and exporter integration.
- */
+export interface TelemetryOptions {
+  flushIntervalMs?: number;
+  maxBufferSize?: number;
+  enableOtelIntegration?: boolean;
+}
+
 class Telemetry extends EventEmitter {
-  private metrics: Metric[] = [];
+  private buffer: Metric[] = [];
   private lastFlush = Date.now();
-  private flushInterval: NodeJS.Timeout | null = null;
+  private flushTimer: NodeJS.Timeout | null = null;
+  private readonly opts: TelemetryOptions;
+  private readonly tracer = trace.getTracer(observabilityConfig.serviceName);
 
-  constructor() {
+  constructor(opts: TelemetryOptions = {}) {
     super();
-    this.startAutoFlush();
-    logger.info(`[telemetry] ✅ Initialized telemetry system for ${config.nodeEnv}`);
-  }
-
-  /**
-   * Record a single metric event (with optional trace context)
-   */
-  record(name: string, value: number, type: MetricType = "gauge", labels?: Record<string, string>) {
-    const activeSpan = trace.getSpan(context.active());
-    const traceId = activeSpan?.spanContext()?.traceId;
-
-    const metric: Metric = {
-      name,
-      value,
-      type,
-      labels,
-      traceId,
-      timestamp: Date.now(),
+    this.opts = {
+      flushIntervalMs: opts.flushIntervalMs ?? 15_000,
+      maxBufferSize: opts.maxBufferSize ?? 500,
+      enableOtelIntegration: opts.enableOtelIntegration ?? true,
     };
 
-    this.metrics.push(metric);
+    this.startAutoFlush();
+    logger.info("[Telemetry] ✅ Initialized core telemetry engine");
   }
 
-  /**
-   * Measure and record execution time of async functions.
-   * Automatically correlates with active trace span.
-   */
-  timer<T extends (...args: any[]) => Promise<any>>(name: string, fn: T): T {
-    return (async (...args: any[]) => {
-      const span = trace.getTracer("telemetry").startSpan(name);
-      const start = performance.now();
-      try {
-        const result = await fn(...args);
-        const duration = performance.now() - start;
-        this.record(name, duration, "timer");
-        span.setStatus({ code: SpanStatusCode.OK });
-        span.end();
-        return result;
-      } catch (err: any) {
-        const duration = performance.now() - start;
-        this.record(`${name}_error`, duration, "timer");
-        span.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
-        span.end();
-        throw err;
-      }
-    }) as T;
-  }
+  /* ------------------------------------------------------------------------
+     🧠 Core API
+  ------------------------------------------------------------------------ */
 
   /**
-   * Collect local system metrics (runtime health snapshot)
+   * Record any numeric metric (safe + async)
    */
-  collectSystemMetrics() {
-    const cpuLoad = os.loadavg()[0];
-    const totalMemMB = os.totalmem() / 1024 / 1024;
-    const usedMemMB = process.memoryUsage().rss / 1024 / 1024;
-    const uptime = process.uptime();
-
-    this.record("system.cpu.load", Number(cpuLoad.toFixed(2)));
-    this.record("system.memory.used.mb", Number(usedMemMB.toFixed(2)));
-    this.record("system.memory.total.mb", Number(totalMemMB.toFixed(2)));
-    this.record("system.uptime.seconds", uptime);
-  }
-
-  /**
-   * Auto-flush buffer periodically (safe for long-running workers)
-   */
-  startAutoFlush(intervalMs = 10000) {
-    if (this.flushInterval) clearInterval(this.flushInterval);
-    this.flushInterval = setInterval(() => this.flush(), intervalMs);
-  }
-
-  /**
-   * Flush all metrics to configured exporter or log sink
-   */
-  flush() {
-    if (this.metrics.length === 0) return;
-
-    const now = Date.now();
-    const diff = (now - this.lastFlush) / 1000;
-    const count = this.metrics.length;
-
-    logger.info(`[telemetry] 📤 Flushing ${count} metrics (${diff.toFixed(1)}s since last flush)`);
-
+  record(name: string, value: number, type: MetricType = "gauge", labels?: Record<string, string>) {
     try {
-      // 🚀 Integration points — can be swapped based on deployment:
-      // Example: send to Prometheus, Datadog, OpenTelemetry Collector, etc.
-      if (config.telemetry?.export === "logger") {
-        this.metrics.forEach((m) => {
-          logger.debug(`[metric] ${m.name}=${m.value}`, { labels: m.labels, traceId: m.traceId });
-        });
-      } else if (config.telemetry?.export === "collector") {
-        // TODO: push to OTLP / gRPC endpoint (e.g., OpenTelemetry Collector)
-      }
+      const metric: Metric = {
+        name,
+        value,
+        type,
+        labels,
+        timestamp: Date.now(),
+      };
+      this.buffer.push(metric);
 
-      this.emit("flush", this.metrics);
-
-      this.metrics = [];
-      this.lastFlush = now;
+      // trigger flush if buffer too large
+      if (this.buffer.length >= (this.opts.maxBufferSize ?? 500)) this.flush();
     } catch (err: any) {
-      logger.error("[telemetry] ❌ Failed to flush metrics:", err.message);
+      logger.error("[Telemetry] Failed to record metric", { error: err.message });
     }
   }
 
   /**
-   * Shutdown safely (called during process termination)
+   * Measure execution time of async functions (auto-records timer metric)
+   */
+  async time<T>(name: string, fn: () => Promise<T>, labels?: Record<string, string>): Promise<T> {
+    const start = performance.now();
+    try {
+      const result = await fn();
+      const duration = performance.now() - start;
+      this.record(name, duration, "timer", labels);
+      return result;
+    } catch (err: any) {
+      const duration = performance.now() - start;
+      this.record(`${name}.error`, duration, "timer", { ...labels, error: "true" });
+      throw err;
+    }
+  }
+
+  /**
+   * Start auto-flushing buffer every X ms
+   */
+  startAutoFlush() {
+    if (this.flushTimer) clearInterval(this.flushTimer);
+    this.flushTimer = setInterval(() => this.flush(), this.opts.flushIntervalMs);
+  }
+
+  /**
+   * Flush buffered metrics (to logs, event bus, or external collector)
+   */
+  async flush() {
+    if (this.buffer.length === 0) return;
+    const batch = [...this.buffer];
+    this.buffer = [];
+
+    const count = batch.length;
+    const intervalSec = ((Date.now() - this.lastFlush) / 1000).toFixed(1);
+    this.lastFlush = Date.now();
+
+    try {
+      logger.info(`[Telemetry] 📊 Flushing ${count} metrics (interval ${intervalSec}s)`);
+
+      // Log detailed metrics only in debug/dev
+      if (config.NODE_ENV !== "production") {
+        batch.forEach((m) =>
+          logger.debug(`[Metric] ${m.name}=${m.value}`, {
+            labels: m.labels,
+            type: m.type,
+          })
+        );
+      }
+
+      // Emit event (useful for internal or external exporters)
+      this.emit("flush", batch);
+
+      // Optional: Export to OpenTelemetry
+      if (this.opts.enableOtelIntegration) {
+        const { healthy } = await otelHealthCheck();
+        if (healthy) {
+          const span = this.tracer.startSpan("telemetry.flush");
+          span.setAttribute("metrics.flushed", count);
+          span.setAttribute("metrics.interval", Number(intervalSec));
+          span.end();
+        }
+      }
+    } catch (err: any) {
+      logger.error("[Telemetry] ❌ Flush failed", { error: err.message });
+    }
+  }
+
+  /**
+   * Graceful shutdown
    */
   async shutdown() {
-    if (this.flushInterval) clearInterval(this.flushInterval);
-    this.collectSystemMetrics();
-    this.flush();
-    logger.info("[telemetry] 🧹 Graceful shutdown complete.");
+    if (this.flushTimer) clearInterval(this.flushTimer);
+    await this.flush();
+    logger.info("[Telemetry] 🧹 Shutdown complete");
+  }
+
+  /* ------------------------------------------------------------------------
+     📦 System Snapshot (for Admin Dashboard)
+  ------------------------------------------------------------------------ */
+  snapshot() {
+    const mem = process.memoryUsage();
+    return {
+      timestamp: new Date().toISOString(),
+      uptimeSec: process.uptime(),
+      cpuLoad: os.loadavg()[0],
+      heapUsedMB: Number((mem.heapUsed / 1024 / 1024).toFixed(2)),
+      rssMB: Number((mem.rss / 1024 / 1024).toFixed(2)),
+      bufferedMetrics: this.buffer.length,
+      lastFlush: new Date(this.lastFlush).toISOString(),
+      environment: config.NODE_ENV,
+    };
+  }
+
+  /* ------------------------------------------------------------------------
+     🧩 On-demand tracing wrapper
+  ------------------------------------------------------------------------ */
+  async traceAsync<T>(
+    spanName: string,
+    fn: () => Promise<T>,
+    attributes?: Record<string, string | number | boolean>
+  ): Promise<T> {
+    const span = this.tracer.startSpan(spanName, { attributes });
+    try {
+      const result = await fn();
+      span.setStatus({ code: 1, message: "OK" });
+      return result;
+    } catch (err: any) {
+      span.setStatus({ code: 2, message: err.message });
+      throw err;
+    } finally {
+      span.end();
+    }
   }
 }
 
-/* --------------------------------------------------------------------------
-   📦 Global Telemetry Instance
--------------------------------------------------------------------------- */
+/* ------------------------------------------------------------------------
+   🧭 Instance Export (Singleton)
+------------------------------------------------------------------------ */
 export const telemetry = new Telemetry();
 
-/* --------------------------------------------------------------------------
-   🧠 Snapshot Helper
--------------------------------------------------------------------------- */
-export const telemetrySnapshot = () => ({
-  timestamp: new Date().toISOString(),
-  cpuLoad: os.loadavg()[0],
-  memoryMB: (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2),
-  uptimeSec: process.uptime(),
-  pendingMetrics: telemetry.listenerCount("flush"),
-  environment: config.nodeEnv,
+/* ------------------------------------------------------------------------
+   🧩 Graceful Shutdown Hooks
+------------------------------------------------------------------------ */
+process.on("SIGTERM", async () => {
+  await telemetry.shutdown();
 });
 
-/* --------------------------------------------------------------------------
-   🧩 Graceful Shutdown Hooks
--------------------------------------------------------------------------- */
-process.on("SIGTERM", async () => await telemetry.shutdown());
-process.on("SIGINT", async () => await telemetry.shutdown());
+process.on("SIGINT", async () => {
+  await telemetry.shutdown();
+});
+
+/* ------------------------------------------------------------------------
+   🧩 Snapshot Export Helper
+------------------------------------------------------------------------ */
+export const telemetrySnapshot = () => telemetry.snapshot();
+
+export default telemetry;
