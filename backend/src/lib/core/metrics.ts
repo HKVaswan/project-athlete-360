@@ -1,26 +1,28 @@
 /**
+ * ------------------------------------------------------------------------
  * src/lib/core/metrics.ts
  * ------------------------------------------------------------------------
  * Enterprise-grade observability metrics for Project Athlete 360.
  *
  * Features:
- *  - Prometheus counters/gauges/histograms with sane cardinality
- *  - API, worker, DB, and system metrics
- *  - Auto-refreshing system resource gauges
- *  - TraceId correlation for logs and traces (OpenTelemetry)
- *  - Safe under clustering or concurrent worker models
+ *  - Prometheus counters/gauges/histograms with low cardinality
+ *  - API, worker, DB, AI, and system metrics
+ *  - Auto-refreshing resource gauges
+ *  - TraceId correlation (OpenTelemetry)
+ *  - Graceful fallback under cluster/worker models
  * ------------------------------------------------------------------------
  */
 
 import client from "prom-client";
 import os from "os";
-import { logger } from "../../logger";
 import { context, trace } from "@opentelemetry/api";
+import { logger } from "../../logger";
 
 const PREFIX = "pa360_";
+const ENV = process.env.NODE_ENV || "unknown";
 
 /* ---------------------------------------------------------------------
-   🔧 Default Metrics
+   🔧 Default Metrics Registration
    ------------------------------------------------------------------- */
 client.collectDefaultMetrics({
   prefix: PREFIX,
@@ -30,10 +32,10 @@ client.collectDefaultMetrics({
 export const register = client.register;
 
 /* ---------------------------------------------------------------------
-   📈 Custom Metrics Definitions
+   📊 Metric Definitions
    ------------------------------------------------------------------- */
 
-// API request metrics
+// ─── API Metrics ─────────────────────────────────────────────
 export const httpRequestDuration = new client.Histogram({
   name: `${PREFIX}http_request_duration_seconds`,
   help: "HTTP request latency distribution (seconds)",
@@ -47,70 +49,100 @@ export const httpRequestCount = new client.Counter({
   labelNames: ["method", "route", "status_code", "env"],
 });
 
+export const apiErrorRate = new client.Gauge({
+  name: `${PREFIX}api_error_rate`,
+  help: "Ratio of errors to total requests (rolling average approximation)",
+  labelNames: ["route", "env"],
+});
+
+// ─── Application Errors ─────────────────────────────────────
 export const errorCount = new client.Counter({
   name: `${PREFIX}error_count_total`,
-  help: "Number of application errors logged",
+  help: "Total number of application errors logged",
   labelNames: ["type", "severity", "env"],
 });
 
+// ─── Worker Metrics ─────────────────────────────────────────
 export const workerJobDuration = new client.Histogram({
-  name: `${PREFIX}worker_job_duration_seconds`,
-  help: "Histogram of job processing duration per queue",
+  name: `${PREFIX}queue_job_duration_seconds`,
+  help: "Job processing duration per queue (seconds)",
   labelNames: ["queue_name", "status", "env"],
   buckets: [0.1, 0.5, 1, 3, 5, 10, 30, 60],
 });
 
+export const queueFailuresTotal = new client.Counter({
+  name: `${PREFIX}queue_failures_total`,
+  help: "Total number of failed jobs per queue",
+  labelNames: ["queue_name", "env"],
+});
+
+// ─── Database ───────────────────────────────────────────────
 export const dbConnectionGauge = new client.Gauge({
-  name: `${PREFIX}db_connections_active`,
-  help: "Active database connections",
+  name: `${PREFIX}db_connection_active_total`,
+  help: "Number of active DB connections",
   labelNames: ["pool_name", "env"],
 });
 
+// ─── Storage ────────────────────────────────────────────────
 export const storageUsageGauge = new client.Gauge({
   name: `${PREFIX}storage_usage_bytes`,
-  help: "Storage usage per institution",
+  help: "Storage usage per institution (bytes)",
+  labelNames: ["institution_id", "env"],
+});
+
+// ─── Billing & Abuse ────────────────────────────────────────
+export const billingOverageCount = new client.Counter({
+  name: `${PREFIX}billing_overage_events_total`,
+  help: "Number of billing overage events detected",
   labelNames: ["institution_id", "env"],
 });
 
 export const trialAbuseCount = new client.Counter({
   name: `${PREFIX}trial_abuse_detected_total`,
-  help: "Trial abuse detection events",
+  help: "Trial-abuse flag triggers per institution",
   labelNames: ["institution_id", "env"],
 });
 
+// ─── Worker Health ──────────────────────────────────────────
+export const workerHealthGauge = new client.Gauge({
+  name: `${PREFIX}worker_health_status`,
+  help: "Worker health status (1=healthy, 0=failed)",
+  labelNames: ["worker", "env"],
+});
+
+// ─── AI Activity ────────────────────────────────────────────
 export const aiActivityCount = new client.Counter({
   name: `${PREFIX}ai_activity_total`,
-  help: "AI events processed (inference, training, etc.)",
+  help: "AI activity events processed (inference, analysis, etc.)",
   labelNames: ["type", "env"],
 });
 
 /* ---------------------------------------------------------------------
-   ⚙️ System Resource Metrics
+   ⚙️ System Gauges (auto-updating)
    ------------------------------------------------------------------- */
 const systemCpuGauge = new client.Gauge({
   name: `${PREFIX}system_cpu_load`,
-  help: "1-min CPU load average",
+  help: "1-minute system CPU load average",
 });
 
 const systemMemoryGauge = new client.Gauge({
   name: `${PREFIX}system_memory_usage_bytes`,
-  help: "Resident memory usage (bytes)",
+  help: "Resident memory usage in bytes",
 });
 
 setInterval(() => {
-  const cpu = os.loadavg()[0];
-  const mem = process.memoryUsage().rss;
-  systemCpuGauge.set(cpu);
-  systemMemoryGauge.set(mem);
+  try {
+    systemCpuGauge.set(os.loadavg()[0]);
+    systemMemoryGauge.set(process.memoryUsage().rss);
+  } catch (err) {
+    logger.warn("[METRICS] Failed to collect system metrics", { error: (err as Error).message });
+  }
 }, 60_000).unref();
 
 /* ---------------------------------------------------------------------
-   🧠 Helper Functions
+   🧠 Recorders / Helpers
    ------------------------------------------------------------------- */
 
-/**
- * Records HTTP metrics with trace correlation.
- */
 export const recordRequestMetrics = (
   method: string,
   route: string,
@@ -119,10 +151,14 @@ export const recordRequestMetrics = (
 ) => {
   const span = trace.getSpan(context.active());
   const traceId = span?.spanContext().traceId ?? "none";
-  const env = process.env.NODE_ENV || "unknown";
 
-  httpRequestDuration.labels(method, route, String(statusCode), env).observe(durationSec);
-  httpRequestCount.labels(method, route, String(statusCode), env).inc();
+  httpRequestDuration.labels(method, route, String(statusCode), ENV).observe(durationSec);
+  httpRequestCount.labels(method, route, String(statusCode), ENV).inc();
+
+  // Approximate error rate tracking
+  if (statusCode >= 400) {
+    apiErrorRate.labels(route, ENV).set(Math.min(1, (apiErrorRate.hashMap?.[route]?.value ?? 0) + 0.01));
+  }
 
   logger.debug({
     traceId,
@@ -130,85 +166,54 @@ export const recordRequestMetrics = (
     route,
     statusCode,
     durationSec,
-    msg: "Request metrics recorded",
+    msg: "HTTP metrics recorded",
   });
 };
 
-/**
- * Records system/application errors for alerting.
- */
-export const recordError = (
-  type: string,
-  severity: "low" | "medium" | "high" = "medium"
-) => {
-  const env = process.env.NODE_ENV || "unknown";
-  errorCount.labels(type, severity, env).inc();
-};
+export const recordError = (type: string, severity: "low" | "medium" | "high" = "medium") =>
+  errorCount.labels(type, severity, ENV).inc();
 
-/**
- * Records queue/job metrics for worker systems.
- */
 export const recordWorkerJob = (
   queue: string,
   durationSec: number,
   status: "success" | "failed"
 ) => {
-  const env = process.env.NODE_ENV || "unknown";
-  workerJobDuration.labels(queue, status, env).observe(durationSec);
+  workerJobDuration.labels(queue, status, ENV).observe(durationSec);
+  if (status === "failed") queueFailuresTotal.labels(queue, ENV).inc();
 };
 
-/**
- * Records active database connections.
- */
-export const recordDBConnections = (poolName: string, active: number) => {
-  const env = process.env.NODE_ENV || "unknown";
-  dbConnectionGauge.labels(poolName, env).set(active);
-};
+export const recordDBConnections = (pool: string, active: number) =>
+  dbConnectionGauge.labels(pool, ENV).set(active);
 
-/**
- * Records per-institution storage usage.
- */
-export const recordStorageUsage = (institutionId: string, bytes: number) => {
-  const env = process.env.NODE_ENV || "unknown";
-  storageUsageGauge.labels(institutionId, env).set(bytes);
-};
+export const recordStorageUsage = (institutionId: string, bytes: number) =>
+  storageUsageGauge.labels(institutionId, ENV).set(bytes);
 
-/**
- * Records AI activity events.
- */
-export const recordAIActivity = (type: string) => {
-  const env = process.env.NODE_ENV || "unknown";
-  aiActivityCount.labels(type, env).inc();
-};
+export const recordBillingOverage = (institutionId: string) =>
+  billingOverageCount.labels(institutionId, ENV).inc();
 
-/**
- * Records trial abuse detections.
- */
-export const recordTrialAbuse = (institutionId: string) => {
-  const env = process.env.NODE_ENV || "unknown";
-  trialAbuseCount.labels(institutionId, env).inc();
-};
+export const recordTrialAbuse = (institutionId: string) =>
+  trialAbuseCount.labels(institutionId, ENV).inc();
+
+export const recordAIActivity = (type: string) =>
+  aiActivityCount.labels(type, ENV).inc();
+
+export const recordWorkerHealth = (worker: string, healthy: boolean) =>
+  workerHealthGauge.labels(worker, ENV).set(healthy ? 1 : 0);
 
 /* ---------------------------------------------------------------------
-   🌐 Expose Metrics & System Snapshot
+   🌐 Exports
    ------------------------------------------------------------------- */
-export const getMetrics = async (): Promise<string> => {
-  return await register.metrics();
-};
+export const getMetrics = async (): Promise<string> => register.metrics();
 
-export const getSystemSnapshot = () => {
-  const memoryUsage = process.memoryUsage();
-  const cpuLoad = os.loadavg()[0];
-  return {
-    uptimeSec: process.uptime(),
-    memoryMB: Math.round(memoryUsage.rss / 1024 / 1024),
-    cpuLoad,
-    timestamp: new Date().toISOString(),
-  };
-};
+export const getSystemSnapshot = () => ({
+  uptimeSec: process.uptime(),
+  memoryMB: Math.round(process.memoryUsage().rss / 1024 / 1024),
+  cpuLoad: os.loadavg()[0],
+  timestamp: new Date().toISOString(),
+});
 
 /* ---------------------------------------------------------------------
-   🧩 Error Handling Hooks
+   🛡 Error Hooks
    ------------------------------------------------------------------- */
 process.on("uncaughtException", (err) => {
   recordError("uncaught_exception", "high");
