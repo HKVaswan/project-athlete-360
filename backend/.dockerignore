@@ -1,0 +1,13 @@
+node_modules
+npm-debug.log
+dist
+.backups
+logs
+.env
+.env.*
+.vscode
+.idea
+coverage
+tests
+.DS_Store
+docker-entrypoint.sh
