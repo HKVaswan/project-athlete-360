@@ -1,0 +1,210 @@
+# 🧭 Observability & Monitoring Runbook  
+**Document Version:** 1.0  
+**Last Updated:** {{ date }}  
+**Author:** Infrastructure & DevOps Team – Project Athlete 360  
+
+---
+
+## 🎯 Objective
+
+This runbook defines **observability and monitoring procedures** for the Project Athlete 360 backend.  
+It ensures **real-time visibility**, **root-cause detection**, and **system reliability** across all environments (production, staging, and development).  
+
+Observability enables the platform to:
+- Detect failures before users are impacted.
+- Correlate metrics, traces, and logs across distributed services.
+- Support performance optimization and SLA adherence.
+- Provide auditable, tamper-proof telemetry for compliance.
+
+---
+
+## 📚 Scope
+
+Applies to:
+- Core API servers (Express/Node backend)
+- Workers (queue, backup, telemetry)
+- Databases (PostgreSQL)
+- Object storage (S3 or compatible)
+- Redis / BullMQ queues
+- AI inference microservices
+- Observability pipelines (OpenTelemetry, Prometheus, Grafana, Loki)
+
+---
+
+## 🧩 Observability Stack Overview
+
+| Component | Responsibility | Location |
+|------------|----------------|-----------|
+| `src/lib/core/metrics.ts` | Prometheus-compatible custom metrics | API & Workers |
+| `src/lib/core/tracing.ts` | OpenTelemetry-based distributed tracing | API, Queue Workers |
+| `src/lib/telemetry.ts` | Application-level telemetry & periodic metric flushing | Core services |
+| `src/workers/telemetry.worker.ts` | Collects, aggregates & pushes telemetry | Background worker |
+| `src/config/observabilityConfig.ts` | Configurable thresholds, exporters, sampling | Config layer |
+| `src/logger.ts` | Structured & colorized Winston logger | All modules |
+| `src/middleware/requestLogger.middleware.ts` | HTTP request/response timing | API Gateway |
+| `src/lib/systemMonitor.ts` | System-level metrics (CPU, memory, queue health) | Global service |
+| `src/services/systemHealth.service.ts` | Health aggregation & alerts | API + Worker monitor |
+| `src/integrations/otel.bootstrap.ts` | Bootstraps OpenTelemetry exporters | API & Worker startup |
+
+---
+
+## ⚙️ Key Observability Domains
+
+### 1. Metrics (Quantitative Insights)
+Collected via `prom-client` and OpenTelemetry metrics.
+
+**Categories:**
+- **API performance:** latency histograms, throughput, errors.
+- **Worker queues:** active, waiting, failed jobs.
+- **AI activity:** inference count, latency.
+- **System health:** CPU, memory, disk, DB status.
+- **Business metrics:** plan usage, overage alerts, backup frequency.
+
+**Endpoints:**
+- `/metrics` (Prometheus scrape target)
+- `/admin/system/status` (for super admins)
+
+**Storage:**
+- Prometheus TSDB (7–14 days retention)
+- Optional: Grafana Cloud or VictoriaMetrics
+
+---
+
+### 2. Logs (Event & Error Context)
+
+All logs are **structured JSON + colorized console output** with trace IDs.  
+Critical logs are persisted in `logs/combined.log` and `logs/error.log`.
+
+**Best Practices:**
+- Every request is tagged with a unique `x-request-id`.
+- Each service logs `{ requestId, userId, route, duration, status }`.
+- Errors are logged with full stack trace (in non-prod) and sent to Sentry.
+- Log levels: `info`, `warn`, `error`, `debug`, `http`.
+
+**Tools:**
+- [Winston](https://github.com/winstonjs/winston)
+- [Sentry](https://sentry.io)
+- [Grafana Loki (optional)](https://grafana.com/oss/loki/)
+
+---
+
+### 3. Traces (Distributed Context)
+
+Implemented using OpenTelemetry and `src/lib/core/tracing.ts`.
+
+**Tracing Flow:**
+1. Request enters API → a trace is started with `traceId`.
+2. Downstream events (DB, Redis, AI service) attach child spans.
+3. Spans include latency, attributes, and errors.
+4. Traces exported to Jaeger / Grafana Tempo via `otel.bootstrap.ts`.
+
+**Exporters (configured in observabilityConfig.ts):**
+- **Jaeger** (default)
+- **OTLP/HTTP** (for Grafana Tempo or Datadog)
+- Sampling rate configurable per environment.
+
+---
+
+### 4. Health Monitoring (Active Checks)
+
+Handled by `src/services/systemHealth.service.ts` and `src/lib/systemMonitor.ts`.
+
+**Components Checked:**
+- Database connectivity (`SELECT 1`)
+- Redis/Queue health
+- Worker activity
+- AI microservice response
+- Object storage reachability
+- API responsiveness and latency
+
+**Frequency:** every 60s  
+**Alerts:** super-admin notifications + audit logs on failures
+
+**Endpoints:**
+- `/health` → readiness probe
+- `/admin/system/status` → detailed system report
+
+---
+
+### 5. Telemetry & Alerts
+
+**Telemetry Worker:**
+- Periodically flushes collected metrics (CPU, memory, latency).
+- Pushes data to configured exporters.
+- Detects anomalies via thresholds in `observabilityConfig.ts`.
+- Emits structured alerts to:
+  - `superAdminAlertsService`
+  - `auditService`
+  - `adminNotification.worker`
+
+**Alert Threshold Examples:**
+| Metric | Threshold | Severity |
+|---------|------------|----------|
+| CPU Usage | >85% | warning |
+| Memory Usage | >90% | critical |
+| Queue backlog | >20 waiting jobs | warning |
+| DB latency | >300ms | degraded |
+| Error rate | >2% (per route) | warning |
+
+---
+
+## 🧰 Troubleshooting Guide
+
+| Scenario | Possible Cause | Resolution |
+|-----------|----------------|-------------|
+| Missing `/metrics` output | Prometheus client not initialized | Restart API / check `metrics.ts` import |
+| Empty Grafana panels | Misconfigured data source | Verify Prometheus target in Grafana |
+| High latency in `/metrics` | Collector overload | Reduce metric granularity or increase interval |
+| Alerts not triggered | Telemetry worker down | Restart telemetry worker / check queue logs |
+| “AI subsystem degraded” | Model endpoint unreachable | Check `ai.bootstrap` logs or API keys |
+| Jaeger trace missing spans | Incorrect parent context | Ensure OpenTelemetry middleware wraps routes |
+
+---
+
+## 🧩 Maintenance & Drills
+
+| Task | Frequency | Responsible | Notes |
+|------|------------|--------------|-------|
+| Validate `/metrics` export | Weekly | DevOps | Ensure Prometheus scrape works |
+| Verify Grafana dashboard | Weekly | Monitoring Team | Cross-check with production latency |
+| Run full health check | Daily | Automated Worker | Uses `runFullHealthCheck()` |
+| Review alert logs | Daily | Super Admins | From `superAdminAlertsService` |
+| Trace latency bottlenecks | Monthly | Engineering | Use Jaeger/Grafana Tempo |
+| Review metric retention & cleanup | Quarterly | DevOps | Manage Prometheus TSDB size |
+
+---
+
+## 🧠 Recovery Playbook
+
+If monitoring pipeline fails:
+
+1. Restart telemetry worker (`pm2 restart telemetry` or Docker restart).  
+2. Verify metrics endpoint `/metrics` returns valid data.  
+3. Check Prometheus service health via `/-/healthy`.  
+4. Review API logs for `[TELEMETRY]` or `[MONITOR]` errors.  
+5. If exporters unreachable, temporarily set `OBSERVABILITY_MODE=local`.  
+6. Notify Infrastructure Lead if data gaps exceed 30 minutes.
+
+---
+
+## ✅ Acceptance Criteria
+
+- All environments expose `/metrics` and `/health` endpoints.
+- Prometheus successfully scrapes metrics every 15s.
+- Jaeger or Tempo receives traces for 95%+ of API requests.
+- Super Admin dashboard reflects live system health.
+- Alerts automatically notify admins for any critical failure.
+
+---
+
+## 📘 References
+
+- [Prometheus Documentation](https://prometheus.io/docs/)
+- [OpenTelemetry Node SDK](https://opentelemetry.io/)
+- [Grafana Observability Stack](https://grafana.com/oss/)
+- [Sentry Error Tracking](https://docs.sentry.io/)
+
+---
+
+**End of Document**  
+*© Project Athlete 360 Infrastructure Team*
