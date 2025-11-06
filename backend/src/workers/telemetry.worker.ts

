@@ -1,0 +1,152 @@
+/**
+ * src/workers/telemetry.worker.ts
+ * --------------------------------------------------------------------------
+ * 🧠 Enterprise Telemetry Worker
+ *
+ * Responsibilities:
+ *  - Periodically collect system, queue, and service metrics.
+ *  - Push metrics to Prometheus, OpenTelemetry, or internal analytics.
+ *  - Aggregate event counts, performance timings, and error rates.
+ *  - Acts as the observability “heartbeat” for Project Athlete 360.
+ *
+ * Integrations:
+ *  - lib/core/metrics.ts  → Prometheus metrics collection
+ *  - lib/core/tracing.ts  → Distributed tracing context propagation
+ *  - services/systemHealth.service.ts → health insights
+ *  - lib/telemetry.ts → runtime metrics aggregation
+ *  - analytics or audit services (future)
+ */
+
+import { parentPort } from "worker_threads";
+import { telemetry } from "../lib/telemetry";
+import { getSystemMetrics } from "../lib/systemMonitor";
+import { runFullHealthCheck } from "../services/systemHealth.service";
+import { logger } from "../logger";
+import { recordWorkerJobs, recordAIActivity, recordError } from "../lib/core/metrics";
+import { traceAsyncFunction, spanLog } from "../lib/core/tracing";
+import { queueMonitor } from "./queue.monitor";
+import { config } from "../config";
+import prisma from "../prismaClient";
+
+const INTERVAL_MS = Number(config.telemetry?.intervalMs ?? 60_000); // 1 minute default
+
+let running = false;
+
+/* ---------------------------------------------------------------------------
+   🧩 Helper: Safe Metric Recording
+--------------------------------------------------------------------------- */
+const safeMetric = async (name: string, fn: () => Promise<any>) => {
+  try {
+    await fn();
+  } catch (err: any) {
+    recordError("telemetry_record_failure", "medium");
+    logger.error(`[TELEMETRY] Failed to record ${name}:`, err.message);
+  }
+};
+
+/* ---------------------------------------------------------------------------
+   🧭 Core Telemetry Cycle
+--------------------------------------------------------------------------- */
+export const runTelemetryCycle = async () =>
+  traceAsyncFunction("telemetry.cycle", async () => {
+    const start = Date.now();
+    spanLog("Telemetry cycle started");
+
+    // 1️⃣ Collect system metrics
+    const systemMetrics = await getSystemMetrics();
+    telemetry.record("system.cpu.percent", systemMetrics.cpuUsage, "gauge");
+    telemetry.record("system.memory.percent", systemMetrics.memoryUsage, "gauge");
+    telemetry.record("system.db.latency_ms", systemMetrics.latencyMs, "timer");
+
+    // 2️⃣ Record worker queue health
+    const healthSummary = await queueMonitor.getHealthSummary();
+    for (const [queueName, counts] of Object.entries(healthSummary.summary)) {
+      recordWorkerJobs(queueName, counts.active || 0);
+    }
+
+    // 3️⃣ Capture application-level health
+    const fullHealth = await runFullHealthCheck();
+    telemetry.record(
+      "system.health.status_code",
+      fullHealth.overall === "healthy" ? 1 : fullHealth.overall === "degraded" ? 0.5 : 0,
+      "gauge"
+    );
+
+    // 4️⃣ Database connection pool utilization (if available)
+    await safeMetric("database.pool", async () => {
+      const connections = await prisma.$queryRaw`SELECT COUNT(*) FROM pg_stat_activity`;
+      telemetry.record("db.active_connections", Number(connections[0].count ?? 0), "gauge");
+    });
+
+    // 5️⃣ AI subsystem metrics (optional)
+    telemetry.record("ai.events.count", Math.floor(Math.random() * 5), "counter"); // placeholder
+    recordAIActivity("telemetry_heartbeat");
+
+    // 6️⃣ Compute latency + flush
+    const duration = Date.now() - start;
+    telemetry.record("telemetry.cycle.duration_ms", duration, "timer");
+    telemetry.flush();
+
+    logger.info(`[TELEMETRY] ✅ Cycle completed in ${duration}ms`, {
+      cpu: systemMetrics.cpuUsage,
+      mem: systemMetrics.memoryUsage,
+      db: systemMetrics.dbStatus,
+      queues: Object.keys(healthSummary.summary).length,
+      status: fullHealth.overall,
+    });
+
+    spanLog("Telemetry cycle completed", { duration });
+  });
+
+/* ---------------------------------------------------------------------------
+   🔁 Periodic Loop
+--------------------------------------------------------------------------- */
+export const startTelemetryWorker = () => {
+  if (running) {
+    logger.warn("[TELEMETRY] Worker already running");
+    return;
+  }
+
+  running = true;
+  logger.info(`[TELEMETRY] 🚀 Telemetry worker started (interval=${INTERVAL_MS / 1000}s)`);
+
+  // Immediately run once, then repeat
+  runTelemetryCycle().catch((err) => logger.error("[TELEMETRY] Initial cycle failed:", err));
+
+  const interval = setInterval(async () => {
+    if (!running) return;
+    await runTelemetryCycle();
+  }, INTERVAL_MS);
+
+  if (parentPort) {
+    parentPort.on("message", (msg) => {
+      if (msg === "stop") {
+        clearInterval(interval);
+        running = false;
+        logger.info("[TELEMETRY] 🧹 Worker stopped gracefully");
+      }
+    });
+  }
+};
+
+/* ---------------------------------------------------------------------------
+   🧩 Graceful Shutdown
+--------------------------------------------------------------------------- */
+process.on("SIGINT", () => {
+  running = false;
+  telemetry.shutdown();
+  logger.info("[TELEMETRY] SIGINT received – shutting down worker");
+});
+
+process.on("SIGTERM", () => {
+  running = false;
+  telemetry.shutdown();
+  logger.info("[TELEMETRY] SIGTERM received – shutting down worker");
+});
+
+/* ---------------------------------------------------------------------------
+   🚀 Auto-start when not imported (standalone)
+--------------------------------------------------------------------------- */
+if (require.main === module) {
+  startTelemetryWorker();
+}
