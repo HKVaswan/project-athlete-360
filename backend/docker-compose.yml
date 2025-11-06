@@ -1,0 +1,153 @@
+version: "3.9"
+
+# 🏗️ Project Athlete 360 — Full Local Infrastructure Stack
+# ---------------------------------------------------------
+# Includes:
+#  - Backend API (Node.js)
+#  - PostgreSQL (Primary DB)
+#  - Redis (Queues + Cache)
+#  - Prometheus (Metrics)
+#  - Grafana (Dashboards)
+#  - Jaeger (Tracing)
+# ---------------------------------------------------------
+
+services:
+  # ───────────────────────────────────────────────
+  # ⚙️ Backend API
+  # ───────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pa360-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/pa360
+      REDIS_URL: redis://redis:6379
+      PROMETHEUS_URL: http://prometheus:9090
+      JAEGER_AGENT_HOST: jaeger
+      JAEGER_AGENT_PORT: 6831
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - pa360-net
+
+  # ───────────────────────────────────────────────
+  # 🗄 PostgreSQL Database
+  # ───────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: pa360-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: pa360
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pa360-net
+
+  # ───────────────────────────────────────────────
+  # 🔁 Redis (Queues + Caching)
+  # ───────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: pa360-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pa360-net
+
+  # ───────────────────────────────────────────────
+  # 📈 Prometheus (Metrics Collection)
+  # ───────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: pa360-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docs/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=7d"
+    depends_on:
+      - backend
+    networks:
+      - pa360-net
+
+  # ───────────────────────────────────────────────
+  # 📊 Grafana (Metrics Dashboard)
+  # ───────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    container_name: pa360-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./docs/dashboards:/var/lib/grafana/dashboards
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - pa360-net
+
+  # ───────────────────────────────────────────────
+  # 🔍 Jaeger (Distributed Tracing)
+  # ───────────────────────────────────────────────
+  jaeger:
+    image: jaegertracing/all-in-one:1.54
+    container_name: pa360-jaeger
+    restart: unless-stopped
+    ports:
+      - "16686:16686"   # UI
+      - "6831:6831/udp" # Agent
+      - "14268:14268"   # Collector
+    environment:
+      COLLECTOR_ZIPKIN_HTTP_PORT: 9411
+    networks:
+      - pa360-net
+
+# ───────────────────────────────────────────────
+# 🧱 Volumes & Networks
+# ───────────────────────────────────────────────
+volumes:
+  postgres_data:
+  grafana_data:
+
+networks:
+  pa360-net:
+    driver: bridge
