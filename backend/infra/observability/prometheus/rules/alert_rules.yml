@@ -1,0 +1,193 @@
+# infra/observability/prometheus/rules/alert_rules.yml
+# --------------------------------------------------------------------------
+# 🚨 Prometheus Alerting Rules — Project Athlete 360
+# --------------------------------------------------------------------------
+# Purpose:
+#   - Define proactive alerts for API, Worker, DB, Billing, and Infra systems.
+#   - Each rule includes severity, annotations, and suggested remediation.
+# --------------------------------------------------------------------------
+
+groups:
+  # ======================================================================
+  # 🧠 API & HTTP Layer Alerts
+  # ======================================================================
+  - name: api_health.rules
+    interval: 15s
+    rules:
+      - alert: HighAPIErrorRate
+        expr: |
+          (sum(rate(pa360_http_requests_total{status_code=~"5.."}[5m])) 
+           / sum(rate(pa360_http_requests_total[5m]))) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "⚠️ High API error rate (>5%)"
+          description: |
+            More than 5% of HTTP requests are failing with 5xx errors.
+            Investigate upstream service or DB dependency.
+          runbook_url: "https://docs.pa360.net/runbooks/api-errors"
+
+      - alert: SlowAPILatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(pa360_http_request_duration_seconds_bucket[5m])) by (le)) > 2
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "🐢 Slow API response times (p95 > 2s)"
+          description: "API requests are taking longer than expected (95th percentile > 2s)."
+          runbook_url: "https://docs.pa360.net/runbooks/slow-api"
+
+  # ======================================================================
+  # ⚙️ Worker / Queue System Alerts
+  # ======================================================================
+  - name: worker_health.rules
+    interval: 30s
+    rules:
+      - alert: WorkerQueueBacklog
+        expr: |
+          sum(pa360_queue_job_duration_seconds_count) by (queue_name)
+          > 1000
+        for: 10m
+        labels:
+          severity: critical
+          team: workers
+        annotations:
+          summary: "🚧 Queue backlog detected"
+          description: "Queue {{ $labels.queue_name }} has over 1000 pending jobs for >10m."
+          runbook_url: "https://docs.pa360.net/runbooks/queue-backlog"
+
+      - alert: WorkerFailures
+        expr: |
+          increase(pa360_queue_failures_total[10m]) > 10
+        for: 3m
+        labels:
+          severity: critical
+          team: workers
+        annotations:
+          summary: "❌ High worker failure rate"
+          description: "More than 10 job failures in the past 10 minutes."
+          runbook_url: "https://docs.pa360.net/runbooks/worker-failures"
+
+      - alert: WorkerUnhealthy
+        expr: |
+          pa360_worker_health_status == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: workers
+        annotations:
+          summary: "🧱 Worker unhealthy"
+          description: "Worker {{ $labels.worker }} reported unhealthy status (status=0)."
+          runbook_url: "https://docs.pa360.net/runbooks/worker-health"
+
+  # ======================================================================
+  # 🗃️ Database & Storage Alerts
+  # ======================================================================
+  - name: database.rules
+    interval: 30s
+    rules:
+      - alert: HighDBConnectionUsage
+        expr: |
+          pa360_db_connection_active_total > 80
+        for: 2m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "🔌 High database connection count"
+          description: "Active DB connections exceed 80."
+          runbook_url: "https://docs.pa360.net/runbooks/db-connections"
+
+      - alert: StorageUsageHigh
+        expr: |
+          pa360_storage_usage_bytes > 50e9
+        for: 10m
+        labels:
+          severity: warning
+          team: infra
+        annotations:
+          summary: "💾 High storage usage"
+          description: "Storage usage exceeds 50GB for one or more institutions."
+          runbook_url: "https://docs.pa360.net/runbooks/storage-usage"
+
+  # ======================================================================
+  # 💳 Billing & Abuse Detection Alerts
+  # ======================================================================
+  - name: billing.rules
+    interval: 1m
+    rules:
+      - alert: BillingOverageDetected
+        expr: |
+          increase(pa360_billing_overage_events_total[10m]) > 0
+        for: 1m
+        labels:
+          severity: info
+          team: billing
+        annotations:
+          summary: "💰 Billing overage event detected"
+          description: "An institution exceeded its usage quota."
+          runbook_url: "https://docs.pa360.net/runbooks/billing-overage"
+
+      - alert: TrialAbuseDetected
+        expr: |
+          increase(pa360_trial_abuse_detected_total[30m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+          team: fraud-detection
+        annotations:
+          summary: "🚨 Trial abuse detected"
+          description: "Multiple trial abuse triggers were recorded within 30 minutes."
+          runbook_url: "https://docs.pa360.net/runbooks/trial-abuse"
+
+  # ======================================================================
+  # 💻 System & Infra Health
+  # ======================================================================
+  - name: system.rules
+    interval: 15s
+    rules:
+      - alert: HighMemoryUsage
+        expr: |
+          pa360_system_memory_usage_bytes > 2e9
+        for: 5m
+        labels:
+          severity: warning
+          team: infra
+        annotations:
+          summary: "🧠 High system memory usage"
+          description: "Memory usage exceeded 2GB for 5+ minutes."
+          runbook_url: "https://docs.pa360.net/runbooks/memory-usage"
+
+      - alert: HighCPULoad
+        expr: |
+          pa360_system_cpu_load > 2
+        for: 5m
+        labels:
+          severity: warning
+          team: infra
+        annotations:
+          summary: "🔥 High CPU load"
+          description: "CPU load average above 2 for more than 5 minutes."
+          runbook_url: "https://docs.pa360.net/runbooks/cpu-load"
+
+  # ======================================================================
+  # 🧭 Meta / Observability Health
+  # ======================================================================
+  - name: observability.rules
+    interval: 30s
+    rules:
+      - alert: PrometheusScrapeFailure
+        expr: |
+          up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: infra
+        annotations:
+          summary: "❗ Prometheus target down"
+          description: "Prometheus failed to scrape one or more targets."
+          runbook_url: "https://docs.pa360.net/runbooks/observability"
