@@ -74,4 +74,96 @@ export function initPrismaTracer(prisma: PrismaClientLike, opts?: { serviceName?
 
       const startHr = process.hrtime.bigint();
 
-      try
+      try {
+        const result = await context.with(trace.setSpan(context.active(), span), () =>
+          next(params)
+        );
+
+        const durationNs = Number(process.hrtime.bigint() - startHr);
+        const durationSec = durationNs / 1_000_000_000;
+
+        // Record DB query duration metric
+        queueMicrotask(() => {
+          try {
+            if (typeof metrics.workerJobDuration === "object") {
+              metrics.workerJobDuration.labels(`prisma.${model}`, "success", process.env.NODE_ENV || "unknown").observe(durationSec);
+            }
+          } catch (err) {
+            logger.debug("[PRISMA-TRACER] metrics record skipped", { err });
+          }
+        });
+
+        span.setAttribute("db.duration_seconds", durationSec);
+        span.setStatus({ code: SpanStatusCode.OK });
+
+        span.end();
+        return result;
+      } catch (err: any) {
+        const durationNs = Number(process.hrtime.bigint() - startHr);
+        const durationSec = durationNs / 1_000_000_000;
+
+        span.recordException(err);
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: err?.message || "Prisma query error",
+        });
+        span.setAttribute("db.duration_seconds", durationSec);
+        span.setAttribute("db.error_message", err?.message ?? "unknown");
+
+        // Record metrics for error
+        queueMicrotask(() => {
+          try {
+            metrics.recordError?.("prisma_query_error", "high");
+            metrics.workerJobDuration?.labels(`prisma.${model}`, "failed", process.env.NODE_ENV || "unknown").observe(durationSec);
+          } catch (mErr) {
+            logger.debug("[PRISMA-TRACER] metrics error on failure", { err: mErr });
+          }
+        });
+
+        span.end();
+        throw err;
+      }
+    });
+
+    logger.info("[PRISMA-TRACER] ✅ Prisma tracing middleware active");
+  } catch (err: any) {
+    logger.warn("[PRISMA-TRACER] ⚠️ Middleware install failed:", err?.message || err);
+  }
+
+  /* --------------------------------------------------------------------
+     🧠 Prisma Query Logger Hook (optional)
+  -------------------------------------------------------------------- */
+  if (prisma.$on && typeof prisma.$on === "function") {
+    try {
+      prisma.$on("query", (e: any) => {
+        const span = trace.getSpan(context.active());
+        if (span) {
+          span.addEvent("prisma.query", {
+            query: e.query?.slice?.(0, 500) ?? "[query]",
+            params: e.params?.slice?.(0, 200) ?? "[params]",
+            duration_ms: e.duration ?? null,
+          });
+        }
+        logger.debug("[PRISMA] Query executed", {
+          traceId: span?.spanContext().traceId,
+          model: e.target,
+          duration: e.duration,
+        });
+      });
+      logger.info("[PRISMA-TRACER] 🔍 Query logger attached (non-blocking)");
+    } catch (err) {
+      logger.debug("[PRISMA-TRACER] Query event binding skipped", { err });
+    }
+  }
+
+  return {
+    getCurrentTraceIds: () => {
+      const span = trace.getSpan(context.active());
+      if (!span) return { traceId: null, spanId: null };
+      const sc = span.spanContext();
+      return { traceId: sc.traceId, spanId: sc.spanId };
+    },
+  };
+}
+
+export default initPrismaTracer;
