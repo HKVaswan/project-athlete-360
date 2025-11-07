@@ -1,0 +1,167 @@
+{
+  "id": null,
+  "uid": "pa360-billing-storage",
+  "title": "Billing & Storage Dashboard - Project Athlete 360",
+  "tags": ["billing", "storage", "pa360", "observability"],
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "style": "dark",
+  "timezone": "browser",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Total Storage Used (All Institutions)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(pa360_storage_usage_bytes) / (1024 * 1024 * 1024)",
+          "legendFormat": "Total (GB)"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "options": {
+        "colorMode": "value",
+        "justifyMode": "center",
+        "orientation": "horizontal"
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Storage Usage per Institution (GB)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "pa360_storage_usage_bytes / (1024 * 1024 * 1024)",
+          "legendFormat": "{{institution_id}}"
+        }
+      ],
+      "gridPos": { "x": 6, "y": 0, "w": 18, "h": 6 },
+      "lines": true,
+      "fill": 2,
+      "linewidth": 2,
+      "yaxes": [{ "format": "decbytes" }, { "format": "short" }]
+    },
+    {
+      "type": "graph",
+      "title": "Billing Overage Events (rate per 5m)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(rate(pa360_billing_overage_events_total[5m])) by (institution_id)",
+          "legendFormat": "{{institution_id}}"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 6, "w": 12, "h": 6 },
+      "lines": true,
+      "fill": 1,
+      "linewidth": 2,
+      "yaxes": [{ "format": "short" }, { "format": "short" }]
+    },
+    {
+      "type": "graph",
+      "title": "Trial Abuse Detections (rate per 10m)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(rate(pa360_trial_abuse_detected_total[10m])) by (institution_id)",
+          "legendFormat": "{{institution_id}}"
+        }
+      ],
+      "gridPos": { "x": 12, "y": 6, "w": 12, "h": 6 },
+      "lines": true,
+      "fill": 1,
+      "linewidth": 2,
+      "yaxes": [{ "format": "short" }, { "format": "short" }]
+    },
+    {
+      "type": "table",
+      "title": "Top 10 Institutions by Storage Usage",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "topk(10, pa360_storage_usage_bytes)",
+          "legendFormat": "{{institution_id}}"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 7 },
+      "options": { "showHeader": true }
+    },
+    {
+      "type": "table",
+      "title": "Top 10 Institutions by Billing Overages (7d)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "topk(10, increase(pa360_billing_overage_events_total[7d]))",
+          "legendFormat": "{{institution_id}}"
+        }
+      ],
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 7 },
+      "options": { "showHeader": true }
+    },
+    {
+      "type": "graph",
+      "title": "Storage Growth Trend (Last 30d)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "increase(pa360_storage_usage_bytes[30d]) / (1024 * 1024 * 1024)",
+          "legendFormat": "{{institution_id}}"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 19, "w": 18, "h": 6 },
+      "lines": true,
+      "fill": 3,
+      "linewidth": 2,
+      "yaxes": [{ "format": "decbytes" }, { "format": "short" }]
+    },
+    {
+      "type": "stat",
+      "title": "Total Billing Overage Events (24h)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(increase(pa360_billing_overage_events_total[24h]))",
+          "legendFormat": "Overages (24h)"
+        }
+      ],
+      "gridPos": { "x": 18, "y": 19, "w": 6, "h": 4 },
+      "options": { "colorMode": "value", "justifyMode": "center" }
+    },
+    {
+      "type": "stat",
+      "title": "Total Trial Abuses Detected (24h)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(increase(pa360_trial_abuse_detected_total[24h]))",
+          "legendFormat": "Trial Abuses (24h)"
+        }
+      ],
+      "gridPos": { "x": 18, "y": 23, "w": 6, "h": 4 },
+      "options": { "colorMode": "value", "justifyMode": "center" }
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "institution_id",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(pa360_storage_usage_bytes, institution_id)",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "label": "Institution"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": ["30s", "1m", "5m", "15m", "1h", "6h"]
+  }
+}
