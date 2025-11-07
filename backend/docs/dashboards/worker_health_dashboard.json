@@ -1,0 +1,185 @@
+{
+  "id": null,
+  "uid": "pa360-worker-health",
+  "title": "Worker Health Dashboard - Project Athlete 360",
+  "tags": ["worker", "bullmq", "queue", "pa360", "observability"],
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "15s",
+  "style": "dark",
+  "timezone": "browser",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Total Jobs Processed",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(increase(pa360_queue_job_duration_seconds_count[5m]))",
+          "legendFormat": "Total Jobs (5m)"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "options": {
+        "colorMode": "value",
+        "justifyMode": "center",
+        "orientation": "horizontal"
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Job Processing Duration (p95 seconds)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(pa360_queue_job_duration_seconds_bucket[5m])) by (le, queue_name))",
+          "legendFormat": "{{queue_name}}"
+        }
+      ],
+      "gridPos": { "x": 6, "y": 0, "w": 12, "h": 6 },
+      "lines": true,
+      "fill": 2,
+      "linewidth": 2,
+      "yaxes": [{ "format": "s" }, { "format": "short" }]
+    },
+    {
+      "type": "graph",
+      "title": "Queue Job Success vs Failures (rate per min)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(rate(pa360_queue_job_duration_seconds_count{status=\"success\"}[1m])) by (queue_name)",
+          "legendFormat": "{{queue_name}} success"
+        },
+        {
+          "expr": "sum(rate(pa360_queue_job_duration_seconds_count{status=\"failed\"}[1m])) by (queue_name)",
+          "legendFormat": "{{queue_name}} failed"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 6, "w": 12, "h": 7 },
+      "lines": true,
+      "fill": 1,
+      "linewidth": 2,
+      "yaxes": [{ "format": "short" }, { "format": "short" }]
+    },
+    {
+      "type": "graph",
+      "title": "Failure Rate (%) per Queue",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "(sum(rate(pa360_queue_failures_total[5m])) by (queue_name) / sum(rate(pa360_queue_job_duration_seconds_count[5m])) by (queue_name)) * 100",
+          "legendFormat": "{{queue_name}}"
+        }
+      ],
+      "gridPos": { "x": 12, "y": 6, "w": 12, "h": 7 },
+      "lines": true,
+      "fill": 1,
+      "linewidth": 2,
+      "yaxes": [{ "format": "percent" }, { "format": "short" }]
+    },
+    {
+      "type": "table",
+      "title": "Top 5 Queues by Job Count (last 5m)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "topk(5, sum(rate(pa360_queue_job_duration_seconds_count[5m])) by (queue_name))",
+          "legendFormat": "{{queue_name}}"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 13, "w": 12, "h": 7 },
+      "options": { "showHeader": true }
+    },
+    {
+      "type": "table",
+      "title": "Top 5 Queues by Failure Rate (last 10m)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "topk(5, (sum(rate(pa360_queue_failures_total[10m])) by (queue_name) / sum(rate(pa360_queue_job_duration_seconds_count[10m])) by (queue_name)) * 100)",
+          "legendFormat": "{{queue_name}}"
+        }
+      ],
+      "gridPos": { "x": 12, "y": 13, "w": 12, "h": 7 },
+      "options": { "showHeader": true }
+    },
+    {
+      "type": "stat",
+      "title": "Worker Health (Active)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(pa360_worker_health_status)",
+          "legendFormat": "Healthy Workers"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 20, "w": 6, "h": 4 },
+      "options": {
+        "colorMode": "background",
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            { "color": "red", "value": 0 },
+            { "color": "yellow", "value": 1 },
+            { "color": "green", "value": 2 }
+          ]
+        },
+        "justifyMode": "center"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Failed Job Count (5m)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(increase(pa360_queue_failures_total[5m]))",
+          "legendFormat": "Failed Jobs"
+        }
+      ],
+      "gridPos": { "x": 6, "y": 20, "w": 6, "h": 4 },
+      "options": { "colorMode": "value", "justifyMode": "center" }
+    },
+    {
+      "type": "graph",
+      "title": "System Resource Usage (Worker Nodes)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "avg(pa360_system_cpu_load)",
+          "legendFormat": "CPU Load"
+        },
+        {
+          "expr": "avg(pa360_system_memory_usage_bytes) / (1024*1024*1024)",
+          "legendFormat": "Memory (GB)"
+        }
+      ],
+      "gridPos": { "x": 12, "y": 20, "w": 12, "h": 6 },
+      "lines": true,
+      "fill": 2,
+      "linewidth": 2
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "queue_name",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(pa360_queue_job_duration_seconds_count, queue_name)",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "label": "Queue Name"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": ["15s", "30s", "1m", "5m", "15m", "1h"]
+  }
+}
