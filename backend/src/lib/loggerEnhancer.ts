@@ -9,6 +9,7 @@
  *  - Structured JSON logs with severity and performance metadata.
  *  - Detects slow or degraded requests automatically.
  *  - Sanitizes sensitive data before logging.
+ *  - Works even if telemetry subsystem is unavailable.
  * --------------------------------------------------------------------------
  */
 
@@ -23,16 +24,18 @@ import { config } from "../config";
    🧩 Correlation ID Attachment
 -------------------------------------------------------------------------- */
 export const attachRequestId = (req: Request, _res: Response, next: NextFunction) => {
-  const traceSpan = trace.getSpan(context.active());
-  const otelTraceId = traceSpan?.spanContext()?.traceId;
-  const requestId = otelTraceId || randomUUID();
+  try {
+    const traceSpan = trace.getSpan(context.active());
+    const otelTraceId = traceSpan?.spanContext()?.traceId;
+    const requestId = otelTraceId || randomUUID();
 
-  (req as any).requestId = requestId;
-  req.headers["x-request-id"] = requestId;
+    (req as any).requestId = requestId;
+    req.headers["x-request-id"] = requestId;
 
-  // Enrich logger context (optional per-request scoping)
-  logger.debug(`[TRACE] Attached correlation ID: ${requestId}`);
-
+    logger.debug(`[TRACE] Correlation ID attached`, { requestId });
+  } catch (err: any) {
+    logger.warn("[LOGGER-ENHANCER] Failed to attach requestId", { error: err.message });
+  }
   next();
 };
 
@@ -47,24 +50,30 @@ export const requestLogger = (req: Request, res: Response, next: NextFunction) =
     const end = process.hrtime.bigint();
     const durationMs = Number(end - start) / 1_000_000;
     const status = res.statusCode;
-    const userId = (req as any).user?.id || "guest";
-    const actorRole = (req as any).user?.role || "public";
+    const user = (req as any).user || {};
+    const userId = user?.id || "guest";
+    const actorRole = user?.role || "public";
+    const route = req.originalUrl || req.path;
 
-    // Record performance metrics
-    telemetry.record("http.request.duration.ms", durationMs, "histogram", {
-      route: req.originalUrl,
-      method: req.method,
-      status: status.toString(),
-    });
+    // Record metrics safely
+    try {
+      telemetry.record("http.request.duration.ms", durationMs, "histogram", {
+        route,
+        method: req.method,
+        status: status.toString(),
+      });
+    } catch (err) {
+      logger.debug("[LOGGER-ENHANCER] telemetry.record failed", { error: err.message });
+    }
 
-    const logPayload = {
-      service: config.serviceName || "backend",
+    const logPayload = sanitizeForLogs({
+      service: config.serviceName || "pa360-backend",
       env: config.nodeEnv,
       region: config.region || "global",
       requestId,
       traceId: req.headers["x-request-id"],
       method: req.method,
-      path: req.originalUrl,
+      path: route,
       status,
       durationMs: Number(durationMs.toFixed(2)),
       userId,
@@ -72,12 +81,12 @@ export const requestLogger = (req: Request, res: Response, next: NextFunction) =
       ip: req.ip,
       ua: req.headers["user-agent"],
       timestamp: new Date().toISOString(),
-    };
+    });
 
-    // Choose severity dynamically
-    if (status >= 500) logger.error(`[HTTP ${status}] ${req.method} ${req.originalUrl}`, logPayload);
-    else if (status >= 400) logger.warn(`[HTTP ${status}] ${req.method} ${req.originalUrl}`, logPayload);
-    else logger.info(`[HTTP ${status}] ${req.method} ${req.originalUrl}`, logPayload);
+    // Dynamic log severity
+    if (status >= 500) logger.error(`[HTTP ${status}] ${req.method} ${route}`, logPayload);
+    else if (status >= 400) logger.warn(`[HTTP ${status}] ${req.method} ${route}`, logPayload);
+    else logger.info(`[HTTP ${status}] ${req.method} ${route}`, logPayload);
   });
 
   next();
@@ -96,17 +105,25 @@ export const slowRequestMonitor = (thresholdMs = 1200) => {
 
       if (durationMs > thresholdMs) {
         const userId = (req as any).user?.id || "guest";
-        logger.warn(`[SLOW REQUEST] ${req.method} ${req.originalUrl} took ${durationMs.toFixed(2)}ms`, {
+        const durationSec = (durationMs / 1000).toFixed(2);
+
+        logger.warn(`[SLOW REQUEST] ${req.method} ${req.originalUrl} took ${durationSec}s`, {
           durationMs,
           thresholdMs,
           userId,
           requestId: (req as any).requestId,
         });
 
-        telemetry.record("http.request.slow.count", 1, "counter", {
-          route: req.originalUrl,
-          durationBucket: `${Math.ceil(durationMs / 1000)}s`,
-        });
+        try {
+          telemetry.record("http.request.slow.count", 1, "counter", {
+            route: req.originalUrl,
+            bucket: `${Math.ceil(durationMs / 1000)}s`,
+          });
+        } catch (err: any) {
+          logger.debug("[LOGGER-ENHANCER] telemetry.record slow request failed", {
+            error: err.message,
+          });
+        }
       }
     });
 
@@ -115,33 +132,47 @@ export const slowRequestMonitor = (thresholdMs = 1200) => {
 };
 
 /* --------------------------------------------------------------------------
-   🧼 PII Sanitizer (Optional for Security Compliance)
+   🧼 PII Sanitizer (for Log Compliance)
 -------------------------------------------------------------------------- */
 export const sanitizeForLogs = (data: any): any => {
-  if (!data) return data;
-  const cloned = { ...data };
+  if (!data || typeof data !== "object") return data;
+  const clone = { ...data };
 
-  // Mask sensitive fields if present
-  ["password", "token", "email", "phone"].forEach((field) => {
-    if (cloned[field]) cloned[field] = "[REDACTED]";
-  });
+  // Mask sensitive fields
+  const sensitiveFields = ["password", "token", "email", "phone", "auth", "apiKey"];
+  for (const field of sensitiveFields) {
+    if (clone[field]) clone[field] = "[REDACTED]";
+  }
 
-  return cloned;
+  // Nested objects
+  for (const key in clone) {
+    if (typeof clone[key] === "object" && clone[key] !== null) {
+      clone[key] = sanitizeForLogs(clone[key]);
+    }
+  }
+
+  return clone;
 };
 
 /* --------------------------------------------------------------------------
-   ✅ Summary
+   ✅ Summary / Usage
 -------------------------------------------------------------------------- */
 /**
- * Recommended usage:
+ * Example usage:
  *
  * import express from "express";
- * import { attachRequestId, requestLogger, slowRequestMonitor } from "../lib/loggerEnhancer";
+ * import {
+ *   attachRequestId,
+ *   requestLogger,
+ *   slowRequestMonitor
+ * } from "../lib/loggerEnhancer";
  *
  * const app = express();
  * app.use(attachRequestId);
  * app.use(requestLogger);
  * app.use(slowRequestMonitor(1500));
  *
- * Metrics automatically flow to Prometheus/OpenTelemetry + logs correlate via requestId.
+ * ✅ Logs automatically include requestId & traceId.
+ * ✅ Metrics flow to Prometheus / OTEL exporters.
+ * ✅ Detects & logs slow requests dynamically.
  */
