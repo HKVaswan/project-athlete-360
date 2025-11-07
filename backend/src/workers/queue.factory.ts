@@ -1,12 +1,14 @@
 /**
  * src/workers/queue.factory.ts
  * --------------------------------------------------------------------------
- * Enterprise Queue Factory for Project Athlete 360
- * --------------------------------------------------------------------------
- * - Creates and manages BullMQ queues with observability, retries, and tracing
- * - Integrates with Prometheus metrics and OpenTelemetry tracing
- * - Provides consistent error handling and graceful shutdowns
- * - Serves as the backbone for all async background jobs
+ * 🚀 Enterprise Queue Factory — Project Athlete 360
+ *
+ * Features:
+ *  - Manages BullMQ queues with OpenTelemetry tracing and Prometheus metrics.
+ *  - Unified Redis connection pool with auto-reconnect and exponential backoff.
+ *  - Structured JSON logging with trace correlation (traceId + requestId).
+ *  - Built-in job retry, error recording, and runtime health monitoring.
+ *  - Graceful shutdown for distributed environments (K8s / PM2 / ECS).
  * --------------------------------------------------------------------------
  */
 
@@ -16,25 +18,33 @@ import { logger } from "../logger";
 import { config } from "../config";
 import { WorkerJobPayload } from "./worker.types";
 import { recordWorkerJob, recordError } from "../lib/core/metrics";
-import { trace } from "@opentelemetry/api";
+import { trace, SpanStatusCode } from "@opentelemetry/api";
 
 /* --------------------------------------------------------------------------
- * ⚙️ Redis Connection (Shared)
+ * ⚙️ Redis Connection (Shared and Observable)
  * ------------------------------------------------------------------------ */
-const redis = new IORedis(config.redisUrl || "redis://127.0.0.1:6379", {
+export const redis = new IORedis(config.redisUrl || "redis://127.0.0.1:6379", {
   maxRetriesPerRequest: null,
   enableReadyCheck: true,
+  reconnectOnError: (err) => {
+    logger.warn("[QUEUE] Redis reconnecting due to error", { error: err.message });
+    return true;
+  },
+  retryStrategy(times) {
+    const delay = Math.min(times * 200, 5000);
+    logger.warn(`[QUEUE] Redis reconnect attempt #${times} (delay: ${delay}ms)`);
+    return delay;
+  },
   lazyConnect: true,
-  reconnectOnError: () => true,
-});
-
-redis.on("error", (err) => {
-  recordError("redis_connection_failure", "high");
-  logger.error("[QUEUE] ❌ Redis connection failure:", err.message);
 });
 
 redis.on("connect", () => {
   logger.info("[QUEUE] ✅ Redis connected for BullMQ queues");
+});
+
+redis.on("error", (err) => {
+  recordError("redis_connection_failure", "high");
+  logger.error("[QUEUE] ❌ Redis connection failure", { error: err.message });
 });
 
 /* --------------------------------------------------------------------------
@@ -58,19 +68,19 @@ export enum QueueName {
 const queues: Record<QueueName, Queue> = {} as any;
 
 /* --------------------------------------------------------------------------
- * 🧩 Default Job Settings
+ * 🧩 Default Job Options
  * ------------------------------------------------------------------------ */
 const defaultJobOptions: JobsOptions = {
   attempts: 3,
   backoff: { type: "exponential", delay: 3000 },
-  removeOnComplete: 50,
-  removeOnFail: 100,
-  timeout: 1000 * 60 * 10, // 10 min
+  removeOnComplete: 100,
+  removeOnFail: 200,
+  timeout: 10 * 60 * 1000, // 10 minutes
   priority: 1,
 };
 
 /* --------------------------------------------------------------------------
- * 🏗️ Queue Creation
+ * 🏗️ Queue Creation with Observability Hooks
  * ------------------------------------------------------------------------ */
 export const createQueue = (name: QueueName): Queue => {
   if (queues[name]) return queues[name];
@@ -81,6 +91,23 @@ export const createQueue = (name: QueueName): Queue => {
     defaultJobOptions,
   });
 
+  queue.on("error", (err) => {
+    recordError(`queue_${name}_error`, "high");
+    logger.error(`[QUEUE:${name}] ❌ Queue runtime error`, { error: err.message });
+  });
+
+  queue.on("waiting", () => logger.debug(`[QUEUE:${name}] Waiting for jobs...`));
+  queue.on("active", () => logger.debug(`[QUEUE:${name}] Job active`));
+  queue.on("completed", (job) => {
+    recordWorkerJob(name, 1, "success");
+    logger.info(`[QUEUE:${name}] ✅ Job completed: ${job.id}`);
+  });
+  queue.on("failed", (job, err) => {
+    recordWorkerJob(name, 1, "failed");
+    recordError(`job_${name}_failed`, "medium");
+    logger.warn(`[QUEUE:${name}] ⚠️ Job failed: ${job?.id}`, { error: err.message });
+  });
+
   queues[name] = queue;
   logger.info(`[QUEUE] ✅ Queue initialized: ${name}`);
 
@@ -88,7 +115,7 @@ export const createQueue = (name: QueueName): Queue => {
 };
 
 /* --------------------------------------------------------------------------
- * 🧠 Job Enqueue Helper
+ * 📥 Job Enqueue (with Tracing)
  * ------------------------------------------------------------------------ */
 export const enqueueJob = async <T extends WorkerJobPayload>(
   queueName: QueueName,
@@ -96,19 +123,29 @@ export const enqueueJob = async <T extends WorkerJobPayload>(
   data: T,
   options?: JobsOptions
 ) => {
-  const span = trace.getTracer("pa360-queue").startSpan(`enqueue.${queueName}`);
+  const tracer = trace.getTracer("pa360.queue");
+  const span = tracer.startSpan(`enqueue.${queueName}`, {
+    attributes: { "queue.name": queueName, "job.name": jobName },
+  });
 
   try {
     const queue = queues[queueName] || createQueue(queueName);
     const job = await queue.add(jobName, data, { ...defaultJobOptions, ...options });
-    logger.info(`[QUEUE:${queueName}] 📥 Enqueued job '${jobName}' (ID: ${job.id})`);
 
-    span.addEvent("job_enqueued", { queueName, jobId: job.id });
+    span.addEvent("job_enqueued", { queue: queueName, jobId: job.id });
+    span.setStatus({ code: SpanStatusCode.OK });
+    logger.info(`[QUEUE:${queueName}] 📥 Enqueued job '${jobName}' (ID: ${job.id})`, {
+      traceId: span.spanContext().traceId,
+    });
+
     return job;
   } catch (err: any) {
     recordError(`enqueue_${queueName}_failed`, "high");
     span.recordException(err);
-    logger.error(`[QUEUE:${queueName}] ❌ Failed to enqueue job '${jobName}': ${err.message}`);
+    span.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
+    logger.error(`[QUEUE:${queueName}] ❌ Failed to enqueue job '${jobName}'`, {
+      error: err.message,
+    });
     throw err;
   } finally {
     span.end();
@@ -116,7 +153,7 @@ export const enqueueJob = async <T extends WorkerJobPayload>(
 };
 
 /* --------------------------------------------------------------------------
- * 🧹 Queue Maintenance Tools
+ * 🧹 Maintenance Utilities
  * ------------------------------------------------------------------------ */
 export const purgeQueue = async (queueName: QueueName) => {
   try {
@@ -125,15 +162,16 @@ export const purgeQueue = async (queueName: QueueName) => {
     logger.warn(`[QUEUE:${queueName}] 🧹 Queue drained successfully`);
   } catch (err: any) {
     recordError(`purge_${queueName}_failed`, "medium");
-    logger.error(`[QUEUE:${queueName}] ❌ Failed to purge queue: ${err.message}`);
+    logger.error(`[QUEUE:${queueName}] ❌ Failed to purge queue`, { error: err.message });
   }
 };
 
 /* --------------------------------------------------------------------------
- * 📊 Queue Health Inspector
+ * 🌡️ Health & Stats Inspection
  * ------------------------------------------------------------------------ */
 export const getQueueHealth = async () => {
   const result: Record<string, any> = {};
+
   for (const [name, queue] of Object.entries(queues)) {
     try {
       const counts = await queue.getJobCounts();
@@ -142,6 +180,7 @@ export const getQueueHealth = async () => {
       result[name] = { error: err.message };
     }
   }
+
   return result;
 };
 
@@ -149,43 +188,49 @@ export const getQueueHealth = async () => {
  * 🛑 Graceful Shutdown
  * ------------------------------------------------------------------------ */
 export const shutdownQueues = async () => {
-  logger.info("[QUEUE] 📴 Shutting down queues gracefully...");
+  logger.info("[QUEUE] 📴 Initiating graceful queue shutdown...");
+
   for (const [name, queue] of Object.entries(queues)) {
     try {
       await queue.close();
       logger.info(`[QUEUE] Closed queue: ${name}`);
     } catch (err: any) {
-      logger.error(`[QUEUE] Error closing queue '${name}': ${err.message}`);
+      logger.error(`[QUEUE] Error closing queue '${name}'`, { error: err.message });
     }
   }
 
   try {
     await redis.quit();
-    logger.info("[QUEUE] Redis connection closed.");
+    logger.info("[QUEUE] Redis connection closed gracefully.");
   } catch (err: any) {
-    logger.error("[QUEUE] Failed to close Redis connection:", err.message);
+    logger.error("[QUEUE] Redis shutdown error", { error: err.message });
   }
 };
 
 /* --------------------------------------------------------------------------
- * 🌡️ Runtime Metrics Updater
+ * 📊 Runtime Metrics Updater
  * ------------------------------------------------------------------------ */
 setInterval(async () => {
   try {
     for (const [name, queue] of Object.entries(queues)) {
-      const active = await queue.getActiveCount();
-      const waiting = await queue.getWaitingCount();
-      const failed = await queue.getFailedCount();
-      const total = active + waiting + failed;
+      const [active, waiting, failed, delayed] = await Promise.all([
+        queue.getActiveCount(),
+        queue.getWaitingCount(),
+        queue.getFailedCount(),
+        queue.getDelayedCount(),
+      ]);
 
+      const total = active + waiting + delayed;
       recordWorkerJob(name, total, failed > 0 ? "failed" : "success");
+
+      logger.debug(`[QUEUE:${name}] Metrics updated`, { active, waiting, failed, delayed });
     }
   } catch (err: any) {
-    logger.debug(`[QUEUE] Metrics update skipped: ${err.message}`);
+    logger.debug(`[QUEUE] Metrics collection skipped`, { error: err.message });
   }
 }, 60_000).unref();
 
 /* --------------------------------------------------------------------------
  * 🧩 Export Registry
  * ------------------------------------------------------------------------ */
-export { queues, redis };
+export { queues };
