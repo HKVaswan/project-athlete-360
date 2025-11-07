@@ -49,9 +49,10 @@ export const httpRequestCount = new client.Counter({
   labelNames: ["method", "route", "status_code", "env"],
 });
 
+// ❌ Error rate will be derived via PromQL instead of local approximation
 export const apiErrorRate = new client.Gauge({
   name: `${PREFIX}api_error_rate`,
-  help: "Ratio of errors to total requests (rolling average approximation)",
+  help: "Rolling API error ratio (computed externally via PromQL)",
   labelNames: ["route", "env"],
 });
 
@@ -117,12 +118,18 @@ export const aiActivityCount = new client.Counter({
   labelNames: ["type", "env"],
 });
 
+// ─── Metrics Exposure ───────────────────────────────────────
+export const metricsExposeCount = new client.Counter({
+  name: `${PREFIX}metrics_exposed_total`,
+  help: "Number of successful /metrics endpoint scrapes",
+});
+
 /* ---------------------------------------------------------------------
    ⚙️ System Gauges (auto-updating)
    ------------------------------------------------------------------- */
 const systemCpuGauge = new client.Gauge({
-  name: `${PREFIX}system_cpu_load`,
-  help: "1-minute system CPU load average",
+  name: `${PREFIX}system_cpu_load_percent`,
+  help: "1-minute system CPU load (percent of total cores)",
 });
 
 const systemMemoryGauge = new client.Gauge({
@@ -132,10 +139,14 @@ const systemMemoryGauge = new client.Gauge({
 
 setInterval(() => {
   try {
-    systemCpuGauge.set(os.loadavg()[0]);
-    systemMemoryGauge.set(process.memoryUsage().rss);
+    const cpuLoad = (os.loadavg()[0] / os.cpus().length) * 100;
+    const memUsage = process.memoryUsage().rss;
+    systemCpuGauge.set(cpuLoad);
+    systemMemoryGauge.set(memUsage);
   } catch (err) {
-    logger.warn("[METRICS] Failed to collect system metrics", { error: (err as Error).message });
+    logger.warn("[METRICS] Failed to collect system metrics", {
+      error: (err as Error).message,
+    });
   }
 }, 60_000).unref();
 
@@ -143,6 +154,15 @@ setInterval(() => {
    🧠 Recorders / Helpers
    ------------------------------------------------------------------- */
 
+/**
+ * Safely sanitize route labels to avoid high-cardinality Prometheus labels
+ */
+const sanitizeRoute = (route: string) =>
+  route.replace(/[0-9a-fA-F-]{8,}/g, ":id").replace(/\/$/, "") || "/";
+
+/**
+ * Record HTTP request metrics with trace correlation
+ */
 export const recordRequestMetrics = (
   method: string,
   route: string,
@@ -151,25 +171,26 @@ export const recordRequestMetrics = (
 ) => {
   const span = trace.getSpan(context.active());
   const traceId = span?.spanContext().traceId ?? "none";
+  const safeRoute = sanitizeRoute(route);
 
-  httpRequestDuration.labels(method, route, String(statusCode), ENV).observe(durationSec);
-  httpRequestCount.labels(method, route, String(statusCode), ENV).inc();
+  httpRequestDuration.labels(method, safeRoute, String(statusCode), ENV).observe(durationSec);
+  httpRequestCount.labels(method, safeRoute, String(statusCode), ENV).inc();
 
-  // Approximate error rate tracking
   if (statusCode >= 400) {
-    apiErrorRate.labels(route, ENV).set(Math.min(1, (apiErrorRate.hashMap?.[route]?.value ?? 0) + 0.01));
+    errorCount.labels("http_error", "medium", ENV).inc();
   }
 
-  logger.debug({
+  logger.info({
     traceId,
     method,
-    route,
+    route: safeRoute,
     statusCode,
     durationSec,
     msg: "HTTP metrics recorded",
   });
 };
 
+/** Generic recorders for different domains */
 export const recordError = (type: string, severity: "low" | "medium" | "high" = "medium") =>
   errorCount.labels(type, severity, ENV).inc();
 
@@ -203,12 +224,15 @@ export const recordWorkerHealth = (worker: string, healthy: boolean) =>
 /* ---------------------------------------------------------------------
    🌐 Exports
    ------------------------------------------------------------------- */
-export const getMetrics = async (): Promise<string> => register.metrics();
+export const getMetrics = async (): Promise<string> => {
+  metricsExposeCount.inc();
+  return register.metrics();
+};
 
 export const getSystemSnapshot = () => ({
   uptimeSec: process.uptime(),
   memoryMB: Math.round(process.memoryUsage().rss / 1024 / 1024),
-  cpuLoad: os.loadavg()[0],
+  cpuLoadPercent: (os.loadavg()[0] / os.cpus().length) * 100,
   timestamp: new Date().toISOString(),
 });
 
