@@ -1,0 +1,174 @@
+/**
+ * src/services/billingTrace.service.ts
+ * --------------------------------------------------------------------------
+ * Enterprise-grade Billing Trace Service
+ *
+ * Purpose:
+ *  - Provides unified tracing, metrics, and audit visibility
+ *    for all billing-related operations (charges, refunds, trials, etc.)
+ *  - Ensures every billing event can be correlated across API, worker,
+ *    and external payment provider systems.
+ *  - Links with OpenTelemetry spans, Prometheus metrics, and audit logs.
+ *
+ * Dependencies:
+ *  - OpenTelemetry (traces)
+ *  - Prometheus (metrics)
+ *  - auditService (internal auditing)
+ *  - logger (structured logs)
+ * --------------------------------------------------------------------------
+ */
+
+import { trace, context } from "@opentelemetry/api";
+import { logger } from "../logger";
+import { auditService } from "./audit.service";
+import {
+  recordError,
+  billingOverageCounter,
+  httpRequestDuration,
+} from "../lib/core/metrics";
+import { config } from "../config";
+
+interface BillingTracePayload {
+  userId?: string;
+  institutionId?: string;
+  planId?: string;
+  action: "charge" | "refund" | "trial" | "overage" | "adjustment";
+  amount?: number;
+  currency?: string;
+  provider?: string;
+  metadata?: Record<string, any>;
+  result?: "success" | "failed";
+  error?: any;
+}
+
+/* --------------------------------------------------------------------------
+ * 🔧 Custom Prometheus Metric (if not already defined globally)
+ * ------------------------------------------------------------------------ */
+import client from "prom-client";
+
+export const billingEventCount = new client.Counter({
+  name: "pa360_billing_events_total",
+  help: "Number of billing events processed",
+  labelNames: ["action", "result", "env"],
+});
+
+/* --------------------------------------------------------------------------
+ * 🧠 Helper: Start or get active trace span
+ * ------------------------------------------------------------------------ */
+const getBillingSpan = (name: string) => {
+  const tracer = trace.getTracer("pa360-billing");
+  const active = trace.getSpan(context.active());
+  return tracer.startSpan(name, {}, active ? context.active() : undefined);
+};
+
+/* --------------------------------------------------------------------------
+ * 💰 Record Billing Event Trace
+ * ------------------------------------------------------------------------ */
+export const recordBillingEvent = async (payload: BillingTracePayload) => {
+  const span = getBillingSpan(`billing.${payload.action}`);
+  const env = process.env.NODE_ENV || "unknown";
+  const startTime = Date.now();
+
+  try {
+    // annotate span metadata
+    span.setAttributes({
+      "billing.user_id": payload.userId ?? "unknown",
+      "billing.institution_id": payload.institutionId ?? "unknown",
+      "billing.plan_id": payload.planId ?? "none",
+      "billing.amount": payload.amount ?? 0,
+      "billing.currency": payload.currency ?? "INR",
+      "billing.provider": payload.provider ?? "internal",
+      "billing.env": env,
+    });
+
+    // simulate event duration measurement
+    const duration = (Date.now() - startTime) / 1000;
+    httpRequestDuration.labels("BILLING", payload.action, payload.result ?? "pending", env).observe(duration);
+
+    // record event metric
+    billingEventCount.labels(payload.action, payload.result ?? "pending", env).inc();
+
+    // audit entry for internal traceability
+    await auditService.log({
+      actorId: payload.userId || "system",
+      actorRole: "system",
+      action: `BILLING_${payload.action.toUpperCase()}`,
+      details: {
+        planId: payload.planId,
+        amount: payload.amount,
+        result: payload.result,
+        provider: payload.provider,
+        meta: payload.metadata,
+      },
+    });
+
+    // success mark
+    span.setStatus({ code: 1 });
+    span.addEvent("billing_event_recorded", payload);
+
+    logger.info(`[BILLING TRACE] ${payload.action.toUpperCase()} event`, {
+      userId: payload.userId,
+      institutionId: payload.institutionId,
+      amount: payload.amount,
+      result: payload.result,
+      provider: payload.provider,
+    });
+  } catch (err: any) {
+    // record as error in metrics
+    recordError("billing_event_failure", "high");
+
+    span.recordException(err);
+    span.setStatus({ code: 2, message: err.message });
+    span.addEvent("billing_event_error", { message: err.message });
+
+    logger.error("[BILLING TRACE] Failed to record billing event", {
+      error: err.message,
+      action: payload.action,
+    });
+
+    await auditService.log({
+      actorId: payload.userId || "system",
+      actorRole: "system",
+      action: `BILLING_${payload.action.toUpperCase()}_FAILED`,
+      details: { error: err.message, ...payload },
+    });
+  } finally {
+    span.end();
+  }
+};
+
+/* --------------------------------------------------------------------------
+ * ⚙️ Specialized Shortcuts
+ * ------------------------------------------------------------------------ */
+
+export const traceCharge = async (opts: Omit<BillingTracePayload, "action">) =>
+  recordBillingEvent({ ...opts, action: "charge" });
+
+export const traceRefund = async (opts: Omit<BillingTracePayload, "action">) =>
+  recordBillingEvent({ ...opts, action: "refund" });
+
+export const traceTrial = async (opts: Omit<BillingTracePayload, "action">) =>
+  recordBillingEvent({ ...opts, action: "trial" });
+
+export const traceOverage = async (opts: Omit<BillingTracePayload, "action">) => {
+  billingOverageCounter?.inc();
+  return recordBillingEvent({ ...opts, action: "overage" });
+};
+
+/* --------------------------------------------------------------------------
+ * 🧩 Example Usage
+ * --------------------------------------------------------------------------
+ * await traceCharge({
+ *   userId: "u_123",
+ *   planId: "pro_monthly",
+ *   amount: 999,
+ *   provider: "stripe",
+ *   result: "success",
+ * });
+ *
+ * await traceOverage({
+ *   institutionId: "inst_01",
+ *   metadata: { usageGB: 12 },
+ *   result: "failed",
+ * });
+ * ------------------------------------------------------------------------ */
