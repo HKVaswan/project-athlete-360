@@ -1,0 +1,98 @@
+# infra/observability/prometheus/prometheus.yml
+# --------------------------------------------------------------------------
+# 📈 Prometheus Configuration — Project Athlete 360
+# --------------------------------------------------------------------------
+# Function:
+#   - Defines how Prometheus scrapes, stores, and labels metrics.
+#   - Connects app metrics, Redis, and system exporters for unified observability.
+# --------------------------------------------------------------------------
+
+global:
+  scrape_interval: 15s            # How often to scrape targets
+  evaluation_interval: 15s        # How often to evaluate alert rules
+  scrape_timeout: 10s             # Timeout per scrape
+
+  # Labels automatically added to every metric
+  external_labels:
+    environment: "production"
+    service: "project-athlete-360"
+    region: "asia-south1"
+
+# --------------------------------------------------------------------------
+# ⚙️ Scrape Configurations
+# --------------------------------------------------------------------------
+scrape_configs:
+  # ─────────────────────────────────────────────
+  # 🧠 Backend Service (Node.js + Prom-client)
+  # ─────────────────────────────────────────────
+  - job_name: "pa360-backend"
+    metrics_path: /metrics
+    scheme: http
+    static_configs:
+      - targets: ["pa360-backend:9464"]
+        labels:
+          component: "api-server"
+          instance: "node-main"
+
+  # ─────────────────────────────────────────────
+  # ⚙️ Worker Metrics
+  # ─────────────────────────────────────────────
+  - job_name: "pa360-workers"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["pa360-worker:9465"]
+        labels:
+          component: "queue-worker"
+          instance: "worker-1"
+
+  # ─────────────────────────────────────────────
+  # 🧮 Redis Exporter
+  # ─────────────────────────────────────────────
+  - job_name: "redis"
+    static_configs:
+      - targets: ["redis-exporter:9121"]
+        labels:
+          component: "redis"
+          instance: "cache-1"
+
+  # ─────────────────────────────────────────────
+  # 🗃 PostgreSQL Exporter (Optional)
+  # ─────────────────────────────────────────────
+  - job_name: "postgresql"
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+        labels:
+          component: "database"
+          instance: "pg-main"
+
+  # ─────────────────────────────────────────────
+  # 🧩 Node Exporter (Host Metrics)
+  # ─────────────────────────────────────────────
+  - job_name: "node"
+    static_configs:
+      - targets: ["node-exporter:9100"]
+        labels:
+          component: "system"
+          instance: "infra-1"
+
+  # ─────────────────────────────────────────────
+  # 🔔 Alertmanager Integration (optional)
+  # ─────────────────────────────────────────────
+  - job_name: "alertmanager"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["alertmanager:9093"]
+
+# --------------------------------------------------------------------------
+# 🧭 (Optional) Alerting Rules
+# --------------------------------------------------------------------------
+rule_files:
+  - "/etc/prometheus/alert.rules.yml"
+
+# --------------------------------------------------------------------------
+# 💾 Storage & Retention (adjust per environment)
+# --------------------------------------------------------------------------
+storage:
+  tsdb:
+    retention_time: 15d
+    retention_size: 10GB
