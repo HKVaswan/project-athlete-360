@@ -1,0 +1,150 @@
+{
+  "id": null,
+  "uid": "pa360-trial-abuse",
+  "title": "Trial Abuse Detection Dashboard - Project Athlete 360",
+  "tags": ["security", "fraud", "pa360", "monitoring"],
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "style": "dark",
+  "timezone": "browser",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Total Trial Abuses Detected (24h)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(increase(pa360_trial_abuse_detected_total[24h]))",
+          "legendFormat": "Abuses (24h)"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "options": { "colorMode": "value", "justifyMode": "center" }
+    },
+    {
+      "type": "stat",
+      "title": "Total Trial Abuses Detected (7d)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(increase(pa360_trial_abuse_detected_total[7d]))",
+          "legendFormat": "Abuses (7d)"
+        }
+      ],
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "options": { "colorMode": "value", "justifyMode": "center" }
+    },
+    {
+      "type": "graph",
+      "title": "Trial Abuse Events (Rate per 10m)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(rate(pa360_trial_abuse_detected_total[10m])) by (institution_id)",
+          "legendFormat": "Institution {{institution_id}}"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 6 },
+      "lines": true,
+      "linewidth": 2,
+      "fill": 1,
+      "yaxes": [{ "format": "short" }, { "format": "short" }]
+    },
+    {
+      "type": "graph",
+      "title": "Trial Abuse Events by User (Top 10)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "topk(10, increase(pa360_trial_abuse_detected_total[24h]))",
+          "legendFormat": "User {{user_id}}"
+        }
+      ],
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 6 },
+      "lines": true,
+      "linewidth": 2,
+      "fill": 1
+    },
+    {
+      "type": "table",
+      "title": "Recent Trial Abuse Detections (Last 2h)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "topk(15, increase(pa360_trial_abuse_detected_total[2h]))",
+          "legendFormat": "Institution {{institution_id}}"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 10, "w": 12, "h": 7 },
+      "options": { "showHeader": true }
+    },
+    {
+      "type": "graph",
+      "title": "Billing Overages vs Trial Abuses (Correlation)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(rate(pa360_billing_overage_events_total[15m])) by (institution_id)",
+          "legendFormat": "Overages - {{institution_id}}"
+        },
+        {
+          "expr": "sum(rate(pa360_trial_abuse_detected_total[15m])) by (institution_id)",
+          "legendFormat": "Abuses - {{institution_id}}"
+        }
+      ],
+      "gridPos": { "x": 12, "y": 10, "w": 12, "h": 7 },
+      "lines": true,
+      "linewidth": 2,
+      "fill": 2,
+      "yaxes": [{ "format": "short" }, { "format": "short" }]
+    },
+    {
+      "type": "table",
+      "title": "Institutions with Highest Abuse Frequency (7d)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "topk(10, increase(pa360_trial_abuse_detected_total[7d]))",
+          "legendFormat": "{{institution_id}}"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 17, "w": 12, "h": 7 },
+      "options": { "showHeader": true }
+    },
+    {
+      "type": "stat",
+      "title": "Most Recent Abuse Detection Timestamp",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "max(timestamp(pa360_trial_abuse_detected_total))",
+          "legendFormat": "Last Detection"
+        }
+      ],
+      "gridPos": { "x": 12, "y": 17, "w": 12, "h": 4 },
+      "options": { "colorMode": "value", "justifyMode": "center" }
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "institution_id",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(pa360_trial_abuse_detected_total, institution_id)",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "label": "Institution"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": ["30s", "1m", "5m", "15m", "1h", "6h"]
+  }
+}
