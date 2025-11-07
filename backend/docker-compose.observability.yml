@@ -1,0 +1,122 @@
+version: "3.9"
+
+services:
+  # ───────────────────────────────────────────────
+  # 🧠 Prometheus — Core Metrics Collector
+  # ───────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: pa360-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/observability/prometheus/rules:/etc/prometheus/rules:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+      - "--web.enable-admin-api"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - observability
+
+  # ───────────────────────────────────────────────
+  # 🚨 Alertmanager — Notification Engine
+  # ───────────────────────────────────────────────
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: pa360-alertmanager
+    restart: unless-stopped
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./infra/observability/alertmanager/alertmanager.yml:/etc/alertmanager/config.yml:ro
+    command:
+      - "--config.file=/etc/alertmanager/config.yml"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9093/-/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      - prometheus
+    networks:
+      - observability
+
+  # ───────────────────────────────────────────────
+  # 🎯 Jaeger — Distributed Tracing
+  # ───────────────────────────────────────────────
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: pa360-jaeger
+    restart: unless-stopped
+    ports:
+      - "16686:16686" # UI
+      - "4318:4318"   # OTLP HTTP
+      - "4317:4317"   # OTLP gRPC
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+      - LOG_LEVEL=warn
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:16686"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - observability
+
+  # ───────────────────────────────────────────────
+  # 📜 Loki — Centralized Log Aggregation
+  # ───────────────────────────────────────────────
+  loki:
+    image: grafana/loki:latest
+    container_name: pa360-loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3100/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - observability
+
+  # ───────────────────────────────────────────────
+  # 📊 Grafana — Unified Observability Dashboard
+  # ───────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    container_name: pa360-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+    volumes:
+      - ./docs/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+      - jaeger
+      - loki
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - observability
+
+networks:
+  observability:
+    driver: bridge
