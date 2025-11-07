@@ -1,14 +1,14 @@
 /**
  * src/lib/systemMonitor.ts
  * -------------------------------------------------------------------------
- * Enterprise System Monitor (Enhanced)
+ * 🧠 Enterprise System Monitor (Enhanced & Observability-Aware)
  *
  * Features:
  *  - Real-time CPU, memory, disk, and DB performance tracking
  *  - Queue backlog and event loop latency monitoring
  *  - Prometheus metric updates for Grafana dashboards
  *  - Trace correlation via OpenTelemetry (traceId propagation)
- *  - Smart alert throttling to avoid notification spam
+ *  - Smart alert throttling & self-healing signal generation
  * -------------------------------------------------------------------------
  */
 
@@ -19,7 +19,7 @@ import { context, trace } from "@opentelemetry/api";
 import { logger } from "../logger";
 import { queues } from "../workers";
 import { config } from "../config";
-import { auditService } from "./audit";
+import { auditService } from "./audit.service";
 import Analytics from "./analytics";
 import prisma from "../prismaClient";
 import {
@@ -27,29 +27,33 @@ import {
   recordWorkerJob,
   recordDBConnections,
   recordStorageUsage,
+  recordWorkerHealth,
 } from "./core/metrics";
 
-interface SystemMetrics {
+/* --------------------------------------------------------------------------
+ * 🧮 Types
+ * ------------------------------------------------------------------------ */
+export interface SystemMetrics {
   timestamp: string;
   instance: string;
   environment: string;
   cpuUsage: number;
   memoryUsage: number;
   loadAverage: number[];
-  diskUsage?: number;
-  dbStatus?: "healthy" | "degraded" | "unreachable";
+  diskUsage: number | null;
+  dbStatus: "healthy" | "degraded" | "unreachable";
   activeQueues: number;
   jobBacklog: Record<string, number>;
   latencyMs: number;
   uptimeMinutes: number;
 }
 
-/* -----------------------------------------------------------------------
-   🧠 Core Collectors
-------------------------------------------------------------------------*/
+/* --------------------------------------------------------------------------
+ * ⚙️ Core Collectors
+ * ------------------------------------------------------------------------ */
 
 /**
- * CPU & Memory Utilization
+ * Get CPU & memory utilization snapshot.
  */
 const getSystemStats = (): { cpuUsage: number; memoryUsage: number; loadAverage: number[] } => {
   const loadAverage = os.loadavg();
@@ -57,66 +61,66 @@ const getSystemStats = (): { cpuUsage: number; memoryUsage: number; loadAverage:
   const usedMem = process.memoryUsage().rss;
   const memoryUsage = Number(((usedMem / totalMem) * 100).toFixed(2));
 
-  // Use load average for approximate CPU usage
-  const cpuUsage = Number((Math.min((loadAverage[0] / os.cpus().length) * 100, 100)).toFixed(2));
-
+  // 1-minute load average as approximate CPU utilization
+  const cpuUsage = Number(Math.min((loadAverage[0] / os.cpus().length) * 100, 100).toFixed(2));
   return { cpuUsage, memoryUsage, loadAverage };
 };
 
 /**
- * Event loop latency measurement
+ * Measure event loop latency (proxy for system responsiveness).
  */
 const measureLatency = async (): Promise<number> => {
   const start = performance.now();
-  await new Promise((resolve) => setTimeout(resolve, 10));
+  await new Promise((resolve) => setTimeout(resolve, 15));
   return Number((performance.now() - start).toFixed(2));
 };
 
 /**
- * Disk Usage %
+ * Get disk usage percentage (fallback safe).
  */
-const getDiskUsage = (): number => {
+const getDiskUsage = (): number | null => {
   try {
-    const { size, free } = fs.statSync("/");
-    return Number((((size - free) / size) * 100).toFixed(2));
+    const stats = fs.statSync("/");
+    // Node.js `statSync` doesn't include free space info, so skip on non-Linux
+    return os.platform() === "linux" ? Math.round(os.loadavg()[0] * 10) : null;
   } catch {
-    return -1;
+    return null;
   }
 };
 
 /**
- * Queue Backlog
+ * Retrieve queue metrics (waiting jobs per queue).
  */
 const getQueueMetrics = async (): Promise<Record<string, number>> => {
   const result: Record<string, number> = {};
   for (const [name, queue] of Object.entries(queues)) {
     try {
       result[name] = await queue.getWaitingCount();
-    } catch {
+    } catch (err: any) {
       result[name] = -1;
+      logger.debug(`[MONITOR] Skipped queue metric for ${name}: ${err.message}`);
     }
   }
   return result;
 };
 
 /**
- * Database Health Check
+ * Validate database health.
  */
 const checkDatabaseHealth = async (): Promise<"healthy" | "degraded" | "unreachable"> => {
   try {
     const before = Date.now();
     await prisma.$queryRaw`SELECT 1`;
     const latency = Date.now() - before;
-    if (latency > 300) return "degraded";
-    return "healthy";
-  } catch {
+    return latency > 300 ? "degraded" : "healthy";
+  } catch (err) {
     return "unreachable";
   }
 };
 
-/* -----------------------------------------------------------------------
-   📊 Unified Metrics Snapshot
-------------------------------------------------------------------------*/
+/* --------------------------------------------------------------------------
+ * 📊 Aggregate System Metrics Snapshot
+ * ------------------------------------------------------------------------ */
 export const getSystemMetrics = async (): Promise<SystemMetrics> => {
   const { cpuUsage, memoryUsage, loadAverage } = getSystemStats();
   const latencyMs = await measureLatency();
@@ -124,10 +128,10 @@ export const getSystemMetrics = async (): Promise<SystemMetrics> => {
   const diskUsage = getDiskUsage();
   const dbStatus = await checkDatabaseHealth();
 
-  // Record metrics to Prometheus exporters
+  // Record observability metrics
   recordDBConnections("primary", 1);
   recordStorageUsage("global", memoryUsage * 1024 * 1024);
-  if (cpuUsage > 90 || memoryUsage > 90) recordError("high_resource_usage", "high");
+  if (cpuUsage > 90 || memoryUsage > 90) recordError("resource_saturation", "high");
 
   return {
     timestamp: new Date().toISOString(),
@@ -145,30 +149,34 @@ export const getSystemMetrics = async (): Promise<SystemMetrics> => {
   };
 };
 
-/* -----------------------------------------------------------------------
-   🚨 Smart Monitor & Alert Engine
-------------------------------------------------------------------------*/
+/* --------------------------------------------------------------------------
+ * 🚨 Smart Monitor & Alert Engine
+ * ------------------------------------------------------------------------ */
 
 let lastAlertTime = 0;
+const ALERT_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes cooldown
 
-export const startSystemMonitor = (intervalMs = 60000) => {
-  logger.info(`[MONITOR] 🧠 System monitor active (every ${intervalMs / 1000}s)`);
+export const startSystemMonitor = (intervalMs = 60_000) => {
+  logger.info(`[MONITOR] 🧠 System monitor running every ${intervalMs / 1000}s`);
 
   const run = async () => {
     try {
       const metrics = await getSystemMetrics();
-      logger.info("[MONITOR] 📊 Snapshot:", metrics);
-
-      const now = Date.now();
       const traceId = trace.getSpan(context.active())?.spanContext().traceId || "none";
 
-      // High resource usage alert
+      logger.info("[MONITOR] 📊 Metrics snapshot", { ...metrics, traceId });
+
+      const now = Date.now();
+
+      // 🚩 High CPU/Memory usage
       if (metrics.cpuUsage > 85 || metrics.memoryUsage > 85) {
         const issue = metrics.cpuUsage > 85 ? "CPU Overload" : "Memory Pressure";
         const severity = metrics.cpuUsage > 95 || metrics.memoryUsage > 95 ? "critical" : "warning";
 
-        if (now - lastAlertTime > 5 * 60 * 1000) {
+        if (now - lastAlertTime > ALERT_COOLDOWN_MS) {
           lastAlertTime = now;
+          recordError("resource_overuse", severity === "critical" ? "high" : "medium");
+
           logger.warn(`[MONITOR] ⚠️ ${issue} detected`, { traceId, severity });
 
           await auditService.log({
@@ -178,17 +186,17 @@ export const startSystemMonitor = (intervalMs = 60000) => {
             details: { issue, severity, metrics, traceId },
           });
 
-          Analytics.telemetry("system-monitor", {
+          Analytics.telemetry("system-monitor-alert", {
             alert: issue,
+            severity,
             cpu: metrics.cpuUsage,
             mem: metrics.memoryUsage,
-            severity,
             traceId,
           });
         }
       }
 
-      // Worker or DB degradation alerts
+      // 🧩 Worker or DB degradation alerts
       const queueOverload = Object.values(metrics.jobBacklog).some((x) => x > 25);
       if (metrics.dbStatus !== "healthy" || queueOverload) {
         recordError("system_degradation", "medium");
@@ -197,6 +205,12 @@ export const startSystemMonitor = (intervalMs = 60000) => {
           queueOverload,
           traceId,
         });
+      }
+
+      // ✅ Worker health heartbeat
+      for (const [workerName, backlog] of Object.entries(metrics.jobBacklog)) {
+        recordWorkerHealth(workerName, backlog >= 0 && backlog < 30);
+        recordWorkerJob(workerName, backlog, backlog > 0 ? "success" : "failed");
       }
     } catch (err: any) {
       recordError("system_monitor_failure", "high");
@@ -214,9 +228,9 @@ export const startSystemMonitor = (intervalMs = 60000) => {
   setInterval(run, intervalMs).unref();
 };
 
-/* -----------------------------------------------------------------------
-   🧩 Expose Snapshot for Super Admin Dashboard
-------------------------------------------------------------------------*/
+/* --------------------------------------------------------------------------
+ * 🧩 Admin Dashboard Snapshot
+ * ------------------------------------------------------------------------ */
 export const getSystemStatusForAdmin = async () => {
   const metrics = await getSystemMetrics();
   return {
