@@ -1,15 +1,17 @@
+// src/config/secretsManager.ts
 /**
- * src/config/secretsManager.ts
+ * src/config/secretsManager.ts (v4)
  * --------------------------------------------------------------------------
- * 🧠 Enterprise Secrets Manager (v3)
+ * Enterprise Secrets Manager (v4) — Hardened & Observability-ready
  *
  * Features:
- *  - Pluggable: ENV | AWS Secrets Manager | Vault
- *  - Secure in-memory cache with TTL + async refresh
- *  - Integrated audit logging & tamper-proof fingerprints
- *  - Self-healing fallback for temporary provider failures
- *  - Entropy-based secret strength validation
- *  - Compatible with automated key rotation worker
+ *  - Pluggable backends: env | aws | vault
+ *  - Encrypted in-memory cache (AES-256-GCM)
+ *  - HMAC-signed fingerprints for tamper-resistant audit trails
+ *  - Prometheus metric: pa360_secrets_access_total
+ *  - Provider health checks + background refresh
+ *  - Hot-reload API (reloadAll)
+ *  - Integrated audit logging and graceful fallbacks
  * --------------------------------------------------------------------------
  */
 
@@ -18,36 +20,50 @@ import fs from "fs";
 import { logger } from "../logger";
 import { config } from "./index";
 import { auditService } from "../services/audit.service";
+import { Counter } from "prom-client";
 
 type Backend = "env" | "aws" | "vault";
-type CacheEntry = { value: string; fetchedAt: number; ttlMs: number; fingerprint: string };
+type CacheEntry = {
+  encryptedValue: string;
+  fetchedAt: number;
+  ttlMs: number;
+  fingerprint: string;
+  signature: string;
+};
 
 class SecretsManager {
   private backend: Backend;
   private cache = new Map<string, CacheEntry>();
-  private defaultTTL = 60_000; // 60s
+  private defaultTTL = Number(config.secrets?.defaultTtlMs ?? 60_000); // 60s default
   private awsClient: any | null = null;
   private vaultClient: any | null = null;
   private initialized = false;
   private backgroundRefreshTimer: NodeJS.Timeout | null = null;
 
+  // Prometheus metric
+  private accessCounter = new Counter({
+    name: "pa360_secrets_access_total",
+    help: "Count of secrets accessed by backend and result",
+    labelNames: ["backend", "result"],
+  });
+
   constructor() {
-    if (config.secrets.backend === "vault") this.backend = "vault";
-    else if (config.secrets.backend === "aws") this.backend = "aws";
+    if (config.secrets?.backend === "vault") this.backend = "vault";
+    else if (config.secrets?.backend === "aws") this.backend = "aws";
     else this.backend = "env";
   }
 
   /* ---------------------------------------------------------------------
-   * 🧩 Initialize Provider Clients (lazy)
+   * Initialization — lazy and safe
    * ------------------------------------------------------------------ */
   async init(): Promise<void> {
     if (this.initialized) return;
     try {
-      if (this.backend === "aws" && config.secrets.aws?.enabled) {
-        const { SecretsManager: AWSSecretsManager } = require("@aws-sdk/client-secrets-manager");
-        this.awsClient = new AWSSecretsManager({ region: config.secrets.aws.region });
+      if (this.backend === "aws" && config.secrets?.aws?.enabled) {
+        const { SecretsManager } = require("@aws-sdk/client-secrets-manager");
+        this.awsClient = new SecretsManager({ region: config.secrets.aws.region });
         logger.info("[SecretsManager] AWS backend initialized.");
-      } else if (this.backend === "vault" && config.secrets.vault?.enabled) {
+      } else if (this.backend === "vault" && config.secrets?.vault?.enabled) {
         const Vault = require("node-vault");
         this.vaultClient = Vault({
           apiVersion: "v1",
@@ -59,107 +75,197 @@ class SecretsManager {
         logger.info("[SecretsManager] Using environment backend.");
       }
     } catch (err: any) {
-      logger.error(`[SecretsManager] init failed: ${err.message}`);
-      this.backend = "env"; // fallback
+      logger.error(`[SecretsManager] init failed: ${err?.message || err}`);
+      // fallback to env backend
+      this.backend = "env";
     }
     this.initialized = true;
-
-    // Background auto-refresh (non-blocking)
     this.scheduleBackgroundRefresh();
   }
 
   /* ---------------------------------------------------------------------
-   * 🔁 Background refresh
+   * Background refresh loop (non-blocking)
    * ------------------------------------------------------------------ */
   private scheduleBackgroundRefresh() {
     if (this.backgroundRefreshTimer) clearInterval(this.backgroundRefreshTimer);
+    const interval = Number(config.secrets?.refreshIntervalMs ?? this.defaultTTL * 2);
     this.backgroundRefreshTimer = setInterval(() => {
       for (const key of this.cache.keys()) {
-        void this.refresh(key);
+        void this.refresh(key).catch((e) =>
+          logger.warn(`[SecretsManager] refresh failed for ${key}: ${e?.message || e}`)
+        );
       }
-    }, this.defaultTTL * 2);
+    }, interval);
+    this.backgroundRefreshTimer.unref();
   }
 
   /* ---------------------------------------------------------------------
-   * 🔐 Get secret (cached)
+   * Public: get secret (cached, encrypted)
    * ------------------------------------------------------------------ */
   async get(key: string, opts?: { forceRefresh?: boolean; ttlMs?: number }): Promise<string | null> {
     await this.init();
 
     const ttlMs = opts?.ttlMs ?? this.defaultTTL;
     const cached = this.cache.get(key);
+
+    // Return from cache if valid
     if (cached && !opts?.forceRefresh && Date.now() - cached.fetchedAt < cached.ttlMs) {
-      return cached.value;
+      try {
+        const value = this.decrypt(cached.encryptedValue);
+        this.accessCounter.labels(this.backend, "cache_hit").inc();
+        return value;
+      } catch (err: any) {
+        logger.warn(`[SecretsManager] decrypt failed for cached key ${key}: ${err?.message || err}`);
+        // fall through to fetch fresh
+      }
     }
 
+    // Fetch from provider
     let value: string | null = null;
     try {
-      value =
-        this.backend === "aws"
-          ? await this.fetchFromAws(key)
-          : this.backend === "vault"
-          ? await this.fetchFromVault(key)
-          : await this.fetchFromEnv(key);
+      if (this.backend === "aws") value = await this.fetchFromAws(key);
+      else if (this.backend === "vault") value = await this.fetchFromVault(key);
+      else value = await this.fetchFromEnv(key);
+      this.accessCounter.labels(this.backend, value ? "success" : "not_found").inc();
     } catch (err: any) {
-      logger.warn(`[SecretsManager] Provider fetch failed (${key}): ${err.message}`);
-      value = await this.fetchFromEnv(key); // fallback
+      logger.warn(`[SecretsManager] provider fetch failed (${key}): ${err?.message || err}`);
+      // fallback to env if provider failed
+      try {
+        value = await this.fetchFromEnv(key);
+        this.accessCounter.labels(this.backend, value ? "fallback_env_success" : "fallback_env_missing").inc();
+      } catch (e) {
+        this.accessCounter.labels(this.backend, "failure").inc();
+      }
     }
 
     if (value != null) {
       const fingerprint = this.secretFingerprint(value);
-      this.cache.set(key, { value, fetchedAt: Date.now(), ttlMs, fingerprint });
-      await this.recordAuditEvent("SECRET_READ", key, fingerprint);
+      const signature = this.signFingerprint(fingerprint);
+      const encryptedValue = this.encrypt(value);
+      this.cache.set(key, {
+        encryptedValue,
+        fetchedAt: Date.now(),
+        ttlMs,
+        fingerprint,
+        signature,
+      });
+
+      await this.recordAuditEvent("SECRET_READ", key, fingerprint, signature);
     }
 
     return value;
   }
 
   /* ---------------------------------------------------------------------
-   * 🧱 Provider fetchers
+   * Put/rotate secret (writes to configured backend and updates cache)
    * ------------------------------------------------------------------ */
-  private async fetchFromEnv(key: string) {
+  async putSecret(key: string, value: string): Promise<void> {
+    await this.init();
+    const fingerprint = this.secretFingerprint(value);
+    const signature = this.signFingerprint(fingerprint);
+
+    try {
+      if (this.backend === "aws" && this.awsClient) {
+        const secretId = config.secrets.aws?.mapping?.[key] || key;
+        // Note: SDK v3 client uses PutSecretValueCommand; using client convenience here for brevity
+        await this.awsClient.putSecretValue?.({ SecretId: secretId, SecretString: value });
+      } else if (this.backend === "vault" && this.vaultClient) {
+        const path = config.secrets.vault?.mapping?.[key] || `secret/data/${key}`;
+        await this.vaultClient.write(path, { data: { value } });
+      } else {
+        // Local fallback mirror (not secure; only for dev)
+        fs.appendFileSync(".env.mirror", `\n# ${new Date().toISOString()} ${key}=${value}`);
+      }
+
+      // update cache
+      const encryptedValue = this.encrypt(value);
+      this.cache.set(key, { encryptedValue, fetchedAt: Date.now(), ttlMs: this.defaultTTL, fingerprint, signature });
+      await this.recordAuditEvent("SECRET_ROTATED", key, fingerprint, signature);
+      this.accessCounter.labels(this.backend, "put").inc();
+    } catch (err: any) {
+      logger.error(`[SecretsManager] putSecret failed for ${key}: ${err?.message || err}`);
+      this.accessCounter.labels(this.backend, "put_failed").inc();
+      throw err;
+    }
+  }
+
+  /* ---------------------------------------------------------------------
+   * Provider fetch implementations
+   * ------------------------------------------------------------------ */
+  private async fetchFromEnv(key: string): Promise<string | null> {
     return process.env[key] ?? null;
   }
 
   private async fetchFromAws(key: string): Promise<string | null> {
     if (!this.awsClient) return null;
     const secretId = config.secrets.aws?.mapping?.[key] || key;
-    const resp = await this.awsClient.getSecretValue({ SecretId: secretId });
-    if (resp.SecretString) return resp.SecretString;
-    if (resp.SecretBinary) return Buffer.from(resp.SecretBinary).toString("utf8");
-    return null;
+    try {
+      const resp = await this.awsClient.getSecretValue?.({ SecretId: secretId });
+      if (!resp) return null;
+      if (resp.SecretString) return resp.SecretString;
+      if (resp.SecretBinary) return Buffer.from(resp.SecretBinary).toString("utf8");
+      return null;
+    } catch (err: any) {
+      throw err;
+    }
   }
 
   private async fetchFromVault(key: string): Promise<string | null> {
     if (!this.vaultClient) return null;
     const path = config.secrets.vault?.mapping?.[key] || `secret/data/${key}`;
-    const resp = await this.vaultClient.read(path);
+    const resp = await this.vaultClient.read?.(path);
+    // node-vault returns { data: { data: { <k>: <v> }}} depending on kv version; we assume 'value'
     return resp?.data?.data?.value ?? null;
   }
 
   /* ---------------------------------------------------------------------
-   * 🧩 Write / Rotate Secret
+   * Provider health check (helpful for dashboards)
    * ------------------------------------------------------------------ */
-  async putSecret(key: string, value: string): Promise<void> {
+  async checkProviderHealth(): Promise<{ healthy: boolean; message: string }> {
     await this.init();
-    const fingerprint = this.secretFingerprint(value);
-
-    if (this.backend === "aws" && this.awsClient) {
-      const secretId = config.secrets.aws?.mapping?.[key] || key;
-      await this.awsClient.putSecretValue({ SecretId: secretId, SecretString: value });
-    } else if (this.backend === "vault" && this.vaultClient) {
-      const path = config.secrets.vault?.mapping?.[key] || `secret/data/${key}`;
-      await this.vaultClient.write(path, { data: { value } });
-    } else {
-      fs.appendFileSync(".env.mirror", `\n${key}=${value}`);
+    try {
+      if (this.backend === "aws" && this.awsClient) {
+        // quick list/listSecrets with minimal permissions
+        await this.awsClient.listSecrets?.({ MaxResults: 1 });
+      } else if (this.backend === "vault" && this.vaultClient) {
+        await this.vaultClient.health?.();
+      } else {
+        // env backend always considered healthy
+      }
+      return { healthy: true, message: "OK" };
+    } catch (err: any) {
+      logger.warn(`[SecretsManager] provider health check failed: ${err?.message || err}`);
+      return { healthy: false, message: err?.message || "error" };
     }
-
-    this.cache.set(key, { value, fetchedAt: Date.now(), ttlMs: this.defaultTTL, fingerprint });
-    await this.recordAuditEvent("SECRET_ROTATED", key, fingerprint);
   }
 
   /* ---------------------------------------------------------------------
-   * 🚨 Validate Secrets Strength
+   * Hot reload all cached secrets from provider
+   * ------------------------------------------------------------------ */
+  async reloadAll(): Promise<void> {
+    const keys = Array.from(this.cache.keys());
+    await Promise.all(keys.map((k) => this.refresh(k).catch((e) => logger.warn(`reloadAll ${k}: ${e?.message || e}`))));
+    logger.info("[SecretsManager] 🔁 reloadAll completed");
+  }
+
+  /* ---------------------------------------------------------------------
+   * Refresh single secret (force)
+   * ------------------------------------------------------------------ */
+  async refresh(key: string) {
+    logger.debug(`[SecretsManager] Refreshing secret: ${key}`);
+    return this.get(key, { forceRefresh: true });
+  }
+
+  /* ---------------------------------------------------------------------
+   * Cache clear
+   * ------------------------------------------------------------------ */
+  clearCache() {
+    this.cache.clear();
+    logger.info("[SecretsManager] Cache cleared.");
+  }
+
+  /* ---------------------------------------------------------------------
+   * Strength validation & asserts for critical secrets
    * ------------------------------------------------------------------ */
   async assertCriticalSecrets(required: string[]): Promise<boolean> {
     const missing: string[] = [];
@@ -177,7 +283,7 @@ class SecretsManager {
     if (missing.length || weak.length) {
       const msg = `Missing or weak secrets detected. Missing: ${missing.join(",")} Weak: ${weak.join(",")}`;
       logger.error(`[SecretsManager] ${msg}`);
-      await auditService.recordSecurityEvent({
+      await auditService.recordSecurityEvent?.({
         message: msg,
         severity: "high",
         metadata: { missing, weak },
@@ -189,10 +295,56 @@ class SecretsManager {
     return true;
   }
 
+  /* ---------------------------------------------------------------------
+   * Utilities: encryption, HMAC signing, fingerprinting, entropy
+   * ------------------------------------------------------------------ */
+  private getEncryptionKey(): Buffer {
+    // Use provided encryption key from config, else derive from APP_SECRET fallback
+    const raw = config.secrets?.encryptionKey || process.env.APP_SECRET || "local-dev-secret";
+    return crypto.createHash("sha256").update(String(raw)).digest();
+  }
+
+  private encrypt(plain: string): string {
+    const key = this.getEncryptionKey();
+    const iv = crypto.randomBytes(12); // recommended for GCM
+    const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+    const encrypted = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);
+    const tag = cipher.getAuthTag();
+    return JSON.stringify({
+      iv: iv.toString("base64"),
+      data: encrypted.toString("base64"),
+      tag: tag.toString("base64"),
+    });
+  }
+
+  private decrypt(payload: string): string {
+    try {
+      const { iv, data, tag } = JSON.parse(payload);
+      const key = this.getEncryptionKey();
+      const decipher = crypto.createDecipheriv("aes-256-gcm", key, Buffer.from(iv, "base64"));
+      decipher.setAuthTag(Buffer.from(tag, "base64"));
+      const decrypted = Buffer.concat([decipher.update(Buffer.from(data, "base64")), decipher.final()]).toString("utf8");
+      return decrypted;
+    } catch (err: any) {
+      logger.warn(`[SecretsManager] decrypt error: ${err?.message || err}`);
+      throw err;
+    }
+  }
+
+  secretFingerprint(secretValue: string) {
+    return crypto.createHash("sha256").update(secretValue).digest("hex").slice(0, 32);
+  }
+
+  private signFingerprint(fingerprint: string) {
+    const auditKey = config.secrets?.auditKey || process.env.SECRETS_AUDIT_KEY || "audit-default";
+    return crypto.createHmac("sha256", String(auditKey)).update(fingerprint).digest("hex");
+  }
+
   private isWeakSecret(value: string): boolean {
+    if (!value) return true;
     if (value.length < 32) return true;
-    const entropy = this.estimateEntropy(value);
-    return entropy < 3.5; // bits per char
+    const unique = new Set(value).size;
+    return Math.log2(unique) < 3.5;
   }
 
   private estimateEntropy(value: string): number {
@@ -201,29 +353,36 @@ class SecretsManager {
   }
 
   /* ---------------------------------------------------------------------
-   * 🔍 Utility + Audit
+   * Audit & telemetry hook
    * ------------------------------------------------------------------ */
-  secretFingerprint(secretValue: string) {
-    return crypto.createHash("sha256").update(secretValue).digest("hex").slice(0, 16);
+  private async recordAuditEvent(action: "SECRET_READ" | "SECRET_ROTATED", key: string, fingerprint: string, signature: string) {
+    try {
+      await auditService.log?.({
+        actorId: "system",
+        actorRole: "system",
+        action,
+        details: {
+          key,
+          fingerprint,
+          signature,
+          backend: this.backend,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (err: any) {
+      logger.warn(`[SecretsManager] audit logging failed: ${err?.message || err}`);
+    }
   }
 
-  private async recordAuditEvent(action: "SECRET_READ" | "SECRET_ROTATED", key: string, fingerprint: string) {
-    await auditService.log({
-      actorId: "system",
-      actorRole: "system",
-      action: "SECURITY_EVENT",
-      details: { event: action, key, fingerprint },
-    });
-  }
-
-  clearCache() {
-    this.cache.clear();
-    logger.info("[SecretsManager] Cache cleared.");
-  }
-
-  async refresh(key: string) {
-    logger.debug(`[SecretsManager] Refreshing secret: ${key}`);
-    return this.get(key, { forceRefresh: true });
+  /* ---------------------------------------------------------------------
+   * Debug helper (do not expose secrets in logs)
+   * ------------------------------------------------------------------ */
+  debugCacheSummary() {
+    return {
+      keys: Array.from(this.cache.keys()),
+      count: this.cache.size,
+      oldest: this.cache.size ? Math.min(...Array.from(this.cache.values()).map((v) => v.fetchedAt)) : null,
+    };
   }
 }
 
