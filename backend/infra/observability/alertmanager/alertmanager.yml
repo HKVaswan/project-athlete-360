@@ -123,4 +123,57 @@ receivers:
           <b>Severity:</b> {{ .CommonLabels.severity }} <br/>
           <b>Alert:</b> {{ .CommonAnnotations.summary }} <br/>
           <b>Description:</b> {{ .CommonAnnotations.description }} <br/>
-          <b>Runbook:</b> <a href="{{ .CommonAnnotations.runbook_url }}">View</
+          <b>Runbook:</b> <a href="{{ .CommonAnnotations.runbook_url }}">View</a>
+          <br/><br/>
+          <i>Triggered at:</i> {{ .StartsAt }}
+
+  # ── Billing / Finance ─────────────────────────────────────────────────
+  - name: 'slack-billing'
+    slack_configs:
+      - channel: '#alerts-billing'
+        title: '💳 Billing Alert: {{ .CommonLabels.alertname }}'
+        text: |
+          *Description:* {{ .CommonAnnotations.description }}
+          *Institution:* {{ .CommonLabels.institution_id | default "N/A" }}
+          *Triggered:* {{ .StartsAt }}
+          *Runbook:* {{ .CommonAnnotations.runbook_url }}
+        send_resolved: true
+
+  # ── Security / Fraud Detection ────────────────────────────────────────
+  - name: 'slack-security'
+    slack_configs:
+      - channel: '#alerts-security'
+        title: '🚨 Security Alert: {{ .CommonLabels.alertname }}'
+        text: |
+          *Alert:* {{ .CommonAnnotations.summary }}
+          *Description:* {{ .CommonAnnotations.description }}
+          *Triggered:* {{ .StartsAt }}
+          *Runbook:* {{ .CommonAnnotations.runbook_url }}
+        send_resolved: true
+
+# --------------------------------------------------------------------------
+# 🕐 Inhibition Rules — Reduce Noise
+# --------------------------------------------------------------------------
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'service']
+  - source_match:
+      alertname: 'HighAPIErrorRate'
+    target_match:
+      alertname: 'SlowAPILatency'
+    equal: ['team']
+
+# --------------------------------------------------------------------------
+# 💤 Time-based Silencing (Optional Example)
+# --------------------------------------------------------------------------
+# time_intervals:
+#   - name: night_hours
+#     time_intervals:
+#       - weekdays: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+#         times:
+#           - start_time: "23:00"
+#             end_time: "07:00"
+# --------------------------------------------------------------------------
