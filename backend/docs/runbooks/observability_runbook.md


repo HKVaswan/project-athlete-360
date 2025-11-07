@@ -1,210 +1,391 @@
-# 🧭 Observability & Monitoring Runbook  
-**Document Version:** 1.0  
-**Last Updated:** {{ date }}  
-**Author:** Infrastructure & DevOps Team – Project Athlete 360  
+🧭 Observability & Monitoring Runbook
+
+Version: 2.0
+Last Updated: {{ date }}
+Author: Infrastructure & DevOps Team – Project Athlete 360
+Reviewed By: Security & Platform Reliability Engineering (PRE)
+
 
 ---
 
-## 🎯 Objective
+🎯 Objective
 
-This runbook defines **observability and monitoring procedures** for the Project Athlete 360 backend.  
-It ensures **real-time visibility**, **root-cause detection**, and **system reliability** across all environments (production, staging, and development).  
+This runbook defines observability, monitoring, and incident-response procedures for the Project Athlete 360 backend and cloud infrastructure.
 
-Observability enables the platform to:
-- Detect failures before users are impacted.
-- Correlate metrics, traces, and logs across distributed services.
-- Support performance optimization and SLA adherence.
-- Provide auditable, tamper-proof telemetry for compliance.
+It ensures:
+
+End-to-end visibility across all services and data pipelines.
+
+Early anomaly detection through metrics, logs, and traces.
+
+Faster mean-time-to-detect (MTTD) and mean-time-to-recover (MTTR).
+
+Audit-grade telemetry retention for compliance and security forensics.
+
+
 
 ---
 
-## 📚 Scope
+📚 Scope
 
 Applies to:
-- Core API servers (Express/Node backend)
-- Workers (queue, backup, telemetry)
-- Databases (PostgreSQL)
-- Object storage (S3 or compatible)
-- Redis / BullMQ queues
-- AI inference microservices
-- Observability pipelines (OpenTelemetry, Prometheus, Grafana, Loki)
+
+API gateways and backend microservices (Node/Express)
+
+Worker clusters (BullMQ, telemetry, notification)
+
+PostgreSQL (Neon / RDS)
+
+Redis
+
+Object storage (S3 or MinIO)
+
+AI & analytics microservices
+
+Observability stack (Prometheus, Grafana, Loki, Jaeger/Tempo, Alertmanager)
+
+Kubernetes or Docker environments
+
+
 
 ---
 
-## 🧩 Observability Stack Overview
+🧩 Observability Stack Overview
 
-| Component | Responsibility | Location |
-|------------|----------------|-----------|
-| `src/lib/core/metrics.ts` | Prometheus-compatible custom metrics | API & Workers |
-| `src/lib/core/tracing.ts` | OpenTelemetry-based distributed tracing | API, Queue Workers |
-| `src/lib/telemetry.ts` | Application-level telemetry & periodic metric flushing | Core services |
-| `src/workers/telemetry.worker.ts` | Collects, aggregates & pushes telemetry | Background worker |
-| `src/config/observabilityConfig.ts` | Configurable thresholds, exporters, sampling | Config layer |
-| `src/logger.ts` | Structured & colorized Winston logger | All modules |
-| `src/middleware/requestLogger.middleware.ts` | HTTP request/response timing | API Gateway |
-| `src/lib/systemMonitor.ts` | System-level metrics (CPU, memory, queue health) | Global service |
-| `src/services/systemHealth.service.ts` | Health aggregation & alerts | API + Worker monitor |
-| `src/integrations/otel.bootstrap.ts` | Bootstraps OpenTelemetry exporters | API & Worker startup |
+Layer	Component	Function	Location
 
----
+Metrics	src/lib/core/metrics.ts	Prometheus counters & histograms	API / Workers
+Tracing	src/lib/core/tracing.ts	OpenTelemetry spans & trace context	All
+Telemetry	src/lib/telemetry.ts + telemetry.worker.ts	Metric aggregation, threshold alerts	Workers
+Logging	src/logger.ts	JSON + colorized structured logs	Global
+Health	systemHealth.service.ts / systemMonitor.ts	System status aggregation	Core
+Visualization	Grafana + Tempo	Dashboards, trace explorer	infra/observability/grafana
+Alerting	Alertmanager	Multi-channel alert dispatch	infra/observability/alertmanager
 
-## ⚙️ Key Observability Domains
 
-### 1. Metrics (Quantitative Insights)
-Collected via `prom-client` and OpenTelemetry metrics.
-
-**Categories:**
-- **API performance:** latency histograms, throughput, errors.
-- **Worker queues:** active, waiting, failed jobs.
-- **AI activity:** inference count, latency.
-- **System health:** CPU, memory, disk, DB status.
-- **Business metrics:** plan usage, overage alerts, backup frequency.
-
-**Endpoints:**
-- `/metrics` (Prometheus scrape target)
-- `/admin/system/status` (for super admins)
-
-**Storage:**
-- Prometheus TSDB (7–14 days retention)
-- Optional: Grafana Cloud or VictoriaMetrics
 
 ---
 
-### 2. Logs (Event & Error Context)
+⚙️ Key Observability Domains
 
-All logs are **structured JSON + colorized console output** with trace IDs.  
-Critical logs are persisted in `logs/combined.log` and `logs/error.log`.
+1. Metrics (Quantitative Performance)
 
-**Best Practices:**
-- Every request is tagged with a unique `x-request-id`.
-- Each service logs `{ requestId, userId, route, duration, status }`.
-- Errors are logged with full stack trace (in non-prod) and sent to Sentry.
-- Log levels: `info`, `warn`, `error`, `debug`, `http`.
+Collected via prom-client and OpenTelemetry Metrics API.
 
-**Tools:**
-- [Winston](https://github.com/winstonjs/winston)
-- [Sentry](https://sentry.io)
-- [Grafana Loki (optional)](https://grafana.com/oss/loki/)
+Categories
 
----
+API latency histograms and error rate
 
-### 3. Traces (Distributed Context)
+Queue health (active/waiting/failed)
 
-Implemented using OpenTelemetry and `src/lib/core/tracing.ts`.
+Worker execution time & success ratio
 
-**Tracing Flow:**
-1. Request enters API → a trace is started with `traceId`.
-2. Downstream events (DB, Redis, AI service) attach child spans.
-3. Spans include latency, attributes, and errors.
-4. Traces exported to Jaeger / Grafana Tempo via `otel.bootstrap.ts`.
+Resource metrics (CPU, memory, disk, DB pool)
 
-**Exporters (configured in observabilityConfig.ts):**
-- **Jaeger** (default)
-- **OTLP/HTTP** (for Grafana Tempo or Datadog)
-- Sampling rate configurable per environment.
+AI inference latency
 
----
+Business KPIs (active users, plan usage, overages)
 
-### 4. Health Monitoring (Active Checks)
 
-Handled by `src/services/systemHealth.service.ts` and `src/lib/systemMonitor.ts`.
+Endpoints
 
-**Components Checked:**
-- Database connectivity (`SELECT 1`)
-- Redis/Queue health
-- Worker activity
-- AI microservice response
-- Object storage reachability
-- API responsiveness and latency
+/metrics — Prometheus scrape
 
-**Frequency:** every 60s  
-**Alerts:** super-admin notifications + audit logs on failures
+/admin/system/status — JSON health snapshot
 
-**Endpoints:**
-- `/health` → readiness probe
-- `/admin/system/status` → detailed system report
+
+Retention
+
+Prometheus TSDB (14–30 days)
+
+Optional offload to Grafana Cloud or VictoriaMetrics
+
+
 
 ---
 
-### 5. Telemetry & Alerts
+2. Logs (Structured Events)
 
-**Telemetry Worker:**
-- Periodically flushes collected metrics (CPU, memory, latency).
-- Pushes data to configured exporters.
-- Detects anomalies via thresholds in `observabilityConfig.ts`.
-- Emits structured alerts to:
-  - `superAdminAlertsService`
-  - `auditService`
-  - `adminNotification.worker`
+All logs follow structured JSON format with traceId correlation.
 
-**Alert Threshold Examples:**
-| Metric | Threshold | Severity |
-|---------|------------|----------|
-| CPU Usage | >85% | warning |
-| Memory Usage | >90% | critical |
-| Queue backlog | >20 waiting jobs | warning |
-| DB latency | >300ms | degraded |
-| Error rate | >2% (per route) | warning |
+Logging Guidelines
 
----
+Each request includes x-request-id or traceId.
 
-## 🧰 Troubleshooting Guide
+Logs include service, userId, route, latency, status.
 
-| Scenario | Possible Cause | Resolution |
-|-----------|----------------|-------------|
-| Missing `/metrics` output | Prometheus client not initialized | Restart API / check `metrics.ts` import |
-| Empty Grafana panels | Misconfigured data source | Verify Prometheus target in Grafana |
-| High latency in `/metrics` | Collector overload | Reduce metric granularity or increase interval |
-| Alerts not triggered | Telemetry worker down | Restart telemetry worker / check queue logs |
-| “AI subsystem degraded” | Model endpoint unreachable | Check `ai.bootstrap` logs or API keys |
-| Jaeger trace missing spans | Incorrect parent context | Ensure OpenTelemetry middleware wraps routes |
+Errors log stack traces (non-prod) + exception fingerprint (prod).
+
+Security/audit events go to auditService.
+
+
+Storage
+
+Local: logs/*.log
+
+Centralized: Loki or S3 archive (90-day retention)
+
+Error tracking: Sentry integration
+
+
 
 ---
 
-## 🧩 Maintenance & Drills
+3. Traces (Distributed Context)
 
-| Task | Frequency | Responsible | Notes |
-|------|------------|--------------|-------|
-| Validate `/metrics` export | Weekly | DevOps | Ensure Prometheus scrape works |
-| Verify Grafana dashboard | Weekly | Monitoring Team | Cross-check with production latency |
-| Run full health check | Daily | Automated Worker | Uses `runFullHealthCheck()` |
-| Review alert logs | Daily | Super Admins | From `superAdminAlertsService` |
-| Trace latency bottlenecks | Monthly | Engineering | Use Jaeger/Grafana Tempo |
-| Review metric retention & cleanup | Quarterly | DevOps | Manage Prometheus TSDB size |
+Traces created via tracing-http.ts middleware and OpenTelemetry SDK.
 
----
+Propagation
 
-## 🧠 Recovery Playbook
+Follows W3C Trace Context (traceparent, tracestate)
 
-If monitoring pipeline fails:
+Auto-injected via Express middleware
 
-1. Restart telemetry worker (`pm2 restart telemetry` or Docker restart).  
-2. Verify metrics endpoint `/metrics` returns valid data.  
-3. Check Prometheus service health via `/-/healthy`.  
-4. Review API logs for `[TELEMETRY]` or `[MONITOR]` errors.  
-5. If exporters unreachable, temporarily set `OBSERVABILITY_MODE=local`.  
-6. Notify Infrastructure Lead if data gaps exceed 30 minutes.
+Queues & async jobs preserve parent span where possible
 
----
 
-## ✅ Acceptance Criteria
+Exporters
 
-- All environments expose `/metrics` and `/health` endpoints.
-- Prometheus successfully scrapes metrics every 15s.
-- Jaeger or Tempo receives traces for 95%+ of API requests.
-- Super Admin dashboard reflects live system health.
-- Alerts automatically notify admins for any critical failure.
+Jaeger (default) — Self-hosted trace store
+
+Grafana Tempo (optional) — via OTLP/HTTP exporter
+
+Sampling rate: 1% (prod), 10% (staging), 100% (dev)
+
+
 
 ---
 
-## 📘 References
+4. Health Monitoring (Active Checks)
 
-- [Prometheus Documentation](https://prometheus.io/docs/)
-- [OpenTelemetry Node SDK](https://opentelemetry.io/)
-- [Grafana Observability Stack](https://grafana.com/oss/)
-- [Sentry Error Tracking](https://docs.sentry.io/)
+Driven by systemHealth.service.ts.
+
+Checks
+
+DB latency & reachability
+
+Redis queue status
+
+Worker job activity
+
+AI service response
+
+S3 object read/write probe
+
+System resource usage (CPU/memory/disk)
+
+
+Frequency: 60 s (default)
+Endpoints:
+
+/health — readiness
+
+/admin/system/status — extended report
+
+
+Alerting:
+Triggered via telemetry worker → Alertmanager → Email / Slack
+
 
 ---
 
-**End of Document**  
-*© Project Athlete 360 Infrastructure Team*
+5. Telemetry & Alerts
+
+Alerts use threshold-based detection and correlation.
+
+Example Thresholds
+
+Metric	Condition	Severity	Action
+
+CPU usage	>85 %	warning	Log + telemetry notice
+Memory usage	>90 %	critical	Super-admin alert
+Queue backlog	>25 jobs	warning	Worker review
+DB latency	>300 ms	degraded	Performance audit
+Error rate	>2 %	warning	DevOps notify
+Trace drop rate	>10 %	critical	Restart otel agent
+
+
+Alert Channels
+
+Email (admins@projectathlete360.com)
+
+Slack #infra-alerts
+
+Sentry incidents
+
+PagerDuty (critical only)
+
+
+
+---
+
+🧰 Troubleshooting & Diagnostics
+
+Symptom	Possible Cause	Mitigation
+
+/metrics empty	Prometheus client not registered	Restart API or import metrics.ts
+Grafana panels blank	Data source misconfig	Verify Prometheus endpoint
+High /metrics latency	Overloaded collectors	Increase scrape interval
+Alerts missing	Telemetry worker paused	Restart telemetry.worker
+“AI degraded”	Endpoint timeout	Check ai.bootstrap logs
+Trace gaps	Context lost in async	Wrap async jobs in trace.wrap()
+
+
+
+---
+
+🧠 Escalation & Incident Response
+
+Severity	Response Time	Responsible	Notification
+
+P1 – Critical	≤15 min	Infra Lead	PagerDuty + Slack
+P2 – Degraded	≤1 h	SRE Team	Email + Slack
+P3 – Warning	≤4 h	DevOps On-Call	Email
+P4 – Info	≤24 h	Scheduled Review	N/A
+
+
+Incident Steps
+
+1. Verify alert in Grafana/Alertmanager.
+
+
+2. Confirm affected service via health dashboard.
+
+
+3. Retrieve trace IDs from Jaeger for failing requests.
+
+
+4. Cross-reference with logs and metrics for correlation.
+
+
+5. Patch, redeploy, or scale service as needed.
+
+
+6. Record incident summary in IncidentRegistry.md.
+
+
+
+
+---
+
+🔒 Security & Compliance Observability
+
+Secrets access tracked via SecretsManager audit events.
+
+All /admin and /metrics routes protected by token or mTLS.
+
+Sensitive fields (password, apiKey, token) redacted before logging.
+
+Logs retained for 90 days, then archived to encrypted S3 bucket.
+
+Changes in observability configuration audited via auditService.
+
+
+
+---
+
+🧩 Maintenance & Validation
+
+Task	Frequency	Owner	Notes
+
+Validate /metrics scrape	Weekly	DevOps	Test Prometheus target
+Verify Grafana dashboards	Weekly	SRE	Ensure live data
+Full health check	Daily	Automated Worker	runFullHealthCheck()
+Review alert logs	Daily	Infra Lead	via systemHealth.service
+Trace audit & latency check	Monthly	Engineering	Investigate slow spans
+Prometheus retention check	Quarterly	DevOps	TSDB cleanup
+Rotate alert credentials	Quarterly	Security	PagerDuty/Slack tokens
+
+
+
+---
+
+🌍 Multi-Region & Failover
+
+Prometheus instances replicated per region (in.us-east, in.eu-west).
+
+Grafana configured with unified data sources and per-region filters.
+
+Failover triggers when regional Prometheus becomes unhealthy for >3 min.
+
+Backup dashboards auto-synced from docs/dashboards/.
+
+Loki logs mirrored to S3 (cross-region replication enabled).
+
+
+
+---
+
+📊 Observability KPIs
+
+KPI	Target	Description
+
+Metrics uptime	≥ 99.9 %	/metrics endpoint availability
+Trace coverage	≥ 95 %	% of API requests traced
+Log completeness	≥ 99 %	Events with traceId correlation
+Alert delivery latency	< 60 s	Time between trigger and notification
+Mean time to detect (MTTD)	< 10 min	Detection latency for major incidents
+Mean time to recover (MTTR)	< 30 min	Resolution latency
+
+
+
+---
+
+🧭 Recovery Playbook
+
+If observability stack fails:
+
+1. Restart telemetry and worker containers.
+
+
+2. Run docker-compose -f docker-compose.observability.yml up -d.
+
+
+3. Verify /metrics endpoint returns valid output.
+
+
+4. Access Prometheus /targets page → ensure healthy state.
+
+
+5. Check Grafana logs (docker logs grafana).
+
+
+6. Reconnect Jaeger/Tempo exporter if traces missing.
+
+
+7. Notify Infra Lead if recovery > 30 min or data loss > 15 min window.
+
+
+
+
+---
+
+✅ Acceptance Criteria
+
+/metrics and /health endpoints reachable in all environments.
+
+Prometheus scrapes succeed every 15 s.
+
+Jaeger/Tempo traces ≥ 95 % of API requests.
+
+Super-admin dashboard live & accurate.
+
+Alertmanager sends notifications within SLA.
+
+All observability changes logged via audit events.
+
+
+
+---
+
+📘 References
+
+Prometheus Docs
+
+OpenTelemetry Node SDK
+
+Grafana Observability Stack
+
+Sentry Error Tracking
+
+AWS Secrets Manager & Vault Integration
