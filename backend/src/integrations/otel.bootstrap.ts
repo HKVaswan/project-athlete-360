@@ -10,16 +10,28 @@
  *  - Ensure graceful shutdown and safe fallback if exporters are unreachable.
  *
  * Design Principles:
- *  - Non-blocking initialization (never prevents app start).
- *  - Auto-detects config from observabilityConfig.ts and environment variables.
- *  - Works seamlessly with multi-service architectures (API + workers).
+ *  - Non-blocking initialization (never prevents app start)
+ *  - Auto-detects config from observabilityConfig.ts and environment variables
+ *  - Works seamlessly with multi-service, multi-worker architectures
+ * --------------------------------------------------------------------------
  */
 
-import { diag, DiagConsoleLogger, DiagLogLevel, context, trace } from "@opentelemetry/api";
+import os from "os";
+import {
+  diag,
+  DiagConsoleLogger,
+  DiagLogLevel,
+  context,
+  trace,
+  SpanStatusCode,
+} from "@opentelemetry/api";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+import {
+  BatchSpanProcessor,
+  SimpleSpanProcessor,
+} from "@opentelemetry/sdk-trace-base";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { Resource } from "@opentelemetry/resources";
-import { SimpleSpanProcessor, BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { SemanticResourceAttributes } from "@opentelemetry/semantic-conventions";
 import { registerInstrumentations } from "@opentelemetry/instrumentation";
 import { HttpInstrumentation } from "@opentelemetry/instrumentation-http";
@@ -35,7 +47,7 @@ let tracerProvider: NodeTracerProvider | null = null;
 let initialized = false;
 
 /* ------------------------------------------------------------------------
-   🔍 Setup Diagnostic Logging (OTel internal)
+   🧠 Internal Diagnostics (only in non-prod)
 ------------------------------------------------------------------------ */
 if (config.NODE_ENV !== "production") {
   diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.WARN);
@@ -49,43 +61,65 @@ const resource = new Resource({
   [SemanticResourceAttributes.SERVICE_NAMESPACE]: "project-athlete-360",
   [SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT]: config.NODE_ENV,
   [SemanticResourceAttributes.SERVICE_VERSION]: process.env.APP_VERSION || "v1",
+  [SemanticResourceAttributes.SERVICE_INSTANCE_ID]: os.hostname(),
 });
 
 /* ------------------------------------------------------------------------
-   🚀 Initialize OTel Tracer Provider
+   🚀 Initialize OpenTelemetry Tracing
 ------------------------------------------------------------------------ */
 export const initOpenTelemetry = async (): Promise<void> => {
   if (initialized) {
-    logger.warn("[OTEL] Already initialized.");
+    logger.warn("[OTEL] Tracer already initialized — skipping.");
     return;
   }
 
   try {
-    tracerProvider = new NodeTracerProvider({ resource });
+    const samplerRate = Math.max(
+      0,
+      Math.min(1, Number(observabilityConfig.samplingRate || 1.0))
+    );
 
-    // Exporter
-    const exporter = new OTLPTraceExporter({
-      url: observabilityConfig.otlpEndpoint,
-      headers: observabilityConfig.otlpHeaders
-        ? JSON.parse(observabilityConfig.otlpHeaders)
-        : undefined,
+    tracerProvider = new NodeTracerProvider({
+      resource,
+      sampler:
+        samplerRate < 1
+          ? new (require("@opentelemetry/sdk-trace-base").ParentBasedSampler)(
+              new (require("@opentelemetry/sdk-trace-base").TraceIdRatioBasedSampler)(
+                samplerRate
+              )
+            )
+          : undefined,
     });
 
-    // Use Batch processor for production; Simple for local debugging
+    // Try OTLP exporter
+    let exporter: OTLPTraceExporter | null = null;
+    try {
+      exporter = new OTLPTraceExporter({
+        url: observabilityConfig.otlpEndpoint,
+        headers: observabilityConfig.otlpHeaders
+          ? JSON.parse(observabilityConfig.otlpHeaders)
+          : undefined,
+      });
+    } catch (e: any) {
+      logger.warn("[OTEL] ⚠️ Failed to initialize OTLP exporter:", e.message);
+    }
+
+    // Choose batch or simple span processor
     const processor =
-      config.NODE_ENV === "production"
+      config.NODE_ENV === "production" && exporter
         ? new BatchSpanProcessor(exporter, {
             maxExportBatchSize: 512,
             scheduledDelayMillis: 5000,
           })
-        : new SimpleSpanProcessor(exporter);
+        : exporter
+        ? new SimpleSpanProcessor(exporter)
+        : undefined;
 
-    tracerProvider.addSpanProcessor(processor);
+    if (processor) tracerProvider.addSpanProcessor(processor);
 
-    // Register provider globally
     tracerProvider.register();
 
-    // Register instrumentations (auto-tracing)
+    // Register core instrumentations
     registerInstrumentations({
       instrumentations: [
         new HttpInstrumentation(),
@@ -98,26 +132,32 @@ export const initOpenTelemetry = async (): Promise<void> => {
 
     initialized = true;
     logger.info(`[OTEL] ✅ Tracing initialized for ${observabilityConfig.serviceName}`);
+    logger.debug({
+      service: observabilityConfig.serviceName,
+      otlpEndpoint: observabilityConfig.otlpEndpoint,
+      samplingRate: samplerRate,
+      environment: config.NODE_ENV,
+    });
   } catch (err: any) {
     logger.error("[OTEL] ❌ Failed to initialize tracing", { error: err.message });
   }
 };
 
 /* ------------------------------------------------------------------------
-   🔁 Graceful Shutdown
+   🧹 Graceful Shutdown
 ------------------------------------------------------------------------ */
 export const shutdownOpenTelemetry = async (): Promise<void> => {
   if (!tracerProvider) return;
   try {
-    await tracerProvider.shutdown();
-    logger.info("[OTEL] 🧹 Tracer provider shut down gracefully.");
+    await Promise.all([tracerProvider.shutdown()]);
+    logger.info("[OTEL] 🧹 Tracer provider shut down cleanly.");
   } catch (err: any) {
-    logger.error("[OTEL] ⚠️ Error during tracer shutdown", { error: err.message });
+    logger.error("[OTEL] ⚠️ Error during OTEL shutdown", { error: err.message });
   }
 };
 
 /* ------------------------------------------------------------------------
-   🧩 Utility: Trace a function or async task
+   🧩 traceAsync - wrap async function in span
 ------------------------------------------------------------------------ */
 export const traceAsync = async <T>(
   spanName: string,
@@ -130,11 +170,11 @@ export const traceAsync = async <T>(
   try {
     const ctx = trace.setSpan(context.active(), span);
     const result = await context.with(ctx, fn);
-    span.setStatus({ code: 1, message: "OK" });
+    span.setStatus({ code: SpanStatusCode.OK });
     return result;
   } catch (err: any) {
-    span.setStatus({ code: 2, message: err.message });
-    logger.error(`[OTEL] Error in traced span ${spanName}`, { error: err.message });
+    span.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
+    logger.error(`[OTEL] Error in traced span: ${spanName}`, { error: err.message });
     throw err;
   } finally {
     span.end();
@@ -142,19 +182,23 @@ export const traceAsync = async <T>(
 };
 
 /* ------------------------------------------------------------------------
-   🧩 Utility: Run sync function with tracing
+   🧩 traceSync - wrap sync function in span
 ------------------------------------------------------------------------ */
-export const traceSync = <T>(spanName: string, fn: () => T, attributes?: Record<string, any>): T => {
+export const traceSync = <T>(
+  spanName: string,
+  fn: () => T,
+  attributes?: Record<string, any>
+): T => {
   const tracer = trace.getTracer(observabilityConfig.serviceName);
   const span = tracer.startSpan(spanName, { attributes });
 
   try {
     const result = fn();
-    span.setStatus({ code: 1, message: "OK" });
+    span.setStatus({ code: SpanStatusCode.OK });
     return result;
   } catch (err: any) {
-    span.setStatus({ code: 2, message: err.message });
-    logger.error(`[OTEL] Error in traced span ${spanName}`, { error: err.message });
+    span.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
+    logger.error(`[OTEL] Error in traced span: ${spanName}`, { error: err.message });
     throw err;
   } finally {
     span.end();
@@ -162,23 +206,30 @@ export const traceSync = <T>(spanName: string, fn: () => T, attributes?: Record<
 };
 
 /* ------------------------------------------------------------------------
-   🧩 Quick Health Probe (for systemHealth.service.ts)
+   🧩 Health Probe
 ------------------------------------------------------------------------ */
-export const otelHealthCheck = async (): Promise<{ healthy: boolean; message: string }> => {
+export const otelHealthCheck = async (): Promise<{
+  healthy: boolean;
+  message: string;
+  latencyMs?: number;
+}> => {
+  const start = Date.now();
   try {
-    if (!initialized) return { healthy: false, message: "OTel not initialized" };
+    if (!initialized) return { healthy: false, message: "Not initialized" };
 
     const tracer = trace.getTracer(observabilityConfig.serviceName);
     if (!tracer) return { healthy: false, message: "Tracer unavailable" };
 
-    return { healthy: true, message: "OTel operational" };
+    const latency = Date.now() - start;
+    return { healthy: true, message: "Operational", latencyMs: latency };
   } catch (err: any) {
-    return { healthy: false, message: err.message };
+    const latency = Date.now() - start;
+    return { healthy: false, message: err.message, latencyMs: latency };
   }
 };
 
 /* ------------------------------------------------------------------------
-   🧱 Automatic Startup / Shutdown Hooks
+   🧱 Signal Handling
 ------------------------------------------------------------------------ */
 process.on("SIGTERM", async () => {
   await shutdownOpenTelemetry();
@@ -189,7 +240,7 @@ process.on("SIGINT", async () => {
 });
 
 /* ------------------------------------------------------------------------
-   📦 Export
+   📦 Exports
 ------------------------------------------------------------------------ */
 export default {
   initOpenTelemetry,
