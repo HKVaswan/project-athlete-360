@@ -1,0 +1,126 @@
+# infra/observability/alertmanager/alertmanager.yml
+# --------------------------------------------------------------------------
+# 🚨 Alertmanager Configuration — Project Athlete 360
+# --------------------------------------------------------------------------
+# Responsibilities:
+#   - Receives alerts from Prometheus (alert_rules.yml)
+#   - Routes alerts by team / severity / category
+#   - Groups alerts to reduce noise
+#   - Sends notifications via Slack, Email, etc.
+#   - Supports escalation and quiet hours
+# --------------------------------------------------------------------------
+
+global:
+  # Default timing configurations
+  resolve_timeout: 5m
+
+  # Email defaults (optional)
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'alerts@pa360.net'
+  smtp_auth_username: 'alerts@pa360.net'
+  smtp_auth_password: '${SMTP_PASSWORD}'  # Load from env at runtime
+
+  # Slack default webhook
+  slack_api_url: '${SLACK_WEBHOOK_URL}'   # Load from environment variable
+
+# --------------------------------------------------------------------------
+# 🔀 Route Hierarchy
+# --------------------------------------------------------------------------
+route:
+  # Default receiver (catch-all)
+  receiver: 'default-notifications'
+
+  # Grouping rules — reduce alert noise
+  group_by: ['alertname', 'team']
+  group_wait: 30s
+  group_interval: 3m
+  repeat_interval: 3h
+
+  # Route tree (by label matching)
+  routes:
+    - match:
+        team: backend
+      receiver: 'slack-backend'
+      group_wait: 15s
+      continue: true
+
+    - match:
+        team: workers
+      receiver: 'slack-workers'
+      group_wait: 20s
+      continue: true
+
+    - match:
+        team: infra
+      receiver: 'infra-email'
+      group_wait: 30s
+      continue: true
+
+    - match:
+        team: billing
+      receiver: 'slack-billing'
+      continue: true
+
+    - match:
+        team: fraud-detection
+      receiver: 'slack-security'
+      continue: true
+
+  # Fallback receiver (if no match above)
+  receiver: 'default-notifications'
+
+# --------------------------------------------------------------------------
+# 📬 Receivers — Notification Channels
+# --------------------------------------------------------------------------
+receivers:
+  # ── Default ────────────────────────────────────────────────────────────
+  - name: 'default-notifications'
+    slack_configs:
+      - channel: '#alerts-general'
+        title: '⚠️ [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}'
+        text: |
+          *Alert Summary:* {{ .CommonAnnotations.summary }}
+          *Description:* {{ .CommonAnnotations.description }}
+          *Severity:* {{ .CommonLabels.severity }}
+          *Environment:* {{ .CommonLabels.env | default "unknown" }}
+          *Triggered at:* {{ .StartsAt }}
+          *Runbook:* {{ .CommonAnnotations.runbook_url }}
+        send_resolved: true
+
+  # ── Backend ────────────────────────────────────────────────────────────
+  - name: 'slack-backend'
+    slack_configs:
+      - channel: '#alerts-backend'
+        title: '🧠 [{{ .Status | toUpper }}] Backend Alert: {{ .CommonLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          _{{ .Annotations.description }}_
+          *Severity:* {{ .Labels.severity }}
+          *Started:* {{ .StartsAt }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+          {{ end }}
+        send_resolved: true
+
+  # ── Workers / Queues ──────────────────────────────────────────────────
+  - name: 'slack-workers'
+    slack_configs:
+      - channel: '#alerts-workers'
+        title: '⚙️ [{{ .Status | toUpper }}] Worker Alert'
+        text: |
+          *Queue:* {{ .CommonLabels.queue_name }}
+          *Issue:* {{ .CommonAnnotations.summary }}
+          *Details:* {{ .CommonAnnotations.description }}
+          *Runbook:* {{ .CommonAnnotations.runbook_url }}
+        send_resolved: true
+
+  # ── Infrastructure ────────────────────────────────────────────────────
+  - name: 'infra-email'
+    email_configs:
+      - to: 'infra@pa360.net'
+        subject: '[Project Athlete 360] {{ .CommonAnnotations.summary }}'
+        html: |
+          <b>Severity:</b> {{ .CommonLabels.severity }} <br/>
+          <b>Alert:</b> {{ .CommonAnnotations.summary }} <br/>
+          <b>Description:</b> {{ .CommonAnnotations.description }} <br/>
+          <b>Runbook:</b> <a href="{{ .CommonAnnotations.runbook_url }}">View</
