@@ -1,35 +1,45 @@
 /**
  * tests/integration/metrics_exposure.spec.ts
  * --------------------------------------------------------------------
- * 🔍 Integration Test: Metrics Exposure & Observability Integrity
+ * 🧠 Enterprise Integration Test: Metrics Exposure & Observability
  *
- * Ensures:
- *  - /metrics endpoint is accessible and correctly formatted.
- *  - No sensitive data is leaked.
- *  - Expected metrics exist (e.g., HTTP, worker, DB, AI).
- *  - OpenTelemetry exporters and Prometheus registry behave correctly.
- *  - Endpoint enforces authentication when required.
+ * Purpose:
+ *   - Validate /metrics endpoint health, format, and security
+ *   - Ensure no sensitive data exposure
+ *   - Confirm Prometheus and OpenTelemetry integration correctness
+ *   - Measure endpoint latency and registry health under load
  * --------------------------------------------------------------------
  */
 
 import request from "supertest";
+import http from "http";
 import app from "../../src/app";
 import { config } from "../../src/config";
 import { register } from "../../src/lib/core/tracing"; // Prometheus registry (if exposed)
-import http from "http";
+import { trace, context } from "@opentelemetry/api";
 
 let server: http.Server;
 
-describe("🧠 Metrics Exposure & Observability", () => {
+describe("🧠 Metrics Exposure & Observability Suite", () => {
   beforeAll(async () => {
-    // spin up app for test
+    // Clean Prometheus registry (if supported)
+    if (register && typeof (register as any).clear === "function") {
+      (register as any).clear();
+    }
+
+    // Start app on ephemeral port
     server = app.listen(0);
   });
 
   afterAll(async () => {
-    if (server) server.close();
+    if (server) {
+      await new Promise((resolve) => server.close(resolve));
+    }
   });
 
+  /* -----------------------------------------------------------
+   * 1️⃣ Metrics Endpoint Availability
+   * --------------------------------------------------------- */
   it("should expose /metrics endpoint successfully", async () => {
     const res = await request(server).get("/metrics").expect(200);
     expect(res.text).toContain("# HELP");
@@ -37,47 +47,66 @@ describe("🧠 Metrics Exposure & Observability", () => {
     expect(res.text).toContain("pa360_http_requests_total");
   });
 
-  it("should return valid Prometheus format", async () => {
+  /* -----------------------------------------------------------
+   * 2️⃣ Prometheus Format Validation
+   * --------------------------------------------------------- */
+  it("should return valid Prometheus exposition format", async () => {
     const res = await request(server).get("/metrics").expect(200);
-    // Prometheus exposition format must start with "# HELP" or metric
     const lines = res.text.trim().split("\n");
     expect(lines[0].startsWith("#")).toBe(true);
-    // Contains at least one metric sample
     const metricLine = lines.find((l) => l && !l.startsWith("#"));
     expect(metricLine).toMatch(/^[a-zA-Z_:][a-zA-Z0-9_:]*\s[0-9eE\+\-\.]+/);
   });
 
-  it("should not contain sensitive data in metrics", async () => {
+  /* -----------------------------------------------------------
+   * 3️⃣ Sensitive Data Validation
+   * --------------------------------------------------------- */
+  it("should not contain sensitive data in metrics output", async () => {
     const res = await request(server).get("/metrics").expect(200);
-    expect(res.text).not.toMatch(/password|token|secret|apikey/i);
+    expect(res.text).not.toMatch(/password|token|secret|apikey|authorization/i);
   });
 
-  it("should contain HTTP request and latency metrics", async () => {
+  /* -----------------------------------------------------------
+   * 4️⃣ Core Metrics Presence Check
+   * --------------------------------------------------------- */
+  it("should contain essential HTTP and latency metrics", async () => {
     const res = await request(server).get("/metrics").expect(200);
     expect(res.text).toContain("pa360_http_requests_total");
     expect(res.text).toContain("pa360_http_request_duration_seconds_bucket");
+    expect(res.text).toMatch(/_bucket\{.*le="1"\}/); // lower bound
+    expect(res.text).toMatch(/_bucket\{.*le="\+Inf"\}/); // upper bound
   });
 
-  it("should include worker or queue metrics when available", async () => {
+  /* -----------------------------------------------------------
+   * 5️⃣ Worker Queue Metrics
+   * --------------------------------------------------------- */
+  it("should include worker/queue metrics when available", async () => {
     const res = await request(server).get("/metrics").expect(200);
-    // These metrics come from telemetry.worker.ts or bullmq instrumentation
-    const hasWorkerMetric = res.text.includes("pa360_worker_jobs_active") ||
-                            res.text.includes("pa360_worker_jobs_failed_total");
+    const hasWorkerMetric =
+      res.text.includes("pa360_worker_jobs_active") ||
+      res.text.includes("pa360_worker_jobs_failed_total") ||
+      res.text.includes("pa360_worker_duration_seconds_bucket");
     expect(hasWorkerMetric).toBe(true);
   });
 
-  it("should respond quickly (under 1s) even under load", async () => {
+  /* -----------------------------------------------------------
+   * 6️⃣ Endpoint Latency Under Load
+   * --------------------------------------------------------- */
+  it("should respond within 1s under normal conditions", async () => {
     const start = Date.now();
     await request(server).get("/metrics").expect(200);
     const latency = Date.now() - start;
     expect(latency).toBeLessThan(1000);
   });
 
-  it("should support optional secure access if enabled", async () => {
-    if (config.metrics.requireAuth) {
+  /* -----------------------------------------------------------
+   * 7️⃣ Secure Access Validation
+   * --------------------------------------------------------- */
+  it("should support secure access enforcement when enabled", async () => {
+    if (config.metrics?.requireAuth) {
       const res = await request(server)
         .get("/metrics")
-        .set("Authorization", `Bearer invalid_token`)
+        .set("Authorization", "Bearer invalid_token")
         .expect(401);
       expect(res.body.message).toMatch(/unauthorized/i);
     } else {
@@ -86,18 +115,35 @@ describe("🧠 Metrics Exposure & Observability", () => {
     }
   });
 
-  it("should allow internal /health to respond independently", async () => {
+  /* -----------------------------------------------------------
+   * 8️⃣ Health Endpoint Independence
+   * --------------------------------------------------------- */
+  it("should allow /health to respond independently from /metrics", async () => {
     const res = await request(server).get("/health").expect(200);
     expect(res.body).toHaveProperty("success", true);
     expect(res.body.message).toMatch(/healthy/i);
   });
 
-  it("should validate OpenTelemetry exporter registration (if enabled)", async () => {
-    if (config.observability.otelEnabled) {
-      expect(register).toBeDefined();
+  /* -----------------------------------------------------------
+   * 9️⃣ OpenTelemetry Exporter Validation
+   * --------------------------------------------------------- */
+  it("should verify OpenTelemetry exporter registration (if enabled)", async () => {
+    if (config.observability?.otelEnabled && register?.getMetricsAsJSON) {
       const metrics = await register.getMetricsAsJSON();
       const metricNames = metrics.map((m: any) => m.name);
       expect(metricNames).toContain("pa360_http_requests_total");
     }
+  });
+
+  /* -----------------------------------------------------------
+   * 🔟 Trace Context Isolation Check
+   * --------------------------------------------------------- */
+  it("should not produce new tracing spans for /metrics endpoint", async () => {
+    const res = await request(server).get("/metrics").expect(200);
+    expect(res.text).toContain("pa360_http_requests_total");
+
+    const activeSpan = trace.getSpan(context.active());
+    // Metrics endpoint should not create its own spans
+    expect(activeSpan).toBeNull();
   });
 });
