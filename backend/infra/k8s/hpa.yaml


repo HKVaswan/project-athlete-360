@@ -1,0 +1,155 @@
+# ---------------------------------------------------------------------------
+# 🧠 Project Athlete 360 — Horizontal Pod Autoscaler (HPA)
+# ---------------------------------------------------------------------------
+# Purpose:
+#  - Dynamically scales pods based on CPU, memory, and custom metrics.
+#  - Integrates with Prometheus Adapter for advanced scaling.
+#  - Maintains resilience and SLA compliance under high traffic.
+# ---------------------------------------------------------------------------
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: pa360-api-hpa
+  namespace: pa360
+  labels:
+    app: pa360-api
+    tier: backend
+    environment: production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: pa360-api
+
+  # 💡 Auto-scaling range
+  minReplicas: 2
+  maxReplicas: 15
+
+  # 🚀 Triggers for scale-up/down
+  metrics:
+    # 1️⃣ CPU-based scaling
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 65
+
+    # 2️⃣ Memory-based scaling
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 75
+
+    # 3️⃣ Custom app-level metrics (via Prometheus Adapter)
+    - type: Pods
+      pods:
+        metric:
+          name: http_requests_per_second
+        target:
+          type: AverageValue
+          averageValue: "50"
+
+  # ⚙️ Scaling behavior: balance speed and stability
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      selectPolicy: Max
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+        - type: Pods
+          value: 4
+          periodSeconds: 30
+    scaleDown:
+      stabilizationWindowSeconds: 60
+      selectPolicy: Min
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+
+---
+# ---------------------------------------------------------------------------
+# 🧩 Worker HPA (Queue Processing)
+# ---------------------------------------------------------------------------
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: pa360-worker-hpa
+  namespace: pa360
+  labels:
+    app: pa360-worker
+    tier: background
+    environment: production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: pa360-worker
+
+  minReplicas: 1
+  maxReplicas: 10
+
+  metrics:
+    # CPU scaling
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+
+    # Queue backlog scaling (via Prometheus metric `queue_jobs_waiting`)
+    - type: Pods
+      pods:
+        metric:
+          name: queue_jobs_waiting
+        target:
+          type: AverageValue
+          averageValue: "20"
+
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 20
+      selectPolicy: Max
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 20
+    scaleDown:
+      stabilizationWindowSeconds: 90
+      selectPolicy: Min
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+
+---
+# ---------------------------------------------------------------------------
+# 🧰 Optional: Prometheus Adapter Config for Custom Metrics
+# ---------------------------------------------------------------------------
+# (Deployed separately, but this snippet shows mapping for HPA custom metrics.)
+#
+# apiVersion: monitoring.coreos.com/v1alpha1
+# kind: PrometheusAdapter
+# metadata:
+#   name: pa360-prometheus-adapter
+# spec:
+#   rules:
+#     custom:
+#       - seriesQuery: 'pa360_http_requests_total{namespace!="",pod!=""}'
+#         resources:
+#           overrides:
+#             namespace: { resource: "namespace" }
+#             pod: { resource: "pod" }
+#         name:
+#           matches: "^(.*)_total"
+#           as: "${1}_per_second"
+#         metricsQuery: 'sum(rate(<<.Series>>[2m])) by (<<.GroupBy>>)'
+# ---------------------------------------------------------------------------
