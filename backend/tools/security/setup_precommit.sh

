@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+# tools/security/setup_precommit.sh
+# -----------------------------------------------------------------------------
+# 🧠 Security Pre-commit Hook Setup Script (Enterprise Edition)
+#
+# Purpose:
+#  - Protect against accidental credential or secret leaks.
+#  - Enforce secure commits and dependency hygiene.
+#  - Integrates with detect-secrets, git-secrets, eslint, and dependency checks.
+#  - Auto-installs required tooling and configures Git hooks for developers.
+#
+# Supports:
+#  - detect-secrets (GitHub / Yelp)
+#  - git-secrets (AWS Labs)
+#  - npm audit / snyk / dependency vulnerability scan (optional)
+#  - Lint & format pre-commit verification
+# -----------------------------------------------------------------------------
+
+set -euo pipefail
+
+echo "🔐 Setting up enterprise pre-commit security hooks for Project Athlete 360..."
+
+# -----------------------------------------------------------------------------
+# 🧰 Ensure Dependencies Installed
+# -----------------------------------------------------------------------------
+if ! command -v git &> /dev/null; then
+  echo "❌ Git not found. Please install Git first."
+  exit 1
+fi
+
+# Install detect-secrets (Python tool)
+if ! command -v detect-secrets &> /dev/null; then
+  echo "📦 Installing detect-secrets..."
+  pip install detect-secrets --quiet || {
+    echo "⚠️ Failed to install detect-secrets. Please install manually: pip install detect-secrets"
+  }
+fi
+
+# Install git-secrets (AWS Labs)
+if ! command -v git-secrets &> /dev/null; then
+  echo "📦 Installing git-secrets..."
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    brew install git-secrets || true
+  else
+    git clone https://github.com/awslabs/git-secrets.git /tmp/git-secrets
+    sudo make -C /tmp/git-secrets install
+  fi
+fi
+
+# -----------------------------------------------------------------------------
+# 🧱 Initialize Git-Secrets Rules
+# -----------------------------------------------------------------------------
+git secrets --install || true
+git secrets --register-aws || true
+git secrets --add 'SECRET_KEY'
+git secrets --add 'API_KEY'
+git secrets --add 'PASSWORD'
+git secrets --add 'PRIVATE_KEY'
+git secrets --add 'ACCESS_TOKEN'
+git secrets --add 'ENCRYPTION_KEY'
+
+echo "✅ Git-secrets installed and custom patterns registered."
+
+# -----------------------------------------------------------------------------
+# 🔍 Initialize detect-secrets Baseline (if not exists)
+# -----------------------------------------------------------------------------
+BASELINE_FILE=".secrets.baseline"
+if [ ! -f "$BASELINE_FILE" ]; then
+  echo "🧾 Generating detect-secrets baseline..."
+  detect-secrets scan > "$BASELINE_FILE"
+  git add "$BASELINE_FILE"
+  echo "✅ Baseline created and staged."
+fi
+
+# -----------------------------------------------------------------------------
+# 🧩 Create .git/hooks/pre-commit Script
+# -----------------------------------------------------------------------------
+HOOK_FILE=".git/hooks/pre-commit"
+mkdir -p "$(dirname "$HOOK_FILE")"
+
+cat > "$HOOK_FILE" << 'EOF'
+#!/usr/bin/env bash
+set -e
+
+echo "🔍 Running pre-commit security checks..."
+
+# 1️⃣ Detect secrets before commit
+if command -v detect-secrets &> /dev/null; then
+  detect-secrets-hook --baseline .secrets.baseline
+else
+  echo "⚠️ detect-secrets not found; skipping secret scan."
+fi
+
+# 2️⃣ Git-secrets scan
+if command -v git-secrets &> /dev/null; then
+  git secrets --pre_commit_hook
+fi
+
+# 3️⃣ Lint staged files (TypeScript/JS)
+if command -v npx &> /dev/null; then
+  echo "🧹 Running ESLint check..."
+  npx eslint --max-warnings=0 --ext .ts,.js src || {
+    echo "❌ ESLint failed. Fix issues before commit."
+    exit 1
+  }
+fi
+
+# 4️⃣ Optional: Dependency vulnerability scan (lightweight)
+if command -v npm &> /dev/null; then
+  echo "🛡️ Checking for dependency vulnerabilities..."
+  npm audit --omit=dev --audit-level=high || true
+fi
+
+echo "✅ Pre-commit checks passed."
+EOF
+
+chmod +x "$HOOK_FILE"
+
+# -----------------------------------------------------------------------------
+# 🧠 Optional: Integrate with pre-push checks
+# -----------------------------------------------------------------------------
+PUSH_HOOK=".git/hooks/pre-push"
+if [ ! -f "$PUSH_HOOK" ]; then
+  cat > "$PUSH_HOOK" << 'EOF'
+#!/usr/bin/env bash
+echo "🚀 Running pre-push validation..."
+npm run test:quick || {
+  echo "❌ Tests failed. Push aborted."
+  exit 1
+}
+EOF
+  chmod +x "$PUSH_HOOK"
+fi
+
+# -----------------------------------------------------------------------------
+# ✅ Completion
+# -----------------------------------------------------------------------------
+echo ""
+echo "🎉 Security pre-commit hooks installed successfully!"
+echo "🔒 The following protections are now active:"
+echo "   • Secret leak detection (detect-secrets, git-secrets)"
+echo "   • Linting enforcement (ESLint)"
+echo "   • Optional dependency vulnerability checks"
+echo "   • Optional test validation on push"
+echo ""
+echo "🧩 Next Steps:"
+echo "   • Review and commit '.secrets.baseline' to repository."
+echo "   • Run './tools/security/setup_precommit.sh' on all developer machines."
+echo ""
+echo "📘 Reference:"
+echo "   - detect-secrets: https://github.com/Yelp/detect-secrets"
+echo "   - git-secrets: https://github.com/awslabs/git-secrets"
+echo ""
+echo "✅ Setup complete for Project Athlete 360 security enforcement."
