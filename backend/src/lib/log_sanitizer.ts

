@@ -1,0 +1,166 @@
+/**
+ * src/lib/log_sanitizer.ts
+ * --------------------------------------------------------------------------
+ * 🧼 Secure Log Sanitizer Utility (Enterprise-Grade)
+ *
+ * Purpose:
+ *  - Prevent leakage of secrets, tokens, and PII in logs or telemetry.
+ *  - Centralized sanitization logic for all log-producing modules.
+ *  - Can be used before sending data to:
+ *      → Winston logger
+ *      → Sentry / Telemetry events
+ *      → Audit Service logs
+ *  - Automatically redacts sensitive fields from nested objects.
+ * --------------------------------------------------------------------------
+ */
+
+import { logger } from "../logger";
+
+/* --------------------------------------------------------------------------
+   🧩 Sensitive Keywords List
+-------------------------------------------------------------------------- */
+const SENSITIVE_KEYS = [
+  "password",
+  "pass",
+  "token",
+  "access_token",
+  "refresh_token",
+  "api_key",
+  "secret",
+  "authorization",
+  "cookie",
+  "session",
+  "creditcard",
+  "cvv",
+  "otp",
+  "mfa",
+  "private",
+  "key",
+  "pin",
+  "iban",
+];
+
+/* --------------------------------------------------------------------------
+   🔒 Sanitization Helpers
+-------------------------------------------------------------------------- */
+
+/**
+ * Deeply sanitize objects and strings by redacting known sensitive keys/values.
+ */
+export function sanitizeLogData(input: any, depth = 0): any {
+  try {
+    if (input == null) return input;
+
+    // Avoid excessive recursion
+    if (depth > 10) return "[Truncated: Deep Object]";
+
+    // Primitive values
+    if (typeof input === "string") {
+      return redactSensitiveStrings(input);
+    }
+
+    // Arrays
+    if (Array.isArray(input)) {
+      return input.map((v) => sanitizeLogData(v, depth + 1));
+    }
+
+    // Plain objects
+    if (typeof input === "object") {
+      const sanitized: Record<string, any> = {};
+      for (const [key, value] of Object.entries(input)) {
+        if (isSensitiveKey(key)) {
+          sanitized[key] = "[REDACTED]";
+        } else {
+          sanitized[key] = sanitizeLogData(value, depth + 1);
+        }
+      }
+      return sanitized;
+    }
+
+    // Other data types (number, boolean, etc.)
+    return input;
+  } catch (err: any) {
+    logger.warn(`[SANITIZER] Error sanitizing data: ${err.message}`);
+    return "[SanitizationError]";
+  }
+}
+
+/**
+ * Detect and redact sensitive substrings from raw strings.
+ */
+export function redactSensitiveStrings(str: string): string {
+  if (!str) return str;
+
+  let sanitized = str;
+
+  // Basic patterns for secrets and tokens
+  const patterns = [
+    /(eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,})/g, // JWTs
+    /(AKIA[0-9A-Z]{16})/g, // AWS keys
+    /(AIza[0-9A-Za-z\-_]{35})/g, // GCP keys
+    /([A-Fa-f0-9]{32,64})/g, // generic hex secrets
+    /([A-Za-z0-9]{40,})/g, // long tokens
+  ];
+
+  for (const pattern of patterns) {
+    sanitized = sanitized.replace(pattern, "[REDACTED]");
+  }
+
+  return sanitized;
+}
+
+/**
+ * Check if a key name looks sensitive (by keyword or substring).
+ */
+export function isSensitiveKey(key: string): boolean {
+  return SENSITIVE_KEYS.some((sensitive) => key.toLowerCase().includes(sensitive));
+}
+
+/* --------------------------------------------------------------------------
+   🧩 Utility Wrappers
+-------------------------------------------------------------------------- */
+
+/**
+ * Sanitize a full log entry before sending to external systems.
+ */
+export function sanitizeForLog(entry: Record<string, any>): Record<string, any> {
+  try {
+    const clean = sanitizeLogData(entry);
+    if (JSON.stringify(entry) !== JSON.stringify(clean)) {
+      logger.debug("[SANITIZER] Sensitive data redacted from log entry.");
+    }
+    return clean;
+  } catch (err: any) {
+    logger.error(`[SANITIZER] Failed to sanitize log entry: ${err.message}`);
+    return { message: "Sanitization failed", _originalError: err.message };
+  }
+}
+
+/**
+ * Middleware-like helper for safe audit / telemetry logging.
+ */
+export function safeLog(message: string, meta?: Record<string, any>) {
+  const cleanMeta = sanitizeLogData(meta || {});
+  logger.info(message, cleanMeta);
+}
+
+/* --------------------------------------------------------------------------
+   ✅ Example Usage
+-------------------------------------------------------------------------- */
+/**
+ * import { safeLog, sanitizeForLog } from "../lib/log_sanitizer";
+ *
+ * // Safe logging inside services
+ * safeLog("User login attempt", { email, password }); // password redacted
+ *
+ * // Sanitize arbitrary data before sending to telemetry
+ * const safePayload = sanitizeForLog(incomingEventData);
+ */
+
+export default {
+  sanitizeLogData,
+  redactSensitiveStrings,
+  sanitizeForLog,
+  safeLog,
+  isSensitiveKey,
+};
