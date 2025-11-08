@@ -1,0 +1,81 @@
+name: ⚡ Load & Performance Testing (k6)
+
+on:
+  workflow_dispatch: # manual trigger
+  push:
+    branches: [main, staging]
+  pull_request:
+    branches: [main, staging]
+  schedule:
+    - cron: "0 3 * * 1" # every Monday 3 AM UTC
+
+jobs:
+  k6-load-test:
+    name: 🔬 Run API Load Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      BASE_URL: ${{ secrets.API_BASE_URL }}
+      K6_CLOUD_TOKEN: ${{ secrets.K6_CLOUD_TOKEN }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_ALERTS_WEBHOOK }}
+      ALERT_CHANNEL: "#devops-alerts"
+
+    steps:
+      - name: 🧩 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: 🧰 Install k6
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnupg software-properties-common
+          curl -s https://dl.k6.io/key.gpg | sudo apt-key add -
+          echo "deb https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install -y k6
+
+      - name: 🧪 Run k6 Load Test
+        run: |
+          echo "🚀 Starting k6 API sanity test..."
+          k6 run k6/load-tests/api_sanity_test.js --out json=load_results.json
+        continue-on-error: true
+
+      - name: 📊 Generate Load Test Summary
+        id: summary
+        run: |
+          echo "📈 Load Test Summary:"
+          node -e "
+          const fs = require('fs');
+          if (fs.existsSync('load_results.json')) {
+            const data = fs.readFileSync('load_results.json', 'utf8');
+            const stats = (data.match(/http_req_duration/g) || []).length;
+            console.log('Total Requests:', stats);
+          } else {
+            console.log('⚠️ No results file found.');
+          }"
+
+      - name: 🚨 Notify Slack on Failure
+        if: failure()
+        run: |
+          echo "⚠️ Load test failed! Sending Slack alert..."
+          curl -X POST -H 'Content-type: application/json' \
+            --data "{\"text\":\":rotating_light: *Load Test Failed!* Project Athlete 360 backend performance degraded. Check CI logs for details.\"}" \
+            $SLACK_WEBHOOK_URL
+
+      - name: 🧾 Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-results
+          path: load_results.json
+
+      - name: ✅ Post Job Summary
+        run: |
+          echo "## ✅ Load Test Completed" >> $GITHUB_STEP_SUMMARY
+          echo "- Branch: ${{ github.ref }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Environment: ${{ env.BASE_URL }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
