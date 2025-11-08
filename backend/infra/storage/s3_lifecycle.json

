@@ -1,0 +1,102 @@
+{
+  "Rules": [
+    {
+      "ID": "pa360-active-data-retention",
+      "Prefix": "uploads/active/",
+      "Status": "Enabled",
+      "Transitions": [
+        {
+          "Days": 30,
+          "StorageClass": "STANDARD_IA"
+        },
+        {
+          "Days": 90,
+          "StorageClass": "GLACIER"
+        }
+      ],
+      "Expiration": {
+        "Days": 365
+      },
+      "NoncurrentVersionTransitions": [
+        {
+          "NoncurrentDays": 30,
+          "StorageClass": "GLACIER"
+        }
+      ],
+      "NoncurrentVersionExpiration": {
+        "NoncurrentDays": 365
+      }
+    },
+
+    {
+      "ID": "pa360-backup-archives",
+      "Prefix": "backups/",
+      "Status": "Enabled",
+      "Transitions": [
+        {
+          "Days": 7,
+          "StorageClass": "STANDARD_IA"
+        },
+        {
+          "Days": 30,
+          "StorageClass": "GLACIER"
+        }
+      ],
+      "Expiration": {
+        "Days": 730
+      },
+      "NoncurrentVersionTransitions": [
+        {
+          "NoncurrentDays": 30,
+          "StorageClass": "GLACIER"
+        }
+      ]
+    },
+
+    {
+      "ID": "pa360-temp-files-cleanup",
+      "Prefix": "temp/",
+      "Status": "Enabled",
+      "Expiration": {
+        "Days": 3
+      },
+      "AbortIncompleteMultipartUpload": {
+        "DaysAfterInitiation": 1
+      }
+    },
+
+    {
+      "ID": "pa360-logs-archive",
+      "Prefix": "logs/",
+      "Status": "Enabled",
+      "Transitions": [
+        {
+          "Days": 14,
+          "StorageClass": "GLACIER"
+        }
+      ],
+      "Expiration": {
+        "Days": 365
+      }
+    },
+
+    {
+      "ID": "pa360-institution-data",
+      "Prefix": "institutions/",
+      "Status": "Enabled",
+      "Transitions": [
+        {
+          "Days": 60,
+          "StorageClass": "STANDARD_IA"
+        },
+        {
+          "Days": 180,
+          "StorageClass": "GLACIER"
+        }
+      ],
+      "Expiration": {
+        "Days": 1095
+      }
+    }
+  ]
+}
