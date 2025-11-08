@@ -1,0 +1,105 @@
+{
+  "Comment": "Project Athlete 360 CDN Distribution Configuration",
+  "CallerReference": "pa360-cloudfront-2025-setup",
+  "Enabled": true,
+  "IsIPV6Enabled": true,
+
+  "Aliases": {
+    "Quantity": 2,
+    "Items": [
+      "cdn.pa360.net",
+      "assets.projectathlete360.com"
+    ]
+  },
+
+  "Origins": {
+    "Quantity": 1,
+    "Items": [
+      {
+        "Id": "S3-Origin-ProjectAthlete360",
+        "DomainName": "pa360-content-bucket.s3.ap-south-1.amazonaws.com",
+        "OriginPath": "",
+        "CustomHeaders": { "Quantity": 0 },
+        "S3OriginConfig": {
+          "OriginAccessIdentity": "origin-access-identity/cloudfront/E1234567890EXAMPLE"
+        },
+        "ConnectionAttempts": 3,
+        "ConnectionTimeout": 10
+      }
+    ]
+  },
+
+  "DefaultCacheBehavior": {
+    "TargetOriginId": "S3-Origin-ProjectAthlete360",
+    "ViewerProtocolPolicy": "redirect-to-https",
+    "AllowedMethods": {
+      "Quantity": 7,
+      "Items": [
+        "GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"
+      ],
+      "CachedMethods": {
+        "Quantity": 2,
+        "Items": ["GET", "HEAD"]
+      }
+    },
+    "CachePolicyId": "658327ea-f89d-4fab-a63d-7e88639e58f6",
+    "OriginRequestPolicyId": "b689b0a8-53d0-40ab-baf2-68738e2966ac",
+    "ResponseHeadersPolicyId": "67f7725c-6f97-4210-82d7-5512b31e9d03",
+    "SmoothStreaming": false,
+    "Compress": true,
+    "FieldLevelEncryptionId": "",
+    "TrustedKeyGroups": {
+      "Enabled": true,
+      "Quantity": 1,
+      "Items": ["K123456789EXAMPLE"]
+    },
+    "RealtimeLogConfigArn": "arn:aws:cloudfront::123456789012:realtime-log-config/pa360-access-logs"
+  },
+
+  "CustomErrorResponses": {
+    "Quantity": 2,
+    "Items": [
+      {
+        "ErrorCode": 403,
+        "ResponsePagePath": "/403.html",
+        "ResponseCode": "403",
+        "ErrorCachingMinTTL": 60
+      },
+      {
+        "ErrorCode": 404,
+        "ResponsePagePath": "/404.html",
+        "ResponseCode": "404",
+        "ErrorCachingMinTTL": 30
+      }
+    ]
+  },
+
+  "Logging": {
+    "Enabled": true,
+    "IncludeCookies": false,
+    "Bucket": "pa360-cdn-logs.s3.amazonaws.com",
+    "Prefix": "cloudfront/"
+  },
+
+  "ViewerCertificate": {
+    "ACMCertificateArn": "arn:aws:acm:us-east-1:123456789012:certificate/abcdef12-3456-7890-abcd-ef1234567890",
+    "SSLSupportMethod": "sni-only",
+    "MinimumProtocolVersion": "TLSv1.2_2021",
+    "CertificateSource": "acm"
+  },
+
+  "Restrictions": {
+    "GeoRestriction": {
+      "RestrictionType": "none",
+      "Quantity": 0
+    }
+  },
+
+  "HttpVersion": "http2and3",
+  "PriceClass": "PriceClass_100",
+
+  "WebACLId": "arn:aws:wafv2:us-east-1:123456789012:global/webacl/pa360-waf/11111111-2222-3333-4444-555555555555",
+
+  "ContinuousDeploymentPolicyId": "",
+  "Staging": false
+}
