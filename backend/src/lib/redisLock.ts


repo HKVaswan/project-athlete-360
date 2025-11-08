@@ -1,0 +1,169 @@
+/**
+ * src/lib/redisLock.ts
+ * --------------------------------------------------------------------------
+ * 🔒 Enterprise Redis Distributed Lock Utility (v3)
+ *
+ * Features:
+ *  - Atomic, fault-tolerant distributed locks (SET NX PX)
+ *  - Auto-expiry and deadlock prevention
+ *  - Safe release with token verification
+ *  - Retry with exponential backoff
+ *  - Prometheus + OpenTelemetry metrics
+ *  - Auditable lock lifecycle events
+ * --------------------------------------------------------------------------
+ */
+
+import { redisClient } from "./redisClient";
+import { randomUUID } from "crypto";
+import { context, trace } from "@opentelemetry/api";
+import { logger } from "../logger";
+import { recordError } from "./core/metrics";
+import { auditService } from "../services/audit.service";
+
+const DEFAULT_TTL_MS = 15_000; // default lock lifetime (15s)
+const DEFAULT_RETRY_DELAY_MS = 150;
+const MAX_RETRIES = 5;
+
+export interface RedisLockOptions {
+  ttlMs?: number;
+  retryCount?: number;
+  retryDelayMs?: number;
+}
+
+export interface RedisLock {
+  key: string;
+  token: string;
+  acquiredAt: number;
+  expiresAt: number;
+  release: () => Promise<boolean>;
+}
+
+/* -----------------------------------------------------------------------
+   🔐 Acquire Distributed Lock
+------------------------------------------------------------------------ */
+export const acquireLock = async (
+  key: string,
+  opts: RedisLockOptions = {}
+): Promise<RedisLock | null> => {
+  const r = redisClient() as any;
+  const ttlMs = opts.ttlMs ?? DEFAULT_TTL_MS;
+  const retryCount = opts.retryCount ?? MAX_RETRIES;
+  const retryDelayMs = opts.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
+  const token = randomUUID();
+
+  const tracer = trace.getTracer("infra");
+  const span = tracer.startSpan("redis.lock.acquire", undefined, context.active());
+  span.setAttribute("lock.key", key);
+
+  for (let attempt = 1; attempt <= retryCount; attempt++) {
+    try {
+      const result = await r.set(key, token, "PX", ttlMs, "NX");
+      if (result === "OK") {
+        const now = Date.now();
+        const lock: RedisLock = {
+          key,
+          token,
+          acquiredAt: now,
+          expiresAt: now + ttlMs,
+          release: async () => await releaseLock(key, token),
+        };
+
+        span.setStatus({ code: 1, message: "Lock acquired" });
+        span.end();
+
+        logger.info(`[redisLock] ✅ Lock acquired`, { key, ttlMs, token });
+        await auditService.log({
+          actorId: "system",
+          actorRole: "system",
+          action: "LOCK_ACQUIRED",
+          details: { key, ttlMs, token },
+        });
+
+        return lock;
+      }
+
+      logger.debug(`[redisLock] Waiting for lock: ${key}, attempt ${attempt}`);
+      await sleep(backoff(attempt, retryDelayMs));
+    } catch (err: any) {
+      recordError("redis_lock_acquire_error", "medium");
+      logger.error(`[redisLock] ❌ Acquire failed (attempt ${attempt}):`, err.message);
+      await sleep(backoff(attempt, retryDelayMs));
+    }
+  }
+
+  span.setStatus({ code: 2, message: "Lock acquisition timeout" });
+  span.end();
+  logger.warn(`[redisLock] ⚠️ Could not acquire lock after ${retryCount} attempts`, { key });
+  return null;
+};
+
+/* -----------------------------------------------------------------------
+   🔓 Release Lock (Token Verified)
+------------------------------------------------------------------------ */
+export const releaseLock = async (key: string, token: string): Promise<boolean> => {
+  const r = redisClient() as any;
+  const tracer = trace.getTracer("infra");
+  const span = tracer.startSpan("redis.lock.release", undefined, context.active());
+  span.setAttribute("lock.key", key);
+
+  const releaseScript = `
+    if redis.call("get", KEYS[1]) == ARGV[1] then
+      return redis.call("del", KEYS[1])
+    else
+      return 0
+    end
+  `;
+
+  try {
+    const result = await r.eval(releaseScript, 1, key, token);
+    const success = result === 1;
+
+    if (success) {
+      logger.info(`[redisLock] 🔓 Lock released`, { key });
+      await auditService.log({
+        actorId: "system",
+        actorRole: "system",
+        action: "LOCK_RELEASED",
+        details: { key, token },
+      });
+    } else {
+      logger.warn(`[redisLock] ⚠️ Lock release skipped (invalid token)`, { key });
+    }
+
+    span.setStatus({ code: 1, message: success ? "Released" : "Skipped" });
+    span.end();
+    return success;
+  } catch (err: any) {
+    recordError("redis_lock_release_error", "low");
+    logger.error(`[redisLock] ❌ Error releasing lock:`, err.message);
+    span.setStatus({ code: 2, message: err.message });
+    span.end();
+    return false;
+  }
+};
+
+/* -----------------------------------------------------------------------
+   🧩 Utilities
+------------------------------------------------------------------------ */
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+const backoff = (attempt: number, baseDelay: number) =>
+  Math.min(baseDelay * Math.pow(2, attempt - 1), 2000); // exponential backoff capped at 2s
+
+/* -----------------------------------------------------------------------
+   🧠 Example Usage
+------------------------------------------------------------------------ */
+// Example:
+// const lock = await acquireLock("user:backup:123");
+// if (lock) {
+//   try {
+//     await doBackup();
+//   } finally {
+//     await lock.release();
+//   }
+// }
+
+export default {
+  acquireLock,
+  releaseLock,
+};
