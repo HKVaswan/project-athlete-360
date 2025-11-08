@@ -1,0 +1,186 @@
+/**
+ * src/integrations/abuseipdb.service.ts
+ * --------------------------------------------------------------------------
+ * 🌐 AbuseIPDB Integration Service (v3 — Enterprise Edition)
+ *
+ * Responsibilities:
+ *  - Check IP reputation (threat score, last report, confidence)
+ *  - Report abusive IPs automatically (DoS, brute force, spam, etc.)
+ *  - Cache recent results to reduce API usage
+ *  - Integrate with security audit + telemetry
+ *  - Fail-safe fallback if API unavailable
+ *
+ * Features:
+ *  - Uses official AbuseIPDB REST API
+ *  - Rate-limited via Redis caching (avoid repeated calls)
+ *  - Fully auditable via `auditService`
+ *  - Integrated with `telemetry` and `alert.worker`
+ * --------------------------------------------------------------------------
+ */
+
+import axios from "axios";
+import { redisClient } from "../lib/redisClient";
+import { logger } from "../logger";
+import { telemetry } from "../lib/telemetry";
+import { auditService } from "../services/audit.service";
+import { config } from "../config";
+
+const ABUSEIPDB_API_KEY = process.env.ABUSEIPDB_API_KEY || config.security?.abuseIpdbKey;
+const ABUSEIPDB_ENDPOINT = "https://api.abuseipdb.com/api/v2";
+const CACHE_TTL_SEC = 6 * 60 * 60; // 6 hours
+const redis = redisClient();
+
+/* --------------------------------------------------------------------------
+ * 🧩 Types
+ * ------------------------------------------------------------------------ */
+interface ReputationResult {
+  ipAddress: string;
+  isBlacklisted: boolean;
+  abuseConfidenceScore: number;
+  countryCode?: string;
+  usageType?: string;
+  isp?: string;
+  domain?: string;
+  totalReports?: number;
+  lastReportedAt?: string;
+}
+
+/* --------------------------------------------------------------------------
+ * ⚙️ Check IP Reputation
+ * -------------------------------------------------------------------------- */
+export async function checkIpReputation(ip: string): Promise<ReputationResult | null> {
+  if (!ip || ip === "127.0.0.1" || ip.startsWith("192.168.")) return null;
+
+  const cacheKey = `abuseipdb:check:${ip}`;
+  try {
+    const cached = await redis.get(cacheKey);
+    if (cached) return JSON.parse(cached);
+
+    if (!ABUSEIPDB_API_KEY) {
+      logger.warn("[AbuseIPDB] API key missing. Skipping reputation check.");
+      return null;
+    }
+
+    const resp = await axios.get(`${ABUSEIPDB_ENDPOINT}/check`, {
+      headers: { Key: ABUSEIPDB_API_KEY, Accept: "application/json" },
+      params: { ipAddress: ip, maxAgeInDays: 90 },
+      timeout: 5000,
+    });
+
+    const data = resp.data?.data;
+    if (!data) throw new Error("Invalid AbuseIPDB response");
+
+    const result: ReputationResult = {
+      ipAddress: ip,
+      isBlacklisted: data.abuseConfidenceScore >= 60,
+      abuseConfidenceScore: data.abuseConfidenceScore,
+      countryCode: data.countryCode,
+      usageType: data.usageType,
+      isp: data.isp,
+      domain: data.domain,
+      totalReports: data.totalReports,
+      lastReportedAt: data.lastReportedAt,
+    };
+
+    await redis.set(cacheKey, JSON.stringify(result), "EX", CACHE_TTL_SEC);
+
+    telemetry.record("security.abuseipdb.checks", 1, "counter");
+
+    if (result.isBlacklisted) {
+      telemetry.record("security.abuseipdb.detected", 1, "counter");
+      logger.warn(`[AbuseIPDB] 🚨 High-risk IP detected: ${ip} (score: ${result.abuseConfidenceScore})`);
+
+      await auditService.log({
+        actorId: ip,
+        actorRole: "system",
+        action: "ABUSEIPDB_BLACKLIST_HIT",
+        details: result,
+      });
+    }
+
+    return result;
+  } catch (err: any) {
+    telemetry.record("security.abuseipdb.errors", 1, "counter");
+    logger.error(`[AbuseIPDB] ❌ Check failed for ${ip}: ${err.message}`);
+    return null;
+  }
+}
+
+/* --------------------------------------------------------------------------
+ * 🚨 Report Abusive IP
+ * -------------------------------------------------------------------------- */
+export async function reportAbusiveIp(
+  ip: string,
+  categories: number[] = [18], // 18 = Web App Attack (AbuseIPDB category)
+  comment = "Automated abuse report from Project Athlete 360 security system"
+) {
+  if (!ABUSEIPDB_API_KEY) {
+    logger.warn("[AbuseIPDB] API key missing. Skipping report.");
+    return;
+  }
+
+  try {
+    const resp = await axios.post(
+      `${ABUSEIPDB_ENDPOINT}/report`,
+      new URLSearchParams({
+        ip,
+        categories: categories.join(","),
+        comment,
+      }),
+      {
+        headers: { Key: ABUSEIPDB_API_KEY, Accept: "application/json" },
+        timeout: 5000,
+      }
+    );
+
+    telemetry.record("security.abuseipdb.reports", 1, "counter");
+    logger.info(`[AbuseIPDB] 📡 Reported abusive IP: ${ip}`);
+
+    await auditService.log({
+      actorId: "system",
+      actorRole: "system",
+      action: "ABUSEIPDB_REPORT",
+      details: { ip, categories, resp: resp.data?.data },
+    });
+  } catch (err: any) {
+    telemetry.record("security.abuseipdb.report_errors", 1, "counter");
+    logger.error(`[AbuseIPDB] ❌ Failed to report IP ${ip}: ${err.message}`);
+  }
+}
+
+/* --------------------------------------------------------------------------
+ * 🧠 Utility: Middleware Wrapper (Optional)
+ * -------------------------------------------------------------------------- */
+export function abuseIpReputationMiddleware() {
+  return async (req: any, res: any, next: any) => {
+    try {
+      const ip =
+        req.headers["x-forwarded-for"]?.toString().split(",")[0].trim() ||
+        req.ip ||
+        req.connection.remoteAddress;
+
+      const rep = await checkIpReputation(ip);
+
+      if (rep?.isBlacklisted) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied — your IP has a high abuse score.",
+        });
+      }
+
+      next();
+    } catch (err: any) {
+      logger.error(`[AbuseIPDB] Middleware error: ${err.message}`);
+      next();
+    }
+  };
+}
+
+/* --------------------------------------------------------------------------
+ * 📦 Export
+ * -------------------------------------------------------------------------- */
+export default {
+  checkIpReputation,
+  reportAbusiveIp,
+  abuseIpReputationMiddleware,
+};
