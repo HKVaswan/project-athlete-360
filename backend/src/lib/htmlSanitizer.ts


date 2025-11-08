@@ -1,0 +1,129 @@
+/**
+ * src/lib/htmlSanitizer.ts
+ * --------------------------------------------------------------------------
+ * 🧼 Enterprise HTML Sanitizer for Project Athlete 360
+ *
+ * Purpose:
+ *  - Prevent XSS and HTML injection vulnerabilities.
+ *  - Sanitize user-provided HTML safely (for bios, blogs, comments, etc).
+ *  - Preserve safe formatting tags (bold, italics, links, lists, tables).
+ *  - Strip dangerous attributes (onerror, onclick, style, javascript:).
+ *  - Integrates with security audits and telemetry for monitoring attacks.
+ *
+ * Libraries:
+ *  - DOMPurify (via jsdom) for robust, standard-compliant sanitization.
+ * --------------------------------------------------------------------------
+ */
+
+import createDOMPurify from "dompurify";
+import { JSDOM } from "jsdom";
+import { telemetry } from "./telemetry";
+import { logger } from "../logger";
+
+/* --------------------------------------------------------------------------
+ * ⚙️ DOMPurify Initialization
+ * ------------------------------------------------------------------------ */
+const window = new JSDOM("").window as unknown as Window;
+const DOMPurify = createDOMPurify(window);
+
+/* --------------------------------------------------------------------------
+ * 🧩 Configuration
+ * ------------------------------------------------------------------------ */
+const ALLOWED_TAGS = [
+  "b", "i", "em", "strong", "u", "a", "p", "ul", "ol", "li", "br",
+  "span", "blockquote", "code", "pre", "img", "h1", "h2", "h3", "h4",
+  "table", "thead", "tbody", "tr", "th", "td"
+];
+
+const ALLOWED_ATTR = [
+  "href",
+  "alt",
+  "title",
+  "target",
+  "rel",
+  "src",
+  "width",
+  "height",
+  "class"
+];
+
+/* --------------------------------------------------------------------------
+ * 🧠 Core Sanitizer
+ * ------------------------------------------------------------------------ */
+export function sanitizeHtml(
+  dirtyHtml: string,
+  opts?: { allowImages?: boolean; strict?: boolean }
+): string {
+  try {
+    if (!dirtyHtml || typeof dirtyHtml !== "string") return "";
+
+    const clean = DOMPurify.sanitize(dirtyHtml, {
+      ALLOWED_TAGS,
+      ALLOWED_ATTR,
+      ADD_ATTR: ["data-*"], // allow limited data attributes
+      FORBID_TAGS: opts?.strict ? ["img", "video", "iframe"] : [],
+      FORBID_ATTR: ["style", "onerror", "onclick", "onload"],
+      ALLOW_DATA_ATTR: false,
+      ADD_TAGS: [],
+      RETURN_TRUSTED_TYPE: false,
+      WHOLE_DOCUMENT: false,
+      KEEP_CONTENT: false,
+      RETURN_DOM_FRAGMENT: false,
+    });
+
+    // Record telemetry (for visibility into potential malicious inputs)
+    telemetry.record("security.htmlSanitized", 1, "counter");
+
+    return clean.trim();
+  } catch (err: any) {
+    logger.warn(`[HTML SANITIZER] ⚠️ Sanitization failed: ${err.message}`);
+    telemetry.record("security.htmlSanitizationError", 1, "counter");
+    return "";
+  }
+}
+
+/* --------------------------------------------------------------------------
+ * 🚨 Security Check Helper
+ * ------------------------------------------------------------------------ */
+/**
+ * Detect potentially malicious patterns BEFORE sanitization.
+ * Useful for threat telemetry or abuse detection.
+ */
+export function detectMaliciousHtml(html: string): boolean {
+  if (!html) return false;
+
+  const suspiciousPatterns = [
+    /on\w+=/gi, // inline JS handlers
+    /javascript:/gi,
+    /<script/gi,
+    /<iframe/gi,
+    /data:text\/html/gi,
+  ];
+
+  const found = suspiciousPatterns.some((regex) => regex.test(html));
+
+  if (found) {
+    telemetry.record("security.htmlMaliciousDetected", 1, "counter");
+    logger.warn("[HTML SANITIZER] 🚨 Malicious HTML pattern detected!");
+  }
+
+  return found;
+}
+
+/* --------------------------------------------------------------------------
+ * 🧩 Example Usage
+ * ------------------------------------------------------------------------
+ * import { sanitizeHtml, detectMaliciousHtml } from "../lib/htmlSanitizer";
+ *
+ * const safe = sanitizeHtml(userInput);
+ * if (detectMaliciousHtml(userInput)) {
+ *    // optional: flag or log potential abuse
+ * }
+ *
+ * res.send({ safe });
+ * ------------------------------------------------------------------------ */
+
+export default {
+  sanitizeHtml,
+  detectMaliciousHtml,
+};
