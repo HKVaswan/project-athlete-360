@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# -------------------------------------------------------------------------
+# 🧨 Project Athlete 360 — Chaos Test: Simulate DB Connection Saturation
+#
+# Purpose:
+#   Simulates PostgreSQL connection pool saturation to validate:
+#     - PgBouncer and Prisma connection resilience
+#     - Health monitor detection & auto-recovery
+#     - Alerting via Prometheus / Sentry / PagerDuty
+#
+# Usage:
+#   chmod +x tools/chaos/simulate_db_saturation.sh
+#   ./tools/chaos/simulate_db_saturation.sh [duration_seconds]
+#
+# Example:
+#   ./tools/chaos/simulate_db_saturation.sh 60
+#
+# Notes:
+#   • Designed for staging or chaos sandbox environments only.
+#   • Requires psql or pgbench, and valid DATABASE_URL in env.
+# -------------------------------------------------------------------------
+
+set -euo pipefail
+
+DURATION="${1:-60}" # default 60s
+CONNECTIONS="${CONNECTIONS:-150}" # number of concurrent connections to spawn
+INTERVAL="${INTERVAL:-0.1}"       # delay between connection spawns (seconds)
+
+echo "⚙️  Starting DB saturation test..."
+echo "   Duration: ${DURATION}s"
+echo "   Connections: ${CONNECTIONS}"
+echo "   Interval between spawns: ${INTERVAL}s"
+echo ""
+
+if [[ -z "${DATABASE_URL:-}" ]]; then
+  echo "❌ DATABASE_URL not set in environment."
+  exit 1
+fi
+
+# Extract DB connection info for display
+DB_HOST=$(echo "$DATABASE_URL" | sed -E 's/^.*@([^:\/]+).*/\1/')
+DB_NAME=$(echo "$DATABASE_URL" | sed -E 's|.*/([^/?]+).*|\1|')
+echo "📡 Target Database: ${DB_HOST}/${DB_NAME}"
+echo ""
+
+start_time=$(date +%s)
+
+# Trap handler for cleanup
+cleanup() {
+  echo ""
+  echo "🧹 Cleaning up test connections..."
+  pkill -f "pgbench" >/dev/null 2>&1 || true
+  pkill -f "psql" >/dev/null 2>&1 || true
+  echo "✅ Cleanup done. Chaos test completed."
+}
+trap cleanup EXIT
+
+# Function to spawn one connection
+spawn_conn() {
+  ( PGPASSWORD="${PGPASSWORD:-}" psql "$DATABASE_URL" -c "SELECT pg_sleep(${DURATION});" >/dev/null 2>&1 ) &
+}
+
+# Attempt to use pgbench if available
+if command -v pgbench >/dev/null 2>&1; then
+  echo "🚀 Using pgbench to simulate load..."
+  pgbench -n -c "${CONNECTIONS}" -T "${DURATION}" "$DATABASE_URL" &
+else
+  echo "⚙️  pgbench not found, using raw psql loop fallback..."
+  for ((i = 1; i <= CONNECTIONS; i++)); do
+    spawn_conn
+    sleep "${INTERVAL}"
+  done
+fi
+
+echo ""
+echo "🧨 Saturation test running... will end after ${DURATION}s"
+echo "Monitor Grafana / Prometheus for DB connection metrics."
+echo "Press Ctrl+C to stop early."
+echo ""
+
+# Wait for duration or manual interruption
+sleep "${DURATION}"
+
+end_time=$(date +%s)
+elapsed=$((end_time - start_time))
+
+echo ""
+echo "⏱️  Test duration: ${elapsed}s"
+echo "✅ Chaos simulation completed successfully."
+echo ""
+echo "🧩 Review dashboards:"
+echo "   - Grafana: DB connection count, CPU, latency"
+echo "   - Prometheus metric: pg_connections_active / pa360_db_connections"
+echo "   - Alerts: Verify PagerDuty/Sentry triggers for 'DB saturation'"
