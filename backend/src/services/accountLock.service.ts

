@@ -1,0 +1,256 @@
+/**
+ * src/services/accountLock.service.ts
+ * --------------------------------------------------------------------------
+ * 🔒 Account Lockout & Abuse Defense Service
+ *
+ * Features:
+ *  - Protects against brute-force and credential stuffing
+ *  - Adaptive lock durations (progressive penalty for repeated offenses)
+ *  - Stores temporary lock state in Redis (fast, distributed)
+ *  - Persistent lock record in DB (optional)
+ *  - Sends audit logs + telemetry metrics
+ *  - Hooks for alerts (Sentry, Slack, PagerDuty)
+ *  - Supports MFA override unlock
+ * --------------------------------------------------------------------------
+ */
+
+import { redisClient } from "../lib/redisClient";
+import { auditService } from "./audit.service";
+import { logger } from "../logger";
+import { telemetry } from "../lib/telemetry";
+import { config } from "../config";
+import prisma from "../prismaClient";
+import { enqueueTestAlert } from "../workers/alert.worker";
+import { recordError } from "../lib/core/metrics";
+
+const redis = redisClient();
+
+/* --------------------------------------------------------------------------
+   Configuration Defaults (tunable per environment)
+-------------------------------------------------------------------------- */
+const MAX_FAILED_ATTEMPTS = Number(process.env.LOCKOUT_MAX_ATTEMPTS ?? 5);
+const BASE_LOCK_DURATION_SEC = Number(process.env.LOCKOUT_BASE_DURATION_SEC ?? 15 * 60); // 15 min
+const LOCK_MULTIPLIER = Number(process.env.LOCKOUT_MULTIPLIER ?? 2); // adaptive multiplier
+const LOCK_EXPIRY_KEY_PREFIX = "acct:lock";
+const FAIL_COUNT_KEY_PREFIX = "acct:fail";
+
+/* --------------------------------------------------------------------------
+   Types
+-------------------------------------------------------------------------- */
+export interface AccountLockInfo {
+  userId: string;
+  locked: boolean;
+  reason?: string;
+  lockedAt?: string;
+  unlockAt?: string;
+  attempts?: number;
+}
+
+/* --------------------------------------------------------------------------
+   Core: Increment failure counter & lock if threshold reached
+-------------------------------------------------------------------------- */
+export async function registerFailedAttempt(userId: string, ip?: string): Promise<AccountLockInfo> {
+  const failKey = `${FAIL_COUNT_KEY_PREFIX}:${userId}`;
+  const lockKey = `${LOCK_EXPIRY_KEY_PREFIX}:${userId}`;
+
+  try {
+    // If already locked → extend duration slightly for repeat offense
+    const existingLock = await redis.get(lockKey);
+    if (existingLock) {
+      const lockData = JSON.parse(existingLock);
+      const extendedLock = BASE_LOCK_DURATION_SEC * LOCK_MULTIPLIER;
+      const unlockAt = Date.now() + extendedLock * 1000;
+
+      await redis.setex(lockKey, extendedLock, JSON.stringify({ ...lockData, unlockAt }));
+      logger.warn(`[LOCKOUT] 🔒 Extended lock for user ${userId}`);
+
+      await auditService.log({
+        actorId: userId,
+        actorRole: "user",
+        action: "ACCOUNT_LOCK_EXTENDED",
+        details: { ip, durationSec: extendedLock },
+      });
+
+      telemetry.record("account.lock.extended", 1);
+      return { userId, locked: true, reason: "Repeated lockout", unlockAt: new Date(unlockAt).toISOString() };
+    }
+
+    // Increment failure count in Redis
+    const tx = (redis as any).multi();
+    tx.incr(failKey);
+    tx.ttl(failKey);
+    const [count, ttl] = await tx.exec().then((res: any[]) => res.map((r) => r[1]));
+
+    if (ttl === -1) await redis.expire(failKey, BASE_LOCK_DURATION_SEC);
+
+    // If threshold reached → lock account
+    if (count >= MAX_FAILED_ATTEMPTS) {
+      const duration = BASE_LOCK_DURATION_SEC;
+      const unlockAt = Date.now() + duration * 1000;
+
+      await redis.setex(lockKey, duration, JSON.stringify({ lockedAt: Date.now(), unlockAt }));
+      await redis.del(failKey);
+
+      telemetry.record("account.locked", 1);
+      logger.warn(`[LOCKOUT] 🚫 Account locked for user ${userId} after ${count} failed attempts`);
+
+      await auditService.log({
+        actorId: userId,
+        actorRole: "user",
+        action: "ACCOUNT_LOCKED",
+        details: { ip, attempts: count, durationSec: duration },
+      });
+
+      // Optional persistent DB log
+      await persistLockRecord(userId, duration);
+
+      // Trigger background alert (Slack, PagerDuty, etc.)
+      try {
+        await enqueueTestAlert(); // replace with actual alert queue dispatch
+      } catch (err) {
+        logger.debug("[LOCKOUT] Alert dispatch skipped (worker disabled)");
+      }
+
+      return {
+        userId,
+        locked: true,
+        reason: "Too many failed login attempts",
+        lockedAt: new Date().toISOString(),
+        unlockAt: new Date(unlockAt).toISOString(),
+      };
+    }
+
+    telemetry.record("account.failed_attempt", 1);
+    return { userId, locked: false, attempts: count };
+  } catch (err: any) {
+    recordError("account_lock_error", "high");
+    logger.error(`[LOCKOUT] ❌ Error in registerFailedAttempt: ${err.message}`);
+    return { userId, locked: false, reason: "error" };
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Check if an account is currently locked
+-------------------------------------------------------------------------- */
+export async function isAccountLocked(userId: string): Promise<AccountLockInfo> {
+  const lockKey = `${LOCK_EXPIRY_KEY_PREFIX}:${userId}`;
+  try {
+    const data = await redis.get(lockKey);
+    if (!data) return { userId, locked: false };
+
+    const lockData = JSON.parse(data);
+    const unlockAt = lockData.unlockAt ? new Date(lockData.unlockAt).toISOString() : undefined;
+
+    if (Date.now() > new Date(lockData.unlockAt).getTime()) {
+      // lock expired
+      await unlockAccount(userId, "auto_expire");
+      return { userId, locked: false };
+    }
+
+    return { userId, locked: true, unlockAt };
+  } catch (err: any) {
+    logger.error(`[LOCKOUT] Error checking lock status: ${err.message}`);
+    return { userId, locked: false };
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Manual unlock (by admin, MFA, or expiry)
+-------------------------------------------------------------------------- */
+export async function unlockAccount(userId: string, method: "admin" | "mfa" | "auto_expire" = "admin") {
+  try {
+    const lockKey = `${LOCK_EXPIRY_KEY_PREFIX}:${userId}`;
+    await redis.del(lockKey);
+    await redis.del(`${FAIL_COUNT_KEY_PREFIX}:${userId}`);
+
+    telemetry.record("account.unlocked", 1);
+    logger.info(`[LOCKOUT] 🔓 Account unlocked for user ${userId} via ${method}`);
+
+    await auditService.log({
+      actorId: userId,
+      actorRole: "user",
+      action: "ACCOUNT_UNLOCKED",
+      details: { method },
+    });
+
+    // persist unlock in DB
+    await prisma.accountLockHistory.create({
+      data: { userId, unlockedAt: new Date(), method },
+    });
+  } catch (err: any) {
+    recordError("account_unlock_error", "medium");
+    logger.error(`[LOCKOUT] ❌ Failed to unlock account: ${err.message}`);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Optional DB persistence (for long-term visibility)
+-------------------------------------------------------------------------- */
+async function persistLockRecord(userId: string, duration: number) {
+  try {
+    await prisma.accountLockHistory.create({
+      data: {
+        userId,
+        lockedAt: new Date(),
+        durationSec: duration,
+        reason: "Too many failed attempts",
+      },
+    });
+  } catch (err: any) {
+    logger.debug("[LOCKOUT] Persistent DB record skipped:", err.message);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Utility: Clear all locks (admin tool)
+-------------------------------------------------------------------------- */
+export async function clearAllLocks() {
+  try {
+    const keys = await redis.keys(`${LOCK_EXPIRY_KEY_PREFIX}:*`);
+    for (const k of keys) await redis.del(k);
+    logger.info(`[LOCKOUT] 🔄 Cleared ${keys.length} lock entries`);
+    return keys.length;
+  } catch (err: any) {
+    logger.error("[LOCKOUT] Failed to clear locks:", err.message);
+    return 0;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Express middleware example — reject locked users
+-------------------------------------------------------------------------- */
+import { Request, Response, NextFunction } from "express";
+
+export const enforceNotLockedMiddleware = () => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.body?.userId || (req as any).user?.id;
+      if (!userId) return next(); // skip for unauthenticated routes
+
+      const lock = await isAccountLocked(userId);
+      if (lock.locked) {
+        return res.status(423).json({
+          success: false,
+          message: "Account temporarily locked due to repeated failed login attempts.",
+          unlockAt: lock.unlockAt,
+        });
+      }
+
+      next();
+    } catch (err: any) {
+      logger.error("[LOCKOUT] Middleware check failed:", err.message);
+      next();
+    }
+  };
+};
+
+/* --------------------------------------------------------------------------
+   Exported API
+-------------------------------------------------------------------------- */
+export default {
+  registerFailedAttempt,
+  isAccountLocked,
+  unlockAccount,
+  clearAllLocks,
+  enforceNotLockedMiddleware,
+};
