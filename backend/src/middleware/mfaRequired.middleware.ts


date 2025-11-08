@@ -1,0 +1,97 @@
+/**
+ * src/middleware/mfaRequired.middleware.ts
+ * --------------------------------------------------------------------------
+ * 🔐 MFA Enforcement Middleware (Enterprise-Grade)
+ *
+ * Responsibilities:
+ *  - Enforce MFA verification for sensitive operations (admin, impersonation, etc.)
+ *  - Works with both session-based and JWT-based authentication
+ *  - Integrates with mfa.service for durable challenge validation
+ *  - Auto-rejects if MFA not verified or expired
+ *  - Logs events to audit trail and telemetry
+ * --------------------------------------------------------------------------
+ */
+
+import { Request, Response, NextFunction } from "express";
+import { mfaService } from "../services/mfa.service";
+import { auditService } from "../services/audit.service";
+import { telemetry } from "../lib/telemetry";
+import { logger } from "../logger";
+import { Errors } from "../utils/errors";
+
+/* --------------------------------------------------------------------------
+   🧠 Middleware Implementation
+-------------------------------------------------------------------------- */
+export const mfaRequiredMiddleware = (requiredRoles: string[] = ["admin", "super_admin"]) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = (req as any).user;
+
+      // 🧩 Skip if no user context
+      if (!user) {
+        throw Errors.Auth("Unauthorized access — no active session.");
+      }
+
+      // 🧩 Check if user's role needs MFA
+      if (!requiredRoles.includes(user.role)) {
+        return next();
+      }
+
+      // 🧩 Check if MFA was verified in current session
+      const sessionMfa = req.session?.mfaVerified || user.mfaVerified;
+
+      if (sessionMfa) {
+        telemetry.record("mfa.enforced.success", 1);
+        return next();
+      }
+
+      // 🧩 If token-based session → verify last MFA challenge
+      const isVerified = await mfaService.verifyRecentChallenge(user.id);
+
+      if (!isVerified) {
+        telemetry.record("mfa.enforced.failed", 1);
+        await auditService.log({
+          actorId: user.id,
+          actorRole: user.role,
+          action: "MFA_REQUIRED_DENIED",
+          details: { route: req.originalUrl },
+        });
+
+        logger.warn(`[MFA] ❌ Access denied — MFA required for user ${user.id}`);
+
+        return res.status(403).json({
+          success: false,
+          message:
+            "Multi-Factor Authentication is required to access this route. Please verify MFA and try again.",
+        });
+      }
+
+      // ✅ Mark MFA as verified for this session
+      if (req.session) req.session.mfaVerified = true;
+
+      telemetry.record("mfa.enforced.success", 1);
+      next();
+    } catch (err: any) {
+      logger.error(`[MFA] Middleware error: ${err.message}`);
+      telemetry.record("mfa.enforced.error", 1);
+
+      return res.status(500).json({
+        success: false,
+        message: "Internal error verifying MFA. Please try again later.",
+      });
+    }
+  };
+};
+
+/* --------------------------------------------------------------------------
+   🧩 Example Usage
+-------------------------------------------------------------------------- */
+/**
+ * import { mfaRequiredMiddleware } from "../middleware/mfaRequired.middleware";
+ *
+ * // Example: Protect sensitive admin routes
+ * router.post("/admin/impersonate", mfaRequiredMiddleware(["super_admin"]), controller.impersonate);
+ * router.post("/admin/settings", mfaRequiredMiddleware(["admin", "super_admin"]), controller.updateSettings);
+ */
+
+export default mfaRequiredMiddleware;
