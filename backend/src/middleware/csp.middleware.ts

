@@ -1,0 +1,112 @@
+/**
+ * src/middleware/csp.middleware.ts
+ * --------------------------------------------------------------------------
+ * 🧠 Smart & Strategic Content Security Policy (CSP) Middleware
+ *
+ * Purpose:
+ *  - Enforce a modern CSP with strong defaults while allowing dynamic frontend behavior.
+ *  - Prevent XSS, data injection, and clickjacking attacks.
+ *  - Auto-adapt policy for different environments (dev, staging, prod).
+ *  - Allow safe inline scripts only when hashed/nonce-based.
+ *  - Seamlessly integrates with Helmet and frontend frameworks.
+ *
+ * Strategy:
+ *  - Restrictive by default (self-only), but allows controlled CDN & analytics exceptions.
+ *  - Generates per-request CSP nonce for inline scripts (secure React hydration).
+ * --------------------------------------------------------------------------
+ */
+
+import { Request, Response, NextFunction } from "express";
+import crypto from "crypto";
+import helmet from "helmet";
+import { config } from "../config";
+import { logger } from "../logger";
+
+/**
+ * Generate a random nonce per request to safely allow inline scripts.
+ */
+export const generateNonce = (req: Request): string => {
+  const nonce = crypto.randomBytes(16).toString("base64");
+  (req as any).cspNonce = nonce;
+  return nonce;
+};
+
+/**
+ * Builds a dynamic CSP policy based on environment and service type.
+ */
+export const cspMiddleware = (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const nonce = generateNonce(req);
+    const isProd = config.nodeEnv === "production";
+
+    const self = "'self'";
+    const none = "'none'";
+    const unsafeInline = "'unsafe-inline'"; // only for dev fallback
+
+    // Allow specific trusted CDNs (customize as needed)
+    const cdnSources = [
+      "https://cdn.jsdelivr.net",
+      "https://cdnjs.cloudflare.com",
+      "https://fonts.googleapis.com",
+      "https://fonts.gstatic.com",
+      "https://www.googletagmanager.com",
+      "https://www.google-analytics.com",
+    ];
+
+    const policy = {
+      defaultSrc: [self],
+      scriptSrc: [
+        self,
+        `'nonce-${nonce}'`,
+        ...(isProd ? [] : [unsafeInline]),
+        ...cdnSources,
+      ],
+      styleSrc: [self, "'unsafe-inline'", ...cdnSources],
+      imgSrc: [self, "data:", "blob:", ...cdnSources],
+      fontSrc: [self, ...cdnSources],
+      connectSrc: [
+        self,
+        ...(config.CLIENT_URLS || []),
+        "https://api.segment.io",
+        "https://sentry.io",
+        "https://analytics.google.com",
+      ],
+      frameAncestors: [self], // prevents clickjacking
+      objectSrc: [none],
+      baseUri: [self],
+      formAction: [self],
+      upgradeInsecureRequests: isProd ? [] : null,
+      reportUri: config.security?.cspReportUri || undefined,
+    };
+
+    // Apply via Helmet
+    helmet.contentSecurityPolicy({
+      useDefaults: true,
+      directives: policy,
+    })(req, res, next);
+  } catch (err: any) {
+    logger.warn(`[CSP] Failed to apply CSP: ${err.message}`);
+    next(); // fail-safe — don’t block request if CSP misconfigured
+  }
+};
+
+/**
+ * Helper for setting CSP meta tag in HTML responses (optional).
+ * Example usage in SSR or template engines.
+ */
+export const getCspMetaTag = (req: Request) => {
+  const nonce = (req as any).cspNonce || "";
+  return `<meta http-equiv="Content-Security-Policy" content="script-src 'self' 'nonce-${nonce}'; object-src 'none'">`;
+};
+
+/**
+ * ✅ Usage:
+ *
+ * import { cspMiddleware } from "../middleware/csp.middleware";
+ * app.use(cspMiddleware);
+ *
+ * // Access nonce in views:
+ * res.render("index", { cspNonce: req.cspNonce });
+ */
+
+export default cspMiddleware;
