@@ -1,0 +1,235 @@
+# infra/observability/pg_stats_exporter.yml
+# -------------------------------------------------------------------------------
+# 🧠 PostgreSQL Metrics Exporter Configuration — Project Athlete 360
+# -------------------------------------------------------------------------------
+# Purpose:
+#  - Collect detailed metrics about DB performance, query latency, connections,
+#    locks, cache efficiency, slow queries, table/index bloat, and replication.
+#  - Export metrics to Prometheus for dashboard visualization and alerts.
+# -------------------------------------------------------------------------------
+# Compatible with:
+#   • prometheus-community/postgres-exporter
+#   • wrouesnel/postgres_exporter
+# -------------------------------------------------------------------------------
+
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+
+# ------------------------------------------------------------------------------
+# 🔧 PostgreSQL Connection Configuration
+# ------------------------------------------------------------------------------
+datasource:
+  host: "${DB_HOST:db}"
+  port: ${DB_PORT:5432}
+  user: "${DB_USER:exporter}"
+  password: "${DB_PASSWORD:secure_exporter_pwd}"
+  database: "${DB_NAME:projectathlete}"
+  sslmode: "${DB_SSLMODE:disable}"
+
+# ------------------------------------------------------------------------------
+# 📊 Default Metrics Collections
+# ------------------------------------------------------------------------------
+queries:
+  pg_up:
+    query: "SELECT 1;"
+    metrics:
+      - name: pg_up
+        type: gauge
+        help: "PostgreSQL server availability (1 = up)"
+
+  connection_stats:
+    query: |
+      SELECT datname,
+             numbackends,
+             xact_commit,
+             xact_rollback,
+             blks_read,
+             blks_hit,
+             tup_returned,
+             tup_fetched,
+             tup_inserted,
+             tup_updated,
+             tup_deleted
+      FROM pg_stat_database;
+    metrics:
+      - name: pg_db_numbackends
+        type: gauge
+        help: Number of active connections
+        key_labels:
+          - datname
+      - name: pg_db_xact_commit
+        type: counter
+        help: Number of transactions committed
+        key_labels:
+          - datname
+      - name: pg_db_xact_rollback
+        type: counter
+        help: Number of transactions rolled back
+        key_labels:
+          - datname
+
+  cache_hit_ratio:
+    query: |
+      SELECT datname,
+             (blks_hit::float / nullif(blks_hit + blks_read, 0)) * 100 AS cache_hit_ratio
+      FROM pg_stat_database;
+    metrics:
+      - name: pg_db_cache_hit_ratio
+        type: gauge
+        help: Cache hit ratio per database (percentage)
+        key_labels:
+          - datname
+
+  slow_queries:
+    query: |
+      SELECT datname,
+             count(*) AS slow_queries
+      FROM pg_stat_activity
+      WHERE state != 'idle' AND now() - query_start > interval '2 seconds'
+      GROUP BY datname;
+    metrics:
+      - name: pg_slow_queries_total
+        type: counter
+        help: Number of queries running longer than 2 seconds
+        key_labels:
+          - datname
+
+  table_bloat:
+    query: |
+      SELECT schemaname, relname, n_live_tup, n_dead_tup
+      FROM pg_stat_user_tables;
+    metrics:
+      - name: pg_table_dead_tuples
+        type: gauge
+        help: Dead tuples in user tables (for bloat analysis)
+        key_labels:
+          - schemaname
+          - relname
+
+  replication_lag:
+    query: |
+      SELECT application_name,
+             EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp())) AS replication_lag
+      FROM pg_stat_replication;
+    metrics:
+      - name: pg_replication_lag_seconds
+        type: gauge
+        help: Replication lag in seconds
+        key_labels:
+          - application_name
+
+  lock_waits:
+    query: |
+      SELECT mode, count(*) AS locks
+      FROM pg_locks
+      WHERE NOT granted
+      GROUP BY mode;
+    metrics:
+      - name: pg_locks_waiting_total
+        type: gauge
+        help: Count of locks currently waiting
+        key_labels:
+          - mode
+
+  connection_pools:
+    query: |
+      SELECT datname, count(*) as active_connections
+      FROM pg_stat_activity
+      WHERE state = 'active'
+      GROUP BY datname;
+    metrics:
+      - name: pg_active_connections_total
+        type: gauge
+        help: Number of active PostgreSQL connections
+        key_labels:
+          - datname
+
+# ------------------------------------------------------------------------------
+# 🧩 Custom Institution Metrics (Project Athlete 360 Specific)
+# ------------------------------------------------------------------------------
+custom_queries:
+  storage_usage_per_institution:
+    query: |
+      SELECT institution_id,
+             SUM(pg_total_relation_size(quote_ident(table_name))) / 1024 / 1024 AS storage_mb
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+      GROUP BY institution_id;
+    metrics:
+      - name: pa360_institution_storage_mb
+        type: gauge
+        help: Total storage used per institution (MB)
+        key_labels:
+          - institution_id
+
+  recent_backup_jobs:
+    query: |
+      SELECT COUNT(*) AS recent_backups
+      FROM backup_jobs
+      WHERE started_at > now() - interval '24 hours';
+    metrics:
+      - name: pa360_backup_jobs_last_24h
+        type: counter
+        help: Number of backup jobs in last 24h
+
+# ------------------------------------------------------------------------------
+# 🔔 Alerts & Threshold Metadata
+# ------------------------------------------------------------------------------
+alert_rules:
+  - name: High Connection Count
+    expr: "pg_db_numbackends > 100"
+    severity: warning
+    description: "Too many active DB connections"
+  - name: Low Cache Hit Ratio
+    expr: "pg_db_cache_hit_ratio < 90"
+    severity: warning
+    description: "Cache efficiency degraded"
+  - name: Replication Lag
+    expr: "pg_replication_lag_seconds > 10"
+    severity: critical
+    description: "Replication lag above threshold"
+
+# ------------------------------------------------------------------------------
+# 🧠 Exporter Settings
+# ------------------------------------------------------------------------------
+exporter:
+  web_listen_address: ":9187"
+  web_telemetry_path: "/metrics"
+  disable_default_metrics: false
+  log_level: "info"
+  constant_labels:
+    service: "project-athlete-360"
+    environment: "${NODE_ENV:production}"
+    region: "${REGION:global}"
+  collectors:
+    enabled:
+      - pg_stat_database
+      - pg_stat_activity
+      - pg_locks
+      - pg_stat_replication
+      - pg_stat_user_tables
+      - pg_statio_user_tables
+    disabled: []
+
+# ------------------------------------------------------------------------------
+# ✅ Notes
+# ------------------------------------------------------------------------------
+# 1. Add this service to docker-compose.observability.yml:
+#     postgres_exporter:
+#       image: prometheuscommunity/postgres-exporter:latest
+#       container_name: postgres_exporter
+#       restart: unless-stopped
+#       volumes:
+#         - ./infra/observability/pg_stats_exporter.yml:/etc/postgres_exporter.yml
+#       environment:
+#         DATA_SOURCE_NAME: "postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=disable"
+#       ports:
+#         - "9187:9187"
+#
+# 2. Prometheus scrape target example:
+#     - job_name: "postgres_exporter"
+#       static_configs:
+#         - targets: ["postgres_exporter:9187"]
+# -------------------------------------------------------------------------------
