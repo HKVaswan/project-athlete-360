@@ -1,0 +1,49 @@
+; ============================================================================
+; infra/db/pgbouncer/userlist.txt
+; ============================================================================
+; 🧠 Project Athlete 360 — PgBouncer Userlist
+;
+; Purpose:
+;  - Defines valid database users and MD5-hashed credentials for PgBouncer.
+;  - PgBouncer authenticates clients using this file before proxying to Postgres.
+;  - Supports multiple roles: application, admin, analytics.
+;
+; Security Notes:
+;  - Use MD5 hash of "password + username" format as required by PostgreSQL.
+;  - Never commit plaintext passwords — use environment substitution in CI/CD.
+;  - Rotate credentials periodically using the secrets rotation worker.
+;  - This file is mounted from Kubernetes Secret or Vault-managed config.
+; ============================================================================
+
+; --------------------------------------------------------------------------
+; 🧩 Format:
+;   "username" "md5<MD5 hash of password + username>"
+;
+; Example: password = "supersecret", username = "pa360_user"
+;   echo -n "supersecretpa360_user" | md5sum
+; --------------------------------------------------------------------------
+
+
+"postgres" "md5b6d0b0a2c6716a18b47e5e2d26e3477b"
+"pa360_user" "md56e5e3c593af2e9dcbf73c21a58ce1441"
+"pa360_admin" "md5f1c3a9c5de0e12ef29ac847d637c812e"
+"analytics_user" "md5c51f9b0e83b6e90a10d6e46f27d512ab"
+
+
+; --------------------------------------------------------------------------
+; 🔒 Notes:
+;  - Hashes above are placeholders; replace with actual MD5(password+username).
+;  - For example:
+;      export USER=pa360_user
+;      export PASS="StrongSecret!"
+;      echo -n "${PASS}${USER}" | md5sum | awk '{print $1}'
+;      → paste as md5<hash> in this file
+;
+;  - If using Vault or AWS Secrets Manager, this file can be auto-generated
+;    via startup scripts or mounted as a Secret volume.
+; --------------------------------------------------------------------------
+
+; 🧰 Example commands for quick verification:
+;  psql -U pa360_user -p 6432 -h pgbouncer-host -d pa360 -c "SELECT 1;"
+;  psql -U pa360_admin -p 6432 -h pgbouncer-host -d pa360 -c "SHOW POOLS;"
+; --------------------------------------------------------------------------
