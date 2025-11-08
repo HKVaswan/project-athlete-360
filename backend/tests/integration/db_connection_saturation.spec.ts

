@@ -1,0 +1,93 @@
+/**
+ * @file tests/integration/db_connection_saturation.spec.ts
+ * ---------------------------------------------------------------------------
+ * 🧠 Project Athlete 360 — Integration Test
+ * Validate DB connection resilience under simulated saturation.
+ *
+ * Goals:
+ *  - Ensure Prisma gracefully handles "too many connections"
+ *  - Confirm systemHealth.service reports 'degraded', not 'unhealthy'
+ *  - Verify recovery after connection load subsides
+ *
+ * Pre-req:
+ *  - PgBouncer or PostgreSQL instance available via DATABASE_URL
+ *  - Jest or Vitest test runner
+ *  - Prometheus and telemetry integrations enabled
+ * ---------------------------------------------------------------------------
+ */
+
+import prisma from "../../src/prismaClient";
+import { runFullHealthCheck } from "../../src/services/systemHealth.service";
+import { healthCheck as redisHealth } from "../../src/lib/redisClient";
+import logger from "../../src/logger";
+
+const MAX_PARALLEL_CONNECTIONS = 100; // adjust for environment
+const TEST_TIMEOUT_MS = 30_000;
+
+describe("🧩 DB Connection Saturation Resilience", () => {
+  jest.setTimeout(TEST_TIMEOUT_MS);
+
+  const connections: any[] = [];
+
+  beforeAll(async () => {
+    logger.info("[TEST] Initializing DB saturation test…");
+    await prisma.$queryRaw`SELECT 1`; // sanity
+  });
+
+  afterAll(async () => {
+    logger.info("[TEST] Cleaning up simulated load connections…");
+    for (const c of connections) {
+      try {
+        await c.$disconnect();
+      } catch {
+        /* ignore */
+      }
+    }
+    await prisma.$disconnect();
+  });
+
+  it("should gracefully handle connection saturation", async () => {
+    const connectionPromises: Promise<any>[] = [];
+    for (let i = 0; i < MAX_PARALLEL_CONNECTIONS; i++) {
+      connectionPromises.push(
+        (async () => {
+          const temp = new (prisma as any).constructor(); // create temp PrismaClient
+          connections.push(temp);
+          try {
+            await temp.$queryRaw`SELECT pg_sleep(1);`;
+          } catch (err: any) {
+            if (
+              !err.message.includes("too many connections") &&
+              !err.message.includes("connection limit")
+            ) {
+              throw err; // only ignore expected saturation errors
+            }
+          }
+        })()
+      );
+    }
+
+    // Run all connection attempts concurrently
+    await Promise.allSettled(connectionPromises);
+
+    // Run system health check — expect degraded, not unhealthy
+    const report = await runFullHealthCheck();
+    logger.info("[TEST] Health report under saturation:", report.summary);
+
+    expect(["degraded", "healthy"]).toContain(report.overall);
+    expect(report.db.ok).toBeTruthy();
+  });
+
+  it("should recover to healthy state after saturation", async () => {
+    // Wait for DB pool to recover
+    await new Promise((r) => setTimeout(r, 5_000));
+
+    const report = await runFullHealthCheck();
+    const redisOk = await redisHealth().catch(() => false);
+
+    logger.info("[TEST] Health report after recovery:", report.summary);
+
+    expect(report.overall).toBe("healthy");
+    expect(redisOk).toBeTruthy();
+  });
+});
