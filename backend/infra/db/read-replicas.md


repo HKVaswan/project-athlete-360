@@ -1,0 +1,205 @@
+# 🧠 Project Athlete 360 — Database Read Replicas Guide  
+**Document Version:** 1.0  
+**Last Updated:** {{ date }}  
+**Maintained By:** Infrastructure & Data Reliability Team  
+
+---
+
+## 🎯 Objective
+This document defines how **read replicas** are deployed, managed, and utilized for horizontal scalability and analytics isolation in Project Athlete 360.  
+
+Read replicas offload query traffic (analytics, reporting, dashboard reads) from the primary PostgreSQL instance — ensuring **low latency, high availability, and minimal contention** during write-heavy operations.
+
+---
+
+## ⚙️ Architecture Overview
+
+┌────────────────────┐ │ Primary Database   │ │ (PostgreSQL master)│ │ Writes + Critical   │ │ Reads               │ └─────────┬──────────┘ │ Streaming Replication ▼ ┌────────────────────┐ │ Replica #1         │ │ (Analytics / BI)   │ │ Read-only Queries  │ └────────────────────┘ │ ▼ ┌────────────────────┐ │ Replica #2         │ │ (Failover / HA)    │ │ Hot Standby Mode   │ └────────────────────┘
+
+---
+
+## 🧩 Core Features
+
+| Capability | Description |
+|-------------|-------------|
+| **Streaming Replication** | Continuous WAL (Write-Ahead Log) streaming from primary to replicas. |
+| **Read Scaling** | API and analytics jobs automatically routed to replicas for SELECT queries. |
+| **Failover** | In case of primary outage, replica can be promoted using `pg_ctl promote`. |
+| **Connection Pooling** | PgBouncer handles client distribution between primary and replicas. |
+| **Lag Monitoring** | Replication lag tracked in Prometheus (`pg_replication_lag_seconds`). |
+| **Query Routing** | Prisma connection string dynamically switches between write and read pools. |
+
+---
+
+## 🧠 Replica Setup Steps
+
+### 1. Prepare Replica Instance
+```bash
+# Example (using Debian/Ubuntu)
+sudo systemctl stop postgresql
+rm -rf /var/lib/postgresql/14/main/*
+pg_basebackup -h primary-db-host -D /var/lib/postgresql/14/main -U replicator -P -R
+sudo systemctl start postgresql
+
+2. Configure Replication in Primary
+
+Edit /etc/postgresql/14/main/pg_hba.conf:
+
+# Allow replica connection
+host replication replicator 10.0.0.0/16 md5
+
+Edit postgresql.conf:
+
+wal_level = replica
+max_wal_senders = 10
+wal_keep_size = 256MB
+archive_mode = on
+archive_command = 'test ! -f /mnt/wal_archive/%f && cp %p /mnt/wal_archive/%f'
+
+Reload Postgres:
+
+sudo systemctl reload postgresql
+
+3. Monitoring Replication Health
+
+SELECT client_addr, state, sync_state, sent_lsn, write_lsn, flush_lsn, replay_lsn,
+pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn) AS replication_lag_bytes
+FROM pg_stat_replication;
+
+In Grafana:
+
+Dashboard: DB / Replication Health
+
+Key metric: pg_replication_lag_seconds < 3
+
+
+
+---
+
+🧩 Integration with Application (Prisma)
+
+Environment Variables
+
+DATABASE_URL_WRITE=postgresql://pa360_admin:***@primary-db:5432/pa360
+DATABASE_URL_READ=postgresql://pa360_readonly:***@replica-db:5432/pa360
+
+Prisma Client Initialization
+
+import { PrismaClient } from "@prisma/client";
+const prisma = new PrismaClient({
+  datasources: {
+    db: { url: process.env.USE_READ_REPLICA === "true"
+        ? process.env.DATABASE_URL_READ
+        : process.env.DATABASE_URL_WRITE }
+  }
+});
+
+Routing Example
+
+Operation	DB Target
+
+INSERT / UPDATE / DELETE	Primary
+SELECT * FROM analytics_*	Read Replica
+Background reports / metrics	Read Replica
+User login / writes	Primary
+
+
+
+---
+
+📊 Monitoring Metrics
+
+Metric	Description	Source
+
+pg_replication_lag_seconds	Replication delay between primary and replica	Prometheus
+pg_connections_read	Active read connections	PgBouncer / Prometheus
+pg_connections_write	Active write connections	PgBouncer
+pg_locks_waiting	Blocking locks	Postgres exporter
+pg_wal_files_retained	WAL retention size	Prometheus
+
+
+
+---
+
+🛡️ Failover Procedure
+
+1. Detect failure (via Alertmanager or health check):
+
+Lag exceeds threshold
+
+Primary not responding >30s
+
+
+
+2. Promote replica:
+
+sudo -u postgres pg_ctl promote -D /var/lib/postgresql/14/main
+
+
+3. Update DNS / load balancer entry:
+
+Point primary-db.pa360.internal → promoted replica
+
+
+
+4. Restart PgBouncer / Prisma services
+
+systemctl restart pgbouncer
+pm2 restart all
+
+
+5. Verify replication resumed after restore.
+
+
+
+
+---
+
+🔐 Security & Compliance
+
+All replica connections use TLS (sslmode=require).
+
+Use separate credentials for read-only users.
+
+Store credentials in AWS Secrets Manager / Vault.
+
+Replication user (replicator) has only REPLICATION privilege.
+
+Regular rotation enforced via secrets.rotation.worker.ts.
+
+
+
+---
+
+📘 Best Practices
+
+Area	Recommendation
+
+Replication Lag	Keep under 3 seconds for analytics workloads.
+Maintenance Window	Run vacuum and index rebuilds on replicas off-peak.
+Query Optimization	Avoid complex joins or subqueries hitting replicas during load spikes.
+Failover Automation	Use tools like Patroni or pg_auto_failover for HA setups.
+Disaster Recovery	Store daily base backups in S3 (via pgBackRest or wal-g).
+
+
+
+---
+
+✅ Acceptance Criteria
+
+Replicas sync continuously with < 3 s lag.
+
+Analytics and reporting queries routed to replicas.
+
+Failover validated via simulated outage drills.
+
+Monitoring and alerting active for lag, WAL errors, and connection saturation.
+
+
+
+---
+
+End of Document
+© Project Athlete 360 Infrastructure Team — High Availability Ops Playbook
+
+---
