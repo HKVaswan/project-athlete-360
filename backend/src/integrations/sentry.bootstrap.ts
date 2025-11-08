@@ -1,20 +1,14 @@
 /**
  * src/integrations/sentry.bootstrap.ts
  * --------------------------------------------------------------------------
- * 🧠 Enterprise Sentry Bootstrap
+ * 🧠 Enterprise Sentry Bootstrap (v2.1)
  *
- * Features:
- *  - Centralized error aggregation & performance tracing
- *  - Deep OpenTelemetry integration (traceId → Sentry)
- *  - Filters non-critical noise and sensitive data
- *  - Safe fallback if Sentry DSN missing or network unreachable
- *  - Supports async context propagation for workers & API
- *  - Auto-captures unhandled exceptions and rejections
- *
- * Dependencies:
- *  - @sentry/node
- *  - @sentry/profiling-node
- *  - @opentelemetry/api (for trace correlation)
+ * Enhancements in this version:
+ *  - Dynamic sampling rates (via env vars)
+ *  - Auto tags: service name, version, region
+ *  - Optional breadcrumbs from logger integration
+ *  - Request body sanitization (passwords, tokens)
+ *  - Better worker safety for async traces
  * --------------------------------------------------------------------------
  */
 
@@ -26,7 +20,7 @@ import { config } from "../config";
 import { auditService } from "../services/audit.service";
 
 /* --------------------------------------------------------------------------
-   ⚙️ Sentry Initialization Configuration
+   ⚙️ Initialization Configuration
 -------------------------------------------------------------------------- */
 export const initSentry = () => {
   try {
@@ -38,28 +32,36 @@ export const initSentry = () => {
     }
 
     const env = config.nodeEnv || "development";
+    const tracesRate = Number(process.env.SENTRY_TRACES_RATE ?? (env === "production" ? 0.2 : 1.0));
+    const profilesRate = Number(process.env.SENTRY_PROFILES_RATE ?? (env === "production" ? 0.1 : 1.0));
 
     Sentry.init({
       dsn: DSN,
       environment: env,
-      release: process.env.APP_VERSION || "v1.0.0",
-      tracesSampleRate: env === "production" ? 0.2 : 1.0,
-      profilesSampleRate: env === "production" ? 0.1 : 1.0,
+      release: config.version || process.env.APP_VERSION || "v1.0.0",
+      tracesSampleRate: tracesRate,
+      profilesSampleRate: profilesRate,
       integrations: [
-        // Auto instrumentation
         new SentryProfiling.ProfilingIntegration(),
         new Sentry.Integrations.Http({ tracing: true }),
         new Sentry.Integrations.OnUncaughtException({ onFatalError: () => {} }),
         new Sentry.Integrations.OnUnhandledRejection(),
       ],
       beforeSend(event) {
-        // Sanitize sensitive data
+        // 🧹 Sanitize sensitive headers
         if (event.request?.headers) {
           delete event.request.headers["authorization"];
           delete event.request.headers["cookie"];
         }
 
-        // Filter known noise or development logs
+        // 🧹 Sanitize sensitive body fields
+        if (event.request?.data && typeof event.request.data === "object") {
+          const clean = { ...event.request.data };
+          ["password", "token", "accessToken", "secret"].forEach((f) => delete (clean as any)[f]);
+          event.request.data = clean;
+        }
+
+        // 🔇 Filter transient network errors
         if (event.message?.includes("ECONNRESET") || event.message?.includes("socket hang up")) {
           return null;
         }
@@ -68,12 +70,16 @@ export const initSentry = () => {
       },
     });
 
-    logger.info(`[SENTRY] ✅ Initialized for ${env} environment`);
+    // 🌍 Global context
+    Sentry.setTag("service", config.serviceName || "pa360-backend");
+    Sentry.setTag("version", config.version || "1.0.0");
+    Sentry.setTag("region", config.region || "global");
 
-    // Capture any startup diagnostics
+    logger.info(`[SENTRY] ✅ Initialized (${env}) | Traces=${tracesRate}, Profiles=${profilesRate}`);
+
     Sentry.captureMessage("Sentry initialized successfully", "info");
 
-    // Auto-capture unhandled errors globally
+    // 🧩 Global fail-safes
     process.on("uncaughtException", (err) => {
       logger.error("[SENTRY] Uncaught Exception", { error: err.message });
       captureException(err);
@@ -91,7 +97,7 @@ export const initSentry = () => {
 };
 
 /* --------------------------------------------------------------------------
-   🧩 Capture Exception / Error Helper
+   🧩 Capture Exception Helper
 -------------------------------------------------------------------------- */
 export const captureException = async (error: any, contextData?: Record<string, any>) => {
   try {
@@ -121,13 +127,17 @@ export const captureException = async (error: any, contextData?: Record<string, 
 };
 
 /* --------------------------------------------------------------------------
-   🧩 Capture Message / Event
+   🧩 Capture Message Helper
 -------------------------------------------------------------------------- */
 export const captureMessage = (message: string, level: Sentry.SeverityLevel = "info") => {
   try {
     const activeSpan = trace.getSpan(context.active());
     const traceId = activeSpan?.spanContext().traceId;
     const eventId = Sentry.captureMessage(message, { level, extra: { traceId } });
+
+    // Breadcrumb for future traces
+    Sentry.addBreadcrumb({ message, level, category: "system" });
+
     logger.info(`[SENTRY] 📬 Logged message '${message}' (trace: ${traceId})`);
     return eventId;
   } catch (err: any) {
@@ -136,7 +146,7 @@ export const captureMessage = (message: string, level: Sentry.SeverityLevel = "i
 };
 
 /* --------------------------------------------------------------------------
-   🧠 Context Enhancer
+   🧠 Safe Scope Wrapper (workers, background jobs, etc.)
 -------------------------------------------------------------------------- */
 export const withSentryScope = async (
   fn: () => Promise<any>,
