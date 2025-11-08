@@ -1,0 +1,184 @@
+/**
+ * src/integrations/slackAlert.bootstrap.ts
+ * --------------------------------------------------------------------------
+ * 💬 Slack Alert Integration (Enterprise Edition)
+ *
+ * Responsibilities:
+ *  - Unified interface to send alerts and notifications to Slack.
+ *  - Supports multiple channels (critical, system, info).
+ *  - Handles markdown formatting, emoji indicators, and link attachments.
+ *  - Integrates with auditService & telemetry for reliability tracking.
+ *  - Auto-suppresses duplicate messages to prevent alert floods.
+ *  - Safe fallback (logs locally if Slack API fails).
+ * --------------------------------------------------------------------------
+ */
+
+import axios from "axios";
+import { logger } from "../logger";
+import { config } from "../config";
+import { auditService } from "../services/audit.service";
+import { telemetry } from "../lib/telemetry";
+import { recordError } from "../lib/core/metrics";
+
+export interface SlackAlertPayload {
+  title: string;
+  message: string;
+  severity: "info" | "warning" | "error" | "critical";
+  context?: Record<string, any>;
+}
+
+class SlackAlertClient {
+  private webhookUrl?: string;
+  private lastSent: Map<string, number>;
+  private cooldownMs: number;
+
+  constructor() {
+    this.webhookUrl =
+      process.env.SLACK_WEBHOOK_URL || config.alerts?.slack?.webhookUrl;
+    this.lastSent = new Map();
+    this.cooldownMs = 60 * 1000; // 1 minute cooldown for same title
+  }
+
+  /* ----------------------------------------------------------------------
+   * 🚨 Send Message to Slack
+   * -------------------------------------------------------------------- */
+  async send(payload: SlackAlertPayload): Promise<void> {
+    if (!this.webhookUrl) {
+      logger.warn("[Slack] ⚠️ Missing webhook URL — skipping alert send.");
+      return;
+    }
+
+    const { title, message, severity, context } = payload;
+    const dedupKey = `${severity}-${title}`;
+    const now = Date.now();
+
+    // Deduplicate alerts
+    const lastTime = this.lastSent.get(dedupKey);
+    if (lastTime && now - lastTime < this.cooldownMs) {
+      logger.debug(`[Slack] ⏸️ Skipping duplicate alert: ${dedupKey}`);
+      return;
+    }
+    this.lastSent.set(dedupKey, now);
+
+    const emoji =
+      severity === "critical"
+        ? "🚨"
+        : severity === "error"
+        ? "🔥"
+        : severity === "warning"
+        ? "⚠️"
+        : "ℹ️";
+
+    const color =
+      severity === "critical"
+        ? "#ff0033"
+        : severity === "error"
+        ? "#ff4500"
+        : severity === "warning"
+        ? "#ffcc00"
+        : "#36a64f";
+
+    const blocks = [
+      {
+        type: "header",
+        text: {
+          type: "plain_text",
+          text: `${emoji} ${title}`,
+          emoji: true,
+        },
+      },
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `*Severity:* ${severity.toUpperCase()}\n${message}`,
+        },
+      },
+      {
+        type: "context",
+        elements: [
+          {
+            type: "mrkdwn",
+            text: `*Environment:* ${config.nodeEnv}\n*Service:* ${config.serviceName}`,
+          },
+        ],
+      },
+    ];
+
+    if (context) {
+      blocks.push({
+        type: "section",
+        fields: Object.entries(context).map(([k, v]) => ({
+          type: "mrkdwn",
+          text: `*${k}:* ${v}`,
+        })),
+      });
+    }
+
+    try {
+      await axios.post(
+        this.webhookUrl,
+        {
+          attachments: [
+            {
+              color,
+              blocks,
+              footer: "Project Athlete 360 Alert System",
+              ts: Math.floor(Date.now() / 1000),
+            },
+          ],
+        },
+        { timeout: 5000 }
+      );
+
+      telemetry.record(`alerts.slack.sent.${severity}`, 1);
+      await auditService.log({
+        actorId: "system",
+        actorRole: "system",
+        action: "ALERT_DISPATCHED",
+        details: { provider: "Slack", title, severity, context },
+      });
+
+      logger.info(`[Slack] ✅ Alert sent: ${title}`);
+    } catch (err: any) {
+      recordError("slack_alert_failed", "medium");
+      telemetry.record("alerts.slack.failed", 1);
+      logger.error(`[Slack] ❌ Failed to send alert: ${err.message}`);
+
+      await auditService.log({
+        actorId: "system",
+        actorRole: "system",
+        action: "ALERT_FAILURE",
+        details: {
+          provider: "Slack",
+          title,
+          severity,
+          error: err.message,
+        },
+      });
+    }
+  }
+
+  /* ----------------------------------------------------------------------
+   * 🧠 Health Check
+   * -------------------------------------------------------------------- */
+  async healthCheck(): Promise<boolean> {
+    if (!this.webhookUrl) return false;
+    try {
+      await axios.post(this.webhookUrl, {
+        text: "🧪 Slack alert health check OK – Project Athlete 360 system online.",
+      });
+      logger.info("[Slack] ✅ Health check passed.");
+      return true;
+    } catch (err: any) {
+      logger.error("[Slack] ❌ Health check failed:", err.message);
+      return false;
+    }
+  }
+}
+
+/* ----------------------------------------------------------------------
+ * 📦 Export Singleton
+ * -------------------------------------------------------------------- */
+export const slackAlertClient = new SlackAlertClient();
+export default slackAlertClient;
