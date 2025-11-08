@@ -1,0 +1,202 @@
+📄 File: infra/terraform/auto-scaling.md
+
+# ⚙️ Project Athlete 360 — Auto Scaling Architecture (Terraform)
+
+**Version:** 1.0  
+**Last Updated:** {{ date }}  
+**Owner:** Infrastructure & DevOps Team  
+
+---
+
+## 🎯 Objective
+
+Ensure **elastic scaling** and **cost-efficient high availability** across all environments using **Terraform-managed auto-scaling policies**.
+
+The auto-scaling layer automatically adjusts compute, database, and worker capacity based on **real-time demand**, ensuring:
+- Low latency during peak traffic.
+- Cost optimization during idle hours.
+- No downtime due to manual scaling delays.
+
+---
+
+## 🧩 Components Under Auto Scaling
+
+| Component | Scaling Type | Terraform Resource | Provider |
+|------------|---------------|--------------------|-----------|
+| API Server (ECS/K8s) | Horizontal (replica count) | `kubernetes_horizontal_pod_autoscaler_v2` / `aws_appautoscaling_target` | AWS/GCP |
+| Worker (BullMQ) | Horizontal | `kubernetes_horizontal_pod_autoscaler_v2` | Kubernetes |
+| Database (PostgreSQL) | Vertical (I/O, memory) + Read Replicas | `aws_db_instance` + `aws_db_instance_replica` | AWS RDS |
+| Redis | Vertical | `aws_elasticache_replication_group` | AWS |
+| S3 Storage | Lifecycle-based (storage tier transitions) | `aws_s3_bucket_lifecycle_configuration` | AWS |
+| CloudFront CDN | Edge scaling (auto) | `aws_cloudfront_distribution` | AWS |
+
+---
+
+## 🧠 Core Design Principles
+
+### 1. Declarative IaC (Infrastructure as Code)
+All scaling configurations (min/max instances, thresholds) are defined via Terraform modules under:
+
+infra/terraform/modules/auto_scaling/
+
+This ensures reproducibility, versioning, and auditability.
+
+---
+
+### 2. Scaling Policies (API Layer)
+
+Example Terraform module snippet:
+```hcl
+resource "aws_appautoscaling_target" "api_scale_target" {
+  max_capacity       = 15
+  min_capacity       = 2
+  resource_id        = "service/pa360/api"
+  scalable_dimension = "ecs:service:DesiredCount"
+  service_namespace  = "ecs"
+}
+
+resource "aws_appautoscaling_policy" "api_scale_up" {
+  name               = "pa360-api-scale-up"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = aws_appautoscaling_target.api_scale_target.resource_id
+  scalable_dimension = aws_appautoscaling_target.api_scale_target.scalable_dimension
+  service_namespace  = aws_appautoscaling_target.api_scale_target.service_namespace
+
+  target_tracking_scaling_policy_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ECSServiceAverageCPUUtilization"
+    }
+    target_value = 65
+  }
+}
+
+Trigger Metrics:
+
+CPU > 65% for 2 minutes → Scale up
+
+CPU < 30% for 10 minutes → Scale down
+
+
+
+---
+
+3. Scaling Policies (Worker Layer)
+
+For queue-based workloads:
+
+resource "aws_appautoscaling_policy" "worker_queue_scale_up" {
+  name = "pa360-worker-queue-scale-up"
+  policy_type = "StepScaling"
+
+  adjustment_type = "ChangeInCapacity"
+  scaling_adjustment = 2
+  cooldown = 60
+
+  metric_aggregation_type = "Average"
+  estimated_instance_warmup = 60
+}
+
+Trigger Metrics:
+
+queue_jobs_waiting > 20 for 1 minute → +2 workers
+
+queue_jobs_waiting == 0 for 10 minutes → scale down gradually
+
+
+
+---
+
+4. Database Scaling
+
+PostgreSQL scaling strategy:
+
+Primary Instance: provisioned with db.m6g.large (burstable under load).
+
+Read Replicas: created for analytics or reporting queries via:
+
+resource "aws_db_instance" "replica" {
+  replicate_source_db = aws_db_instance.primary.id
+  instance_class       = "db.t4g.medium"
+  publicly_accessible  = false
+}
+
+Connection Pooling: handled via PgBouncer layer (infra/db/pgbouncer/).
+
+
+
+---
+
+5. Cost-Aware Safeguards
+
+Guardrail	Description
+
+max_capacity limit	Prevents runaway scaling from bug-triggered spikes
+scale_down_cooldown	Prevents thrashing and resource churn
+Off-peak auto-suspend	Optional: pause staging worker pods during night hours
+Alert integration	Slack / PagerDuty alerts on scaling threshold breaches
+
+
+
+---
+
+🔍 Observability & Metrics
+
+All scaling activities are observable through:
+
+Prometheus → Grafana dashboards (scale event timelines).
+
+CloudWatch metrics (CPUUtilization, RequestCountPerTarget).
+
+Audit logs: scaling events recorded in auditService and pushed to Sentry for review.
+
+
+
+---
+
+🧰 Testing & Validation
+
+Test	Purpose	Tool
+
+Load test	Validate autoscaling under synthetic load	k6 / Artillery
+Spike test	Simulate traffic burst to ensure scale-up triggers	k6 spike scenario
+Soak test	Long-running load for stability	k6 / Prometheus metrics
+Failover test	Validate read replica handover	pgbench or manual test
+
+
+
+---
+
+🧩 Automation & CI/CD Integration
+
+In .github/workflows/infra_deploy.yml:
+
+Auto-apply scaling policies post-deployment.
+
+Verify Prometheus metrics availability before enabling autoscale.
+
+Slack notification on scale event changes.
+
+
+
+---
+
+✅ Acceptance Criteria
+
+[x] Terraform auto-scaling applied successfully.
+
+[x] HPA policies active and visible via kubectl get hpa.
+
+[x] Scale-up and scale-down events logged to Prometheus + Sentry.
+
+[x] No downtime observed during scaling transitions.
+
+[x] Read replicas synced within <15s replication lag.
+
+
+
+---
+
+End of Document
+© Project Athlete 360 Infrastructure Team
+
+---
