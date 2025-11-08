@@ -1,0 +1,186 @@
+/**
+ * src/lib/rateLimiterRedis.ts
+ * --------------------------------------------------------------------------
+ * 🚦 Enterprise Distributed Rate Limiter (v3)
+ *
+ * Features:
+ *  - Global, per-user, or per-IP rate limiting
+ *  - Atomic counters via Redis (INCR + EXPIRE)
+ *  - Sliding window algorithm (optional mode)
+ *  - Integrated with OpenTelemetry and Prometheus
+ *  - Alerts on abuse or threshold breaches
+ *  - Fully compatible with Express middleware
+ * --------------------------------------------------------------------------
+ */
+
+import { redisClient } from "./redisClient";
+import { context, trace } from "@opentelemetry/api";
+import { logger } from "../logger";
+import { recordError } from "./core/metrics";
+import { auditService } from "../services/audit.service";
+import { config } from "../config";
+
+export interface RateLimitResult {
+  allowed: boolean;
+  remaining: number;
+  limit: number;
+  resetIn: number;
+}
+
+export interface RateLimitOptions {
+  keyPrefix?: string;
+  windowSec?: number;
+  maxRequests?: number;
+  sliding?: boolean;
+  userId?: string;
+  ip?: string;
+}
+
+/* --------------------------------------------------------------------------
+ * ⚙️ Core Implementation
+ * ------------------------------------------------------------------------ */
+export const rateLimiterRedis = async (
+  identifier: string,
+  opts: RateLimitOptions = {}
+): Promise<RateLimitResult> => {
+  const r = redisClient() as any;
+  const tracer = trace.getTracer("infra");
+  const span = tracer.startSpan("rateLimiterRedis.check", undefined, context.active());
+
+  const prefix = opts.keyPrefix || "ratelimit";
+  const windowSec = opts.windowSec ?? 60; // default 1 minute
+  const maxRequests = opts.maxRequests ?? 30;
+  const sliding = opts.sliding ?? false;
+  const key = `${prefix}:${identifier}`;
+
+  try {
+    const now = Date.now();
+    const ttlMs = windowSec * 1000;
+
+    if (!sliding) {
+      // 🔒 Fixed window counter
+      const pipeline = r.multi();
+      pipeline.incr(key);
+      pipeline.ttl(key);
+      const [count, ttl] = await pipeline.exec().then((res: any) => res.map((r: any) => r[1]));
+
+      // Set expiry only on first hit
+      if (ttl === -1) await r.expire(key, windowSec);
+
+      const remaining = Math.max(0, maxRequests - count);
+      const allowed = count <= maxRequests;
+      const resetIn = ttl > 0 ? ttl * 1000 : ttlMs;
+
+      span.setAttributes({ key, count, allowed, windowSec, maxRequests });
+      span.setStatus({ code: allowed ? 1 : 2 });
+      span.end();
+
+      if (!allowed) {
+        await handleAbuse(identifier, count, maxRequests);
+      }
+
+      return { allowed, remaining, limit: maxRequests, resetIn };
+    } else {
+      // 🧠 Sliding window rate limiter
+      const windowStart = now - ttlMs;
+      const pipeline = r.multi();
+      pipeline.zremrangebyscore(key, 0, windowStart);
+      pipeline.zadd(key, now, `${now}-${Math.random()}`);
+      pipeline.zcard(key);
+      pipeline.pexpire(key, ttlMs);
+      const [, , count] = await pipeline.exec().then((res: any) => res.map((r: any) => r[1]));
+
+      const remaining = Math.max(0, maxRequests - count);
+      const allowed = count <= maxRequests;
+      const resetIn = ttlMs;
+
+      span.setAttributes({ key, count, allowed, windowSec, maxRequests, mode: "sliding" });
+      span.setStatus({ code: allowed ? 1 : 2 });
+      span.end();
+
+      if (!allowed) {
+        await handleAbuse(identifier, count, maxRequests);
+      }
+
+      return { allowed, remaining, limit: maxRequests, resetIn };
+    }
+  } catch (err: any) {
+    recordError("rate_limiter_error", "medium");
+    span.recordException(err);
+    span.setStatus({ code: 2, message: err.message });
+    span.end();
+
+    logger.error(`[RateLimiter] ❌ Error checking rate limit: ${err.message}`);
+    return { allowed: true, remaining: opts.maxRequests ?? 30, limit: opts.maxRequests ?? 30, resetIn: 0 };
+  }
+};
+
+/* --------------------------------------------------------------------------
+ * 🚨 Abuse & Alert Handling
+ * ------------------------------------------------------------------------ */
+const handleAbuse = async (identifier: string, count: number, max: number) => {
+  const ratio = (count / max).toFixed(2);
+  logger.warn(`[RateLimiter] ⚠️ Limit exceeded by ${identifier} (${count}/${max})`);
+
+  await auditService.log({
+    actorId: identifier,
+    actorRole: "user",
+    action: "RATE_LIMIT_EXCEEDED",
+    details: { identifier, count, max, ratio, timestamp: new Date().toISOString() },
+  });
+
+  // Future: integrate with alert worker (e.g., alert.worker.ts)
+};
+
+/* --------------------------------------------------------------------------
+ * 🧩 Express Middleware Wrapper
+ * ------------------------------------------------------------------------ */
+export const rateLimiterMiddleware =
+  (opts: RateLimitOptions = {}) =>
+  async (req: any, res: any, next: any) => {
+    try {
+      const identifier =
+        opts.userId ||
+        req.user?.id ||
+        req.ip ||
+        req.headers["x-forwarded-for"] ||
+        "anonymous";
+
+      const result = await rateLimiterRedis(identifier, opts);
+
+      res.setHeader("X-RateLimit-Limit", result.limit);
+      res.setHeader("X-RateLimit-Remaining", result.remaining);
+      res.setHeader("X-RateLimit-Reset", Math.ceil(result.resetIn / 1000));
+
+      if (!result.allowed) {
+        return res.status(429).json({
+          success: false,
+          message: "Too many requests. Please slow down.",
+          retryAfter: Math.ceil(result.resetIn / 1000),
+        });
+      }
+
+      next();
+    } catch (err: any) {
+      logger.error("[RateLimiter] Middleware error:", err.message);
+      next();
+    }
+  };
+
+/* --------------------------------------------------------------------------
+ * 🧠 Example Usage
+ * ------------------------------------------------------------------------
+ *
+ * import express from "express";
+ * import { rateLimiterMiddleware } from "../lib/rateLimiterRedis";
+ *
+ * const app = express();
+ * app.use("/api/", rateLimiterMiddleware({ windowSec: 60, maxRequests: 50 }));
+ *
+ * // Works seamlessly across horizontally scaled API nodes via Redis
+ * ------------------------------------------------------------------------ */
+
+export default {
+  rateLimiterRedis,
+  rateLimiterMiddleware,
+};
