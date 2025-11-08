@@ -6,9 +6,10 @@
  * Responsibilities:
  *  - Initialize and manage PagerDuty incident notifications.
  *  - Abstract alert routing for errors, health failures, and telemetry alerts.
- *  - Supports async fallback to email/SMS if PagerDuty API unavailable.
- *  - Rate-limited + deduplicated alert dispatch (prevents spam storms).
- *  - Integrated with auditService and system telemetry.
+ *  - Supports async fallback to Slack/email if PagerDuty API unavailable.
+ *  - Implements deduplication + rate-limiting (spam prevention).
+ *  - Integrates with auditService, telemetry, and alert.worker.ts.
+ *  - Securely handles sensitive data (via log_sanitizer).
  * --------------------------------------------------------------------------
  */
 
@@ -18,6 +19,7 @@ import { config } from "../config";
 import { auditService } from "../services/audit.service";
 import { telemetry } from "../lib/telemetry";
 import { recordError } from "../lib/core/metrics";
+import { sanitizeForLog } from "../lib/log_sanitizer";
 
 type PagerDutySeverity = "critical" | "error" | "warning" | "info";
 
@@ -41,44 +43,55 @@ interface PagerDutyEvent {
 class PagerDutyClient {
   private readonly apiUrl = "https://events.pagerduty.com/v2/enqueue";
   private lastAlertTimestamps = new Map<string, number>();
-  private rateLimitMs = 60_000; // 1 minute per dedup key
+  private readonly rateLimitMs = 60_000; // 1 minute per dedup key
 
   /**
-   * Send incident or alert to PagerDuty
+   * 🔔 Send incident or alert to PagerDuty
    */
-  async sendAlert(
-    summary: string,
-    severity: PagerDutySeverity = "critical",
-    details: Record<string, any> = {},
-    dedupKey?: string
-  ) {
+  async trigger({
+    title,
+    message,
+    severity = "critical",
+    details = {},
+    dedupKey,
+    source = "system",
+  }: {
+    title: string;
+    message: string;
+    severity?: PagerDutySeverity;
+    details?: Record<string, any>;
+    dedupKey?: string;
+    source?: string;
+  }): Promise<boolean> {
     const routingKey = config.alerts?.pagerDuty?.routingKey;
     if (!routingKey) {
       logger.warn("[PagerDuty] Routing key not configured — skipping alert.");
       return false;
     }
 
-    // Rate-limit duplicate alerts
-    const key = dedupKey || `${summary}-${severity}`;
+    // Deduplication
+    const key = dedupKey || `${title}-${severity}`;
     const lastSent = this.lastAlertTimestamps.get(key);
     if (lastSent && Date.now() - lastSent < this.rateLimitMs) {
-      logger.info(`[PagerDuty] ⏱️ Skipping duplicate alert: ${key}`);
+      logger.debug(`[PagerDuty] ⏸️ Skipping duplicate alert: ${key}`);
       return false;
     }
+
+    const payload = sanitizeForLog({
+      summary: title,
+      source: source || config.nodeEnv || "unknown",
+      severity,
+      component: details.component || "backend",
+      group: details.group || "infrastructure",
+      class: details.class || "system-alert",
+      custom_details: { message, ...details },
+    });
 
     const event: PagerDutyEvent = {
       routing_key: routingKey,
       event_action: "trigger",
       dedup_key: key,
-      payload: {
-        summary,
-        source: config.nodeEnv || "unknown-environment",
-        severity,
-        component: details.component || "backend",
-        group: details.group || "infrastructure",
-        class: details.class || "system-alert",
-        custom_details: details,
-      },
+      payload,
     };
 
     try {
@@ -88,36 +101,38 @@ class PagerDutyClient {
       });
 
       this.lastAlertTimestamps.set(key, Date.now());
-      telemetry.record("alerts.pagerduty.sent", 1);
+      telemetry.record(`alerts.pagerduty.sent.${severity}`, 1);
+      logger.info(`[PagerDuty] 🚀 Alert triggered: ${title} [${severity}]`);
 
-      logger.info(`[PagerDuty] 🚀 Alert triggered: ${summary}`);
       await auditService.log({
         actorId: "system",
         actorRole: "system",
         action: "ALERT_TRIGGERED",
-        details: { provider: "PagerDuty", summary, severity, eventId: response.data.dedup_key },
+        details: { provider: "PagerDuty", summary: title, severity, eventId: response.data.dedup_key },
       });
 
       return true;
     } catch (err: any) {
       recordError("pagerduty_alert_failed", "critical");
+      telemetry.record("alerts.pagerduty.failed", 1);
       logger.error(`[PagerDuty] ❌ Failed to trigger alert: ${err.message}`);
 
-      // Fallback notification to ensure reliability
-      await this.fallbackNotify(summary, severity, details);
+      // Fallback
+      await this.fallbackNotify(title, severity, details);
       return false;
     }
   }
 
   /**
-   * Resolve a previously triggered alert
+   * ✅ Resolve a previously triggered PagerDuty incident
    */
   async resolveAlert(dedupKey: string) {
-    if (!config.alerts?.pagerDuty?.routingKey) return;
+    const routingKey = config.alerts?.pagerDuty?.routingKey;
+    if (!routingKey) return;
 
     try {
       const event: PagerDutyEvent = {
-        routing_key: config.alerts.pagerDuty.routingKey,
+        routing_key: routingKey,
         event_action: "resolve",
         dedup_key: dedupKey,
         payload: {
@@ -126,6 +141,7 @@ class PagerDutyClient {
           severity: "info",
         },
       };
+
       await axios.post(this.apiUrl, event);
       logger.info(`[PagerDuty] ✅ Incident resolved: ${dedupKey}`);
     } catch (err: any) {
@@ -135,23 +151,34 @@ class PagerDutyClient {
   }
 
   /**
-   * Fallback mechanism — notify admins via email or Slack if PagerDuty fails
+   * 🛡️ Fallback Mechanism
+   * Used when PagerDuty API fails — ensures alert still reaches admins.
    */
   private async fallbackNotify(summary: string, severity: string, details: Record<string, any>) {
     logger.warn(`[PagerDuty:FALLBACK] Sending backup alert: ${summary}`);
+
     try {
       await auditService.log({
         actorId: "system",
         actorRole: "system",
         action: "ALERT_FALLBACK",
-        details: { provider: "email/slack", summary, severity, ...details },
+        details: { provider: "email/slack", summary, severity, ...sanitizeForLog(details) },
       });
 
       telemetry.record("alerts.fallback.triggered", 1);
-      // You can also hook this into Slack or Email notification worker:
-      // await addNotificationJob({ type: "systemAlert", body: summary, severity });
+
+      // Optional Slack fallback if configured
+      if (config.alerts?.slack?.webhookUrl) {
+        const { slackAlertClient } = await import("./slackAlert.bootstrap");
+        await slackAlertClient.send({
+          title: `⚠️ [Fallback] ${summary}`,
+          message: "PagerDuty delivery failed — fallback notification issued.",
+          severity: "error",
+          context: details,
+        });
+      }
     } catch (err: any) {
-      logger.error(`[PagerDuty:FALLBACK] ❌ Failed to send backup alert: ${err.message}`);
+      logger.error(`[PagerDuty:FALLBACK] ❌ Fallback failed: ${err.message}`);
     }
   }
 }
