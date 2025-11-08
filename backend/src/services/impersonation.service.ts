@@ -13,39 +13,36 @@
  */
 
 import jwt from "jsonwebtoken";
-import { prisma } from "../prismaClient";
+import crypto from "crypto";
+import prisma from "../prismaClient";
 import { logger } from "../logger";
 import { auditService } from "./audit.service";
 import { config } from "../config";
-import crypto from "crypto";
 import { Errors } from "../utils/errors";
 
-const IMPERSONATION_TOKEN_TTL = 15 * 60; // 15 minutes
-const IMPERSONATION_SECRET = process.env.IMPERSONATION_SECRET || config.jwt.secret;
+const IMPERSONATION_TOKEN_TTL = Number(process.env.IMPERSONATION_TOKEN_TTL_SEC ?? 15 * 60); // seconds
+const IMPERSONATION_SECRET = process.env.IMPERSONATION_SECRET || config.jwt?.secret;
+if (!IMPERSONATION_SECRET) {
+  logger.warn("[IMPERSONATION] No IMPERSONATION_SECRET configured — tokens will use ephemeral secret.");
+}
 
-/* -----------------------------------------------------------------------
-   🧩 Types
-------------------------------------------------------------------------*/
 export interface ImpersonationPayload {
   superAdminId: string;
   targetUserId: string;
   issuedAt: string;
   expiresAt: string;
   signature: string;
+  nonce?: string;
 }
 
-/* -----------------------------------------------------------------------
-   🧠 Core Impersonation Service
-------------------------------------------------------------------------*/
 class ImpersonationService {
   /**
-   * Verify super admin and target, then generate a temporary impersonation token.
+   * Create a short-lived impersonation JWT after validating the super admin and target user.
+   * Stores a hashed token in DB for later validation & revocation.
    */
-  async createImpersonationToken(
-    superAdminId: string,
-    targetUserId: string
-  ): Promise<string> {
+  async createImpersonationToken(superAdminId: string, targetUserId: string): Promise<string> {
     try {
+      // Validate super admin
       const superAdmin = await prisma.user.findUnique({
         where: { id: superAdminId },
         select: { id: true, role: true, mfaVerified: true, username: true },
@@ -54,24 +51,31 @@ class ImpersonationService {
       if (!superAdmin || superAdmin.role !== "super_admin") {
         throw Errors.Forbidden("Only Super Admins can initiate impersonation.");
       }
+
       if (!superAdmin.mfaVerified) {
         throw Errors.Forbidden("MFA verification required before impersonation.");
       }
 
+      // Validate target
       const targetUser = await prisma.user.findUnique({
         where: { id: targetUserId },
         select: { id: true, username: true, role: true },
       });
-      if (!targetUser) throw Errors.NotFound("Target user not found.");
 
+      if (!targetUser) throw Errors.NotFound("Target user not found.");
       if (targetUser.role === "super_admin") {
-        throw Errors.Forbidden("Cannot impersonate another Super Admin.");
+        throw Errors.Forbidden("Impersonation of other Super Admins is not allowed.");
       }
 
+      // Build payload and cryptographic signature
       const issuedAt = new Date();
       const expiresAt = new Date(issuedAt.getTime() + IMPERSONATION_TOKEN_TTL * 1000);
-      const baseString = `${superAdminId}:${targetUserId}:${issuedAt.toISOString()}`;
-      const signature = crypto.createHmac("sha256", IMPERSONATION_SECRET).update(baseString).digest("hex");
+      const nonce = crypto.randomBytes(8).toString("hex");
+      const baseString = `${superAdminId}:${targetUserId}:${issuedAt.toISOString()}:${nonce}`;
+      const signature = crypto
+        .createHmac("sha256", IMPERSONATION_SECRET || "")
+        .update(baseString)
+        .digest("hex");
 
       const payload: ImpersonationPayload = {
         superAdminId,
@@ -79,13 +83,15 @@ class ImpersonationService {
         issuedAt: issuedAt.toISOString(),
         expiresAt: expiresAt.toISOString(),
         signature,
+        nonce,
       };
 
-      // Sign JWT impersonation token
-      const token = jwt.sign(payload, IMPERSONATION_SECRET, {
+      // Sign JWT
+      const token = jwt.sign(payload as any, IMPERSONATION_SECRET || "", {
         expiresIn: IMPERSONATION_TOKEN_TTL,
       });
 
+      // Persist token hash & session record (for revocation / audit)
       await prisma.impersonationSession.create({
         data: {
           superAdminId,
@@ -93,63 +99,82 @@ class ImpersonationService {
           tokenHash: crypto.createHash("sha256").update(token).digest("hex"),
           expiresAt,
           active: true,
+          createdAt: new Date(),
         },
       });
 
+      // Audit log
       await auditService.log({
         actorId: superAdminId,
         actorRole: "super_admin",
         action: "IMPERSONATION_REQUEST",
-        details: { targetUserId, targetRole: targetUser.role },
+        details: { targetUserId, targetRole: targetUser.role, method: "token" },
       });
 
       logger.info(
-        `[IMPERSONATION] Super Admin ${superAdmin.username} impersonating ${targetUser.username} (${targetUser.role})`
+        `[IMPERSONATION] Super Admin ${superAdmin.username} (${superAdmin.id}) created impersonation token for ${targetUser.username} (${targetUser.id}).`
       );
 
       return token;
     } catch (err: any) {
-      logger.error(`[IMPERSONATION] ❌ Failed to create token: ${err.message}`);
+      logger.error(`[IMPERSONATION] Failed to create token: ${err?.message || err}`);
+      // Preserve error surface, but wrap to avoid leaking internals
+      if (err?.statusCode) throw err;
       throw Errors.Server("Failed to create impersonation token.");
     }
   }
 
   /**
-   * Validate impersonation token integrity and expiration.
+   * Validate the provided impersonation token:
+   *  - Verify JWT signature & expiry
+   *  - Cross-check stored session token hash
+   *  - Return decoded payload on success
    */
-  async validateToken(token: string) {
+  async validateToken(token: string): Promise<ImpersonationPayload> {
     try {
+      if (!IMPERSONATION_SECRET) throw Errors.Server("Impersonation secret not configured.");
+
       const decoded = jwt.verify(token, IMPERSONATION_SECRET) as ImpersonationPayload;
 
-      // Cross-check stored session
+      // Validate presence of required fields
+      if (!decoded || !decoded.superAdminId || !decoded.targetUserId) {
+        throw Errors.Auth("Invalid impersonation token.");
+      }
+
+      // Validate stored session exists & token hash matches
+      const storedHash = crypto.createHash("sha256").update(token).digest("hex");
       const session = await prisma.impersonationSession.findFirst({
-        where: { targetUserId: decoded.targetUserId, active: true },
+        where: {
+          targetUserId: decoded.targetUserId,
+          superAdminId: decoded.superAdminId,
+          tokenHash: storedHash,
+          active: true,
+        },
       });
 
-      if (!session) throw Errors.Auth("Invalid or expired impersonation session.");
-      const storedHash = session.tokenHash;
-      const providedHash = crypto.createHash("sha256").update(token).digest("hex");
-      if (storedHash !== providedHash) throw Errors.Auth("Token mismatch or tampering detected.");
+      if (!session) throw Errors.Auth("Invalid or revoked impersonation session.");
 
+      // Check expiry in payload
       const now = new Date();
       if (new Date(decoded.expiresAt) < now) {
+        // revoke stale session
         await this.revokeSession(decoded.superAdminId, decoded.targetUserId);
         throw Errors.Auth("Impersonation token expired.");
       }
 
       return decoded;
     } catch (err: any) {
-      logger.warn(`[IMPERSONATION] Invalid or expired token: ${err.message}`);
+      logger.warn(`[IMPERSONATION] Token validation failed: ${err?.message || err}`);
       throw Errors.Auth("Invalid or expired impersonation token.");
     }
   }
 
   /**
-   * Revoke an active impersonation session manually or on expiry.
+   * Revoke an active impersonation session.
    */
   async revokeSession(superAdminId: string, targetUserId: string) {
     try {
-      await prisma.impersonationSession.updateMany({
+      const result = await prisma.impersonationSession.updateMany({
         where: { superAdminId, targetUserId, active: true },
         data: { active: false, revokedAt: new Date() },
       });
@@ -157,55 +182,66 @@ class ImpersonationService {
       await auditService.log({
         actorId: superAdminId,
         actorRole: "super_admin",
-        action: "ADMIN_OVERRIDE",
-        details: { targetUserId, event: "Impersonation session revoked" },
+        action: "IMPERSONATION_REVOKE",
+        details: { targetUserId, revokedCount: result.count },
       });
 
-      logger.info(`[IMPERSONATION] Session revoked for ${targetUserId}`);
+      logger.info(`[IMPERSONATION] Revoked ${result.count} session(s) for ${targetUserId} by ${superAdminId}`);
+      return result.count;
     } catch (err: any) {
-      logger.error(`[IMPERSONATION] ❌ Failed to revoke session: ${err.message}`);
+      logger.error(`[IMPERSONATION] Failed to revoke session: ${err?.message || err}`);
       throw Errors.Server("Failed to revoke impersonation session.");
     }
   }
 
   /**
-   * List all active impersonation sessions (for monitoring / security dashboard)
+   * List active impersonation sessions for monitoring / security dashboard.
    */
   async listActiveSessions() {
-    return prisma.impersonationSession.findMany({
-      where: { active: true },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        superAdminId: true,
-        targetUserId: true,
-        createdAt: true,
-        expiresAt: true,
-      },
-    });
+    try {
+      return await prisma.impersonationSession.findMany({
+        where: { active: true },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          superAdminId: true,
+          targetUserId: true,
+          createdAt: true,
+          expiresAt: true,
+          revokedAt: true,
+        },
+      });
+    } catch (err: any) {
+      logger.error(`[IMPERSONATION] Failed to list sessions: ${err?.message || err}`);
+      throw Errors.Server("Failed to list impersonation sessions.");
+    }
   }
 
   /**
-   * Force revoke all active impersonations (emergency security control)
+   * Emergency: Force revoke all active impersonations and emit a security event.
    */
   async revokeAll() {
-    const result = await prisma.impersonationSession.updateMany({
-      where: { active: true },
-      data: { active: false, revokedAt: new Date() },
-    });
+    try {
+      const result = await prisma.impersonationSession.updateMany({
+        where: { active: true },
+        data: { active: false, revokedAt: new Date() },
+      });
 
-    await auditService.recordSecurityEvent({
-      actorRole: "system",
-      message: "Emergency impersonation session revocation executed.",
-      severity: "high",
-    });
+      await auditService.recordSecurityEvent({
+        actorRole: "system",
+        message: "Emergency impersonation session revocation executed.",
+        severity: "high",
+        metadata: { revokedCount: result.count },
+      });
 
-    logger.warn(`[IMPERSONATION] ⚠️ Force-revoked ${result.count} active sessions.`);
-    return result.count;
+      logger.warn(`[IMPERSONATION] ⚠️ Force-revoked ${result.count} active session(s).`);
+      return result.count;
+    } catch (err: any) {
+      logger.error(`[IMPERSONATION] Failed to force revoke sessions: ${err?.message || err}`);
+      throw Errors.Server("Failed to force revoke impersonation sessions.");
+    }
   }
 }
 
-/* -----------------------------------------------------------------------
-   🚀 Export Singleton
-------------------------------------------------------------------------*/
 export const impersonationService = new ImpersonationService();
+export default impersonationService;
