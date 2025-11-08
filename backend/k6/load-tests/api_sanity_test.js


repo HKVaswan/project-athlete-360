@@ -1,0 +1,108 @@
+/**
+ * k6/load-tests/api_sanity_test.js
+ * ------------------------------------------------------------------------
+ * 🚀 Project Athlete 360 — API Sanity & Load Test
+ * ------------------------------------------------------------------------
+ * Purpose:
+ *  - Validate core API endpoints under concurrent load
+ *  - Measure latency, throughput, and error rate
+ *  - Ensure API meets SLA thresholds
+ * ------------------------------------------------------------------------
+ * Usage:
+ *    k6 run k6/load-tests/api_sanity_test.js
+ *
+ * Optional (with Prometheus remote write):
+ *    K6_PROMETHEUS_RW_URL=http://prometheus:9090/api/v1/write k6 run k6/load-tests/api_sanity_test.js
+ * ------------------------------------------------------------------------
+ */
+
+import http from "k6/http";
+import { check, sleep } from "k6";
+import { Trend, Counter, Rate } from "k6/metrics";
+
+// 🧠 Custom Metrics
+const apiLatency = new Trend("api_latency", true);
+const apiErrors = new Counter("api_errors");
+const successRate = new Rate("success_rate");
+
+// 🧩 Load Configuration
+export const options = {
+  stages: [
+    { duration: "30s", target: 10 },   // ramp-up
+    { duration: "1m", target: 25 },    // steady load
+    { duration: "30s", target: 0 },    // ramp-down
+  ],
+  thresholds: {
+    http_req_failed: ["rate<0.02"],  // <2% requests fail
+    http_req_duration: ["p(95)<500"], // 95% below 500ms
+    success_rate: ["rate>0.98"],     // success above 98%
+  },
+};
+
+// 🧠 Test Configuration
+const BASE_URL = __ENV.BASE_URL || "https://api.projectathlete360.com";
+const AUTH_TOKEN = __ENV.AUTH_TOKEN || "dummy-test-token"; // optional JWT for staging
+
+const headers = {
+  "Content-Type": "application/json",
+  Authorization: `Bearer ${AUTH_TOKEN}`,
+};
+
+// 🧩 Endpoints to Test
+const endpoints = [
+  { name: "health", path: "/health" },
+  { name: "login", path: "/auth/login", method: "POST", payload: { email: "test@pa360.net", password: "12345678" } },
+  { name: "user_profile", path: "/users/me" },
+  { name: "plans", path: "/plans" },
+  { name: "metrics", path: "/metrics" },
+];
+
+// 🧠 Main Load Function
+export default function () {
+  const endpoint = endpoints[Math.floor(Math.random() * endpoints.length)];
+  const url = `${BASE_URL}${endpoint.path}`;
+
+  let res;
+  const start = Date.now();
+
+  try {
+    if (endpoint.method === "POST") {
+      res = http.post(url, JSON.stringify(endpoint.payload), { headers });
+    } else {
+      res = http.get(url, { headers });
+    }
+  } catch (err) {
+    apiErrors.add(1);
+    successRate.add(false);
+    return;
+  }
+
+  const latency = Date.now() - start;
+  apiLatency.add(latency);
+
+  const passed = check(res, {
+    "status is 2xx": (r) => r.status >= 200 && r.status < 300,
+    "response time OK": () => latency < 800,
+  });
+
+  successRate.add(passed);
+  if (!passed) apiErrors.add(1);
+
+  sleep(Math.random() * 2); // simulate realistic user pacing
+}
+
+// 🧩 Summary Report
+export function handleSummary(data) {
+  return {
+    stdout: `
+📊 Project Athlete 360 - API Sanity Test Summary
+------------------------------------------------
+Avg response time: ${data.metrics.http_req_duration.avg.toFixed(2)} ms
+95th percentile:  ${data.metrics.http_req_duration.p(95).toFixed(2)} ms
+Error rate:       ${(data.metrics.http_req_failed.rate * 100).toFixed(2)}%
+Success rate:     ${(data.metrics.success_rate.rate * 100).toFixed(2)}%
+------------------------------------------------
+`,
+    "results/api_sanity_test_summary.json": JSON.stringify(data),
+  };
+}
