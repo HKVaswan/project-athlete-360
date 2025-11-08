@@ -1,247 +1,219 @@
 /**
  * src/lib/redisClient.ts
+ * --------------------------------------------------------------------------
+ * 🧠 Enterprise-Grade Redis Client (v3)
  *
- * Enterprise-grade Redis client wrapper using ioredis.
- * - Single exported Redis instance (singleton)
- * - Robust connection options (backoff, max retries)
- * - Optional sentinel / cluster support (via env)
- * - Health check helper
- * - Graceful shutdown helper
- *
- * Usage:
- *   import { redis, healthCheck, shutdownRedis } from "../lib/redisClient";
- *   await healthCheck(); // throws if unhealthy
+ * Features:
+ *  - Singleton Redis/Cluster client via ioredis
+ *  - Resilient retry + exponential backoff
+ *  - Cluster & Sentinel support
+ *  - Health check & graceful shutdown
+ *  - Integrated OpenTelemetry & Prometheus metrics
+ *  - Circuit breaker for repeated connection failures
+ * --------------------------------------------------------------------------
  */
 
-import IORedis, { Redis, RedisOptions, Cluster, ClusterNode } from "ioredis";
+import IORedis, { Redis, Cluster, RedisOptions, ClusterNode } from "ioredis";
 import { config } from "../config";
-import logger from "../logger";
+import { logger } from "../logger";
+import { context, trace } from "@opentelemetry/api";
+import { recordError } from "./core/metrics";
+import { auditService } from "../services/audit.service";
 
 let client: Redis | Cluster | null = null;
 let isShuttingDown = false;
 
-/**
- * Build redis options from config with sensible production defaults.
- */
-const buildOptions = (): RedisOptions => {
-  const base: RedisOptions = {
-    // common sensible defaults
-    maxRetriesPerRequest: null, // delegate retries to retryStrategy
-    enableReadyCheck: true,
-    // keepAlive in seconds
-    keepAlive: 30,
-    // connection timeout (ms)
-    connectTimeout: Number(config.redisConnectTimeout || 10000),
-    // Lazy connect: create client without immediately connecting if desired
-    lazyConnect: false,
-    // auto-resubscribe + autoresend commands after reconnect
-    autoResubscribe: true,
-    autoResendUnfulfilledCommands: true,
-    // TLS (if REDIS_TLS === true)
-    tls: config.redisTls ? {} : undefined,
-    keyPrefix: config.redisKeyPrefix || undefined,
-    // Pretty conservative command buffer size to avoid OOM in bad states
-    maxRetriesPerRequest: 20,
-    // custom retry strategy
-    retryStrategy: (times: number) => {
-      const baseDelay = 200; // ms
-      // exponential backoff with cap
-      const delay = Math.min(2000, Math.pow(2, Math.min(times, 8)) * baseDelay);
-      return delay;
-    },
-  };
+// Circuit breaker state
+let failureCount = 0;
+let circuitOpen = false;
+const CIRCUIT_THRESHOLD = 5;
+const CIRCUIT_RESET_TIMEOUT_MS = 30_000;
 
-  return base;
-};
+/* -----------------------------------------------------------------------
+   🧩 Redis Configuration Builder
+------------------------------------------------------------------------ */
+const buildOptions = (): RedisOptions => ({
+  enableReadyCheck: true,
+  lazyConnect: false,
+  autoResubscribe: true,
+  autoResendUnfulfilledCommands: true,
+  connectTimeout: Number(config.redisConnectTimeout || 10_000),
+  keepAlive: 30,
+  tls: config.redisTls ? {} : undefined,
+  keyPrefix: config.redisKeyPrefix || undefined,
+  maxRetriesPerRequest: 20,
+  retryStrategy: (times: number) => {
+    const delay = Math.min(2000, Math.pow(2, Math.min(times, 8)) * 200);
+    return delay;
+  },
+});
 
-/**
- * Initialize and return a singleton Redis client.
- * Supports:
- *  - Single node (REDIS_URL)
- *  - Cluster (REDIS_CLUSTER_NODES JSON array)
- */
+/* -----------------------------------------------------------------------
+   🚀 Initialize Singleton Client
+------------------------------------------------------------------------ */
 export const getRedis = (): Redis | Cluster => {
   if (client) return client;
 
-  const clusterNodesEnv = config.redisClusterNodes; // expected JSON array with { host, port }
+  const opts = buildOptions();
   try {
+    const clusterNodesEnv = config.redisClusterNodes;
     if (clusterNodesEnv) {
-      // parse cluster nodes (supports JSON string or pre-parsed array)
+      // Parse cluster node list
       let nodes: ClusterNode[] = [];
       if (typeof clusterNodesEnv === "string") {
-        // allow comma-separated host:port or JSON array
         try {
-          const parsed = JSON.parse(clusterNodesEnv);
-          if (Array.isArray(parsed)) nodes = parsed;
-          else throw new Error("Invalid REDIS_CLUSTER_NODES JSON");
+          nodes = JSON.parse(clusterNodesEnv);
         } catch {
-          // fallback to comma-separated host:port list
-          nodes = (clusterNodesEnv as string)
-            .split(",")
-            .map((s) => {
-              const [host, port] = s.trim().split(":");
-              return { host, port: Number(port || 6379) };
-            });
+          nodes = clusterNodesEnv.split(",").map((s) => {
+            const [host, port] = s.trim().split(":");
+            return { host, port: Number(port || 6379) };
+          });
         }
       } else if (Array.isArray(clusterNodesEnv)) {
-        nodes = clusterNodesEnv as any;
+        nodes = clusterNodesEnv;
       }
 
-      logger.info(`[redis] Initializing Redis Cluster with ${nodes.length} nodes`);
-      client = new Cluster(nodes, {
-        redisOptions: buildOptions(),
-      });
+      logger.info(`[redis] Initializing Redis Cluster (${nodes.length} nodes)`);
+      client = new Cluster(nodes, { redisOptions: opts });
     } else {
-      // Single node via URL or host/port
       const url = config.redisUrl;
-      const opts = buildOptions();
-      if (!url) {
+      if (url) {
+        logger.info(`[redis] Connecting to Redis via URL`);
+        client = new IORedis(url, opts);
+      } else {
         const host = config.redisHost || "127.0.0.1";
         const port = Number(config.redisPort || 6379);
-        logger.info(`[redis] Initializing single-node Redis at ${host}:${port}`);
+        logger.info(`[redis] Connecting to Redis at ${host}:${port}`);
         client = new IORedis(port, host, opts);
-      } else {
-        logger.info(`[redis] Initializing single-node Redis via URL`);
-        client = new IORedis(url, opts);
       }
     }
 
     attachEventHandlers(client);
     return client;
   } catch (err: any) {
-    logger.error("[redis] Failed to initialize Redis client", err);
+    logger.error("[redis] ❌ Initialization failed:", err);
+    recordError("redis_init_failure", "high");
     throw err;
   }
 };
 
-/**
- * Attach event handlers for logging and health monitoring
- */
+/* -----------------------------------------------------------------------
+   🧭 Event Handlers & Circuit Breaker
+------------------------------------------------------------------------ */
 const attachEventHandlers = (c: Redis | Cluster) => {
+  (c as any).on("connect", () => {
+    logger.info("[redis] 🟢 Connecting...");
+    failureCount = 0;
+  });
+
+  (c as any).on("ready", () => {
+    logger.info("[redis] ✅ Ready");
+    circuitOpen = false;
+  });
+
+  (c as any).on("reconnecting", (delay: number) => {
+    logger.warn(`[redis] ♻️ Reconnecting in ${delay}ms`);
+  });
+
+  (c as any).on("error", async (err: Error) => {
+    logger.error("[redis] ❌ Error:", err.message);
+    recordError("redis_error", "medium");
+    failureCount++;
+
+    if (failureCount >= CIRCUIT_THRESHOLD && !circuitOpen) {
+      circuitOpen = true;
+      logger.warn("[redis] ⚠️ Circuit opened due to repeated failures");
+      await auditService.log({
+        actorId: "system",
+        actorRole: "system",
+        action: "REDIS_CIRCUIT_OPENED",
+        details: { error: err.message, failureCount },
+      });
+
+      setTimeout(() => {
+        failureCount = 0;
+        circuitOpen = false;
+        logger.info("[redis] 🔄 Circuit reset");
+      }, CIRCUIT_RESET_TIMEOUT_MS);
+    }
+  });
+
+  (c as any).on("end", () => logger.warn("[redis] 🔴 Connection ended"));
+  (c as any).on("close", () => logger.warn("[redis] 🔒 Connection closed"));
+};
+
+/* -----------------------------------------------------------------------
+   🧠 Health Check
+------------------------------------------------------------------------ */
+export const healthCheck = async (opts?: { timeoutMs?: number }) => {
+  const timeoutMs = opts?.timeoutMs ?? 3000;
+  const span = trace.getTracer("infra").startSpan("redis.healthCheck", undefined, context.active());
+
   try {
-    // `on` exists for both Redis and Cluster instances
-    (c as any).on("connect", () => logger.info("[redis] connecting..."));
-    (c as any).on("ready", () => logger.info("[redis] ready"));
-    (c as any).on("close", () => logger.warn("[redis] connection closed"));
-    (c as any).on("end", () => logger.warn("[redis] connection ended"));
-    (c as any).on("reconnecting", (delay: number) =>
-      logger.warn(`[redis] reconnecting in ${delay}ms`)
-    );
-    (c as any).on("error", (err: Error) => logger.error("[redis] error:", err?.message || err));
-  } catch (err) {
-    // best-effort — do not crash on attach errors
-    logger.error("[redis] failed to attach event handlers", err);
+    if (circuitOpen) throw new Error("Circuit open – skipping Redis health check");
+
+    const r = getRedis();
+    const pingPromise = async () => {
+      if ((r as any).nodes) {
+        const masters = (r as any).nodes("master") as Redis[];
+        for (const node of masters) {
+          const pong = await node.ping().catch(() => null);
+          if (pong?.toLowerCase().includes("pong")) return true;
+        }
+        throw new Error("Redis cluster PING failed");
+      } else {
+        const pong = await (r as Redis).ping();
+        if (!pong.toLowerCase().includes("pong")) throw new Error("Redis PING failed");
+      }
+      return true;
+    };
+
+    await Promise.race([
+      pingPromise(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("Redis health timeout")), timeoutMs)),
+    ]);
+
+    span.setStatus({ code: 1, message: "Healthy" });
+    span.end();
+    return true;
+  } catch (err: any) {
+    recordError("redis_health_check_failed", "critical");
+    logger.error("[redis] ⚠️ Health check failed:", err.message);
+    span.setStatus({ code: 2, message: err.message });
+    span.end();
+    throw err;
   }
 };
 
-/**
- * Lightweight health check for Redis.
- * - For Cluster: checks at least one master node responds to PING
- * - For single node: runs PING
- *
- * Throws Error if unhealthy.
- */
-export const healthCheck = async (opts?: { timeoutMs?: number }) => {
-  const timeoutMs = opts?.timeoutMs ?? 3000;
-  const r = getRedis();
-
-  const pingPromise = (async () => {
-    try {
-      // ioredis cluster has .nodes()
-      if ((r as any).nodes && typeof (r as any).nodes === "function") {
-        const masters = (r as any).nodes("master") as Redis[];
-        if (!masters || masters.length === 0)
-          throw new Error("No master nodes available in Redis cluster");
-
-        // try to ping at least one master
-        let ok = false;
-        for (const node of masters) {
-          try {
-            const pong = await node.ping();
-            if (typeof pong === "string" && pong.toLowerCase().includes("pong")) {
-              ok = true;
-              break;
-            }
-          } catch (err) {
-            // try next node
-          }
-        }
-        if (!ok) throw new Error("Redis cluster masters did not respond to PING");
-      } else {
-        const pong = await (r as Redis).ping();
-        if (!pong || !String(pong).toLowerCase().includes("pong"))
-          throw new Error("Redis ping failed");
-      }
-      return true;
-    } catch (err: any) {
-      throw err;
-    }
-  })();
-
-  // enforce timeout
-  const result = await Promise.race([
-    pingPromise,
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Redis health check timeout")), timeoutMs)
-    ),
-  ]);
-
-  return result as boolean;
-};
-
-/**
- * Gracefully shutdown Redis connection (used during app termination)
- */
+/* -----------------------------------------------------------------------
+   🧹 Graceful Shutdown
+------------------------------------------------------------------------ */
 export const shutdownRedis = async (force = false) => {
-  if (!client) return;
-  if (isShuttingDown && !force) return;
+  if (!client || (isShuttingDown && !force)) return;
   isShuttingDown = true;
 
   try {
-    logger.info("[redis] Shutting down Redis connection...");
-    // good practice to quit rather than disconnect -> ensures queued commands handled
+    logger.info("[redis] 🧹 Shutting down...");
     await (client as any).quit();
-    logger.info("[redis] Redis quit complete");
+    logger.info("[redis] ✅ Redis shutdown complete.");
   } catch (err: any) {
-    logger.warn("[redis] Error during quit, forcing disconnect:", err?.message || err);
+    logger.warn("[redis] ⚠️ Quit failed, forcing disconnect:", err.message);
     try {
       (client as any).disconnect();
-    } catch (e) {
-      // ignore
-    }
+    } catch {}
   } finally {
     client = null;
   }
 };
 
-/**
- * Safe getter for the internal client for places that need direct access.
- * Prefer using typed wrappers rather than exporting client directly.
- */
-export const redisClient = (): Redis | Cluster => {
-  return getRedis();
-};
+/* -----------------------------------------------------------------------
+   🔧 Utility Export
+------------------------------------------------------------------------ */
+export const redisClient = (): Redis | Cluster => getRedis();
 
-/**
- * Listen for process termination to close redis gracefully
- */
-const listenForShutdown = () => {
-  const doShutdown = async () => {
-    try {
-      await shutdownRedis();
-    } catch (err) {
-      // ignore
-    } finally {
-      // do not exit the process here - caller (server.ts) should handle exit
-    }
-  };
-
-  process.once("SIGINT", doShutdown);
-  process.once("SIGTERM", doShutdown);
-  process.once("SIGQUIT", doShutdown);
-};
-
-listenForShutdown();
+process.once("SIGINT", () => void shutdownRedis());
+process.once("SIGTERM", () => void shutdownRedis());
+process.once("SIGQUIT", () => void shutdownRedis());
 
 export default {
   getRedis,
