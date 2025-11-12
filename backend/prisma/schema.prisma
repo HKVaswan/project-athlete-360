@@ -457,19 +457,22 @@ model Invoice {
 }
 
 model BillingTransaction {
-  id              String   @id @default(uuid())
+  id              String             @id @default(uuid())
   provider        BillingProvider
-  transactionId   String   @unique
-  institution     Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+  transactionId   String             @unique
+  institution     Institution?       @relation(fields: [institutionId], references: [id], onDelete: SetNull)
   institutionId   String?
   amountPaid      Float
-  currency        String   @default("INR")
+  currency        String             @default("INR")
   status          BillingTransactionStatus
   reconciledAt    DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  flagged         Boolean  @default(false)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  flagged         Boolean            @default(false)
   metadata        Json?
+
+  // 🔥 Add this relation (fixes missing opposite field)
+  billingEvents   BillingEvent[]     @relation("TransactionToEvent")
 
   @@index([provider])
   @@map("billing_transactions")
@@ -481,7 +484,7 @@ model BillingEvent {
   type                  String
   provider              BillingProvider
   billingTransactionId  String?
-  billingTransaction    BillingTransaction? @relation(fields: [billingTransactionId], references: [id], onDelete: SetNull)
+  billingTransaction    BillingTransaction? @relation("TransactionToEvent", fields: [billingTransactionId], references: [id], onDelete: SetNull)
   payload               Json?
   createdAt             DateTime           @default(now())
 
