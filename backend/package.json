@@ -1,26 +1,14 @@
-{
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "outDir": "dist",
-    "rootDir": "src",
-    "strict": true,
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "skipLibCheck": true,
-    "resolveJsonModule": true,
-    "noImplicitAny": true,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noFallthroughCasesInSwitch": true,
-    "useUnknownInCatchVariables": false,
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": false,
-    "isolatedModules": true,
-    "sourceMap": true,
-    "removeComments": true
-  },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+"scripts": {
+  "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+  "build": "npm run clean && tsc -p tsconfig.json",
+  "start": "node dist/server.js",
+  "lint": "eslint . --ext .ts",
+  "format": "prettier --write .",
+  "test": "jest --passWithNoTests",
+  "clean": "rimraf dist",
+  "check": "npm run lint && npm run test",
+  "prepare": "husky install || true",
+  "prisma:generate": "npx prisma generate",
+  "prisma:migrate": "npx prisma migrate deploy",
+  "postinstall": "npx prisma generate"
 }
