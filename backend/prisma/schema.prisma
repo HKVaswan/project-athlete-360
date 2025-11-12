@@ -5,8 +5,7 @@
 // -----------------------------------------------------------------------------
 
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["clientExtensions"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -312,7 +311,7 @@ model Subscription {
 }
 
 // -----------------------------------------------------------------------------
-// NOTIFICATIONS (NEWLY ADDED)
+// NOTIFICATIONS
 // -----------------------------------------------------------------------------
 
 model Notification {
@@ -321,9 +320,9 @@ model Notification {
   userId         String
   title          String
   message        String
-  type           String    @default("GENERAL") // SYSTEM | BILLING | ALERT | ACHIEVEMENT
-  priority       String    @default("normal")  // low | normal | high
-  channel        String?   // push | email | in-app
+  type           String    @default("GENERAL")
+  priority       String    @default("normal")
+  channel        String?
   read           Boolean   @default(false)
   readAt         DateTime?
   delivered      Boolean   @default(false)
@@ -352,19 +351,20 @@ model AthleteAnalytics {
 
 model InstitutionAnalytics {
   institutionId  String   @id
+  institution    Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
   avgPerformance Float?
   attendanceRate Float?
   updatedAt      DateTime @updatedAt
 }
 
 // -----------------------------------------------------------------------------
-// SYSTEM / BILLING / SECURITY MODELS (Required for completeness)
+// SYSTEM / BILLING / SECURITY MODELS
 // -----------------------------------------------------------------------------
 
 model AuditLog {
   id           String   @id @default(uuid())
   actorId      String?
-  actor        User?     @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actor        User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
   actorRole    String?
   action       String
   entity       String?
@@ -463,18 +463,18 @@ model PresignedUpload {
 }
 
 model BillingTransaction {
-  id              String                     @id @default(uuid())
+  id              String   @id @default(uuid())
   provider        BillingProvider
-  transactionId   String                     @unique
-  institution     Institution?               @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+  transactionId   String   @unique
+  institution     Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
   institutionId   String?
   amountPaid      Float
-  currency        String                     @default("INR")
+  currency        String   @default("INR")
   status          BillingTransactionStatus
   reconciledAt    DateTime?
-  createdAt       DateTime                   @default(now())
-  updatedAt       DateTime                   @updatedAt
-  flagged         Boolean                    @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  flagged         Boolean  @default(false)
   metadata        Json?
 }
 
