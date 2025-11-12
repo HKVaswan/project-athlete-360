@@ -1,14 +1,23 @@
-"scripts": {
-  "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-  "build": "npm run clean && tsc -p tsconfig.json",
-  "start": "node dist/server.js",
-  "lint": "eslint . --ext .ts",
-  "format": "prettier --write .",
-  "test": "jest --passWithNoTests",
-  "clean": "rimraf dist",
-  "check": "npm run lint && npm run test",
-  "prepare": "husky install || true",
-  "prisma:generate": "npx prisma generate",
-  "prisma:migrate": "npx prisma migrate deploy",
-  "postinstall": "npx prisma generate"
+{
+  "scripts": {
+    "clean": "rimraf dist",
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "lint": "eslint . --ext .ts",
+    "format": "prettier --write .",
+    "test": "jest --passWithNoTests",
+    "check": "npm run lint && npm run test",
+    "prepare": "husky install || true",
+
+    "prisma:generate": "npx prisma generate",
+    "prisma:migrate": "npx prisma migrate deploy",
+
+    // 🔧 Important for Render and CI/CD builds
+    "postinstall": "prisma generate && echo '✅ Prisma client generated successfully'"
+  },
+
+  "engines": {
+    "node": ">=20.0.0 <26.0.0"
+  }
 }
