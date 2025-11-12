@@ -30,6 +30,9 @@ type NotificationJobPayload = {
   initiatedBy?: string; // admin/super_admin/system
 };
 
+/**
+ * Core worker handler
+ */
 export default async function (job: Job<NotificationJobPayload>) {
   const startTime = Date.now();
   const { type, recipientId, title, body, channel = ["inApp"], meta, initiatedBy } = job.data;
@@ -91,7 +94,7 @@ export default async function (job: Job<NotificationJobPayload>) {
       await notificationRepository.markAsSent(saved.id);
       logger.info(`[NOTIFICATION] ✅ Job ${job.id} completed successfully.`);
     } else {
-      await notificationRepository.markAsFailed(saved.id, failures.map(f => f.error).join(", "));
+      await notificationRepository.markAsFailed(saved.id, failures.map((f) => f.error).join(", "));
       logger.warn(`[NOTIFICATION] ⚠️ Partial/failed delivery for job ${job.id}`, failures);
     }
 
@@ -119,3 +122,48 @@ export default async function (job: Job<NotificationJobPayload>) {
     // Critical escalation for system-level issues
     await handleCriticalFailureAlert(err.message);
     throw Errors.Server("Notification job failed critically.");
+  }
+}
+
+/**
+ * Helper: escalate repeated failures
+ */
+async function handleFailureEscalation(
+  type: string,
+  failures: any[],
+  jobId: string
+) {
+  try {
+    const superAdmins = await prisma.user.findMany({ where: { role: "SUPER_ADMIN" } });
+    for (const admin of superAdmins) {
+      await notificationRepository.create({
+        userId: admin.id,
+        type: "systemAlert",
+        title: `Repeated Notification Failure (${type})`,
+        body: `Job ${jobId} encountered repeated failures.\nErrors: ${failures
+          .map((f) => f.error)
+          .join(", ")}`,
+      });
+    }
+  } catch (err: any) {
+    logger.error("[NOTIFICATION] Escalation failed", err);
+  }
+}
+
+/**
+ * Helper: handle system-level failures (e.g., DB or queue offline)
+ */
+async function handleCriticalFailureAlert(message: string) {
+  try {
+    const superAdmins = await prisma.user.findMany({ where: { role: "SUPER_ADMIN" } });
+    for (const admin of superAdmins) {
+      await sendEmail(
+        admin.email!,
+        "🚨 Critical Notification Failure",
+        `<p>System detected a fatal error in notification worker:</p><pre>${message}</pre>`
+      );
+    }
+  } catch (err: any) {
+    logger.error("[NOTIFICATION] Critical failure alert failed", err);
+  }
+}
