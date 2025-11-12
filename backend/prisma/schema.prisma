@@ -546,3 +546,36 @@ model PlatformAnalytics {
   avgPerformance    Float?
   updatedAt         DateTime @updatedAt
 }
+
+model InstitutionAnalytics { ... }
+
+model PlatformAnalytics { ... }
+
+//
+// Notifications
+// -------------------------------------------------------------------------
+// Tracks in-app and system notifications for all users.
+// Supports real-time, email, and push notification integration.
+// -------------------------------------------------------------------------
+model Notification {
+  id             String    @id @default(uuid())
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  title          String
+  message        String
+  type           String              @default("GENERAL") // e.g. SYSTEM, BILLING, ALERT, ACHIEVEMENT
+  priority       String              @default("normal")   // low, normal, high
+  channel        String?             // push | email | in-app
+  read           Boolean             @default(false)
+  readAt         DateTime?
+  delivered      Boolean             @default(false)
+  deliveredAt    DateTime?
+  metadata       Json?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@index([userId])
+  @@index([type])
+  @@index([priority])
+  @@index([createdAt])
+}
