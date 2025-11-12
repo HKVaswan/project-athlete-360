@@ -1,0 +1,46 @@
+{
+  "compilerOptions": {
+    /* === Core Build Settings === */
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "dist",
+    "rootDir": "src",
+    "lib": ["ES2020", "DOM"],
+
+    /* === Strictness & Safety === */
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+
+    /* === Module Interoperability === */
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "allowJs": false,
+    "skipLibCheck": true,
+
+    /* === Decorators & Metadata (for DI or ORM) === */
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+
+    /* === Source Maps for Debugging === */
+    "sourceMap": true,
+
+    /* === Output Cleanliness === */
+    "removeComments": true,
+    "pretty": true,
+
+    /* === Type Roots (for custom types & global.d.ts) === */
+    "typeRoots": ["./src/types", "./node_modules/@types"],
+
+    /* === Advanced Node 20+ compatibility === */
+    "allowImportingTsExtensions": true,
+    "moduleDetection": "force"
+  },
+  "include": ["src/**/*.ts", "src/**/*.d.ts"],
+  "exclude": ["node_modules", "dist", "tests", "**/*.spec.ts"]
+}
