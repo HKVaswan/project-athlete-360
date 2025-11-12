@@ -1,83 +1,26 @@
 {
-  "name": "project-athlete-360-backend",
-  "version": "2.0.0",
-  "description": "Next-gen enterprise backend for Project Athlete 360 — modular APIs, distributed workers, observability, and AI-integrated analytics.",
-  "type": "module",
-  "main": "dist/server.js",
-  "private": true,
-
-  "scripts": {
-    "dev": "NODE_ENV=development ts-node-dev --respawn --transpile-only --ignore-watch node_modules src/server.ts",
-    "clean": "rimraf dist",
-    "build": "npm run clean && tsc -p tsconfig.json",
-    "start": "NODE_ENV=production node dist/server.js",
-    "worker:start": "NODE_ENV=production node dist/workers/index.js",
-    "lint": "eslint . --ext .ts --max-warnings=0",
-    "format": "prettier --write .",
-    "test": "NODE_ENV=test jest --passWithNoTests --runInBand",
-    "check": "npm run lint && npm run test",
-    "prepare": "husky install || true",
-    "prisma:generate": "npx prisma generate",
-    "prisma:migrate": "npx prisma migrate deploy",
-    "postinstall": "npm run prisma:generate"
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "dist",
+    "rootDir": "src",
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "noImplicitAny": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": true,
+    "useUnknownInCatchVariables": false,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": false,
+    "isolatedModules": true,
+    "sourceMap": true,
+    "removeComments": true
   },
-
-  "dependencies": {
-    "@prisma/client": "^6.19.0",
-    "express": "^4.21.1",
-    "bullmq": "^5.5.0",
-    "ioredis": "^5.4.1",
-    "prom-client": "^15.1.1",
-    "helmet": "^7.2.0",
-    "cors": "^2.8.5",
-    "compression": "^1.7.5",
-    "dotenv": "^16.4.5",
-    "axios": "^1.7.2",
-    "pino": "^9.4.0",
-    "winston": "^3.12.0",
-    "zod": "^3.23.8",
-    "dayjs": "^1.11.11",
-    "clsx": "^2.1.1",
-    "express-async-errors": "^3.1.1",
-    "http-status-codes": "^2.3.0",
-    "uuid": "^10.0.0",
-    "node-cron": "^3.0.3"
-  },
-
-  "devDependencies": {
-    "typescript": "^5.6.3",
-    "@types/node": "^22.7.4",
-    "@types/express": "^4.17.21",
-    "@types/jest": "^29.5.12",
-    "ts-node-dev": "^2.0.0",
-    "eslint": "^9.0.0",
-    "prettier": "^3.3.3",
-    "jest": "^29.7.0",
-    "ts-jest": "^29.2.4",
-    "rimraf": "^6.0.1",
-    "husky": "^9.0.11",
-    "lint-staged": "^15.2.10"
-  },
-
-  "lint-staged": {
-    "*.ts": ["eslint --fix", "prettier --write"]
-  },
-
-  "prisma": {
-    "engines": {
-      "queryEngineType": "binary"
-    }
-  },
-
-  "engines": {
-    "node": ">=20.0.0",
-    "npm": ">=9.0.0"
-  },
-
-  "license": "MIT",
-  "author": {
-    "name": "H.K. Vaswan",
-    "organization": "Project Athlete 360",
-    "url": "https://projectathlete360.com"
-  }
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }
