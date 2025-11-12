@@ -14,7 +14,6 @@
  *  - Auto-resume after restart; logs full audit trail.
  *  - Intelligent load distribution (batch processing).
  *  - Fully integrates with superAdminAlertsService & usageProjection lib.
- *
  * -----------------------------------------------------------------------------
  */
 
@@ -70,16 +69,14 @@ export default async function usageProjectionWorker(job: Job<ProjectionJobPayloa
 /**
  * 💡 Example Queue Setup (for reference)
  * 
- * import { Queue } from "bullmq";
+ * import { Queue, Worker } from "bullmq";
  * import usageProjectionWorker from "./usageProjection.worker";
  * 
  * const projectionQueue = new Queue("usageProjection", { connection });
  * 
- * projectionQueue.add("projectUsage", {}, { repeat: { cron: "0 */6 * * *" } });
+ * // Escaped cron expression below to prevent parser confusion
+ * projectionQueue.add("projectUsage", {}, { repeat: { cron: "0 *\\/6 * * *" } });
  * 
- * // Worker registration example:
- * import { Worker } from "bullmq";
  * const projectionWorker = new Worker("usageProjection", usageProjectionWorker, { connection });
- * 
  * projectionWorker.on("failed", (job, err) => console.error("Projection job failed:", err));
  */
