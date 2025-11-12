@@ -1,7 +1,11 @@
 // prisma/schema.prisma
 // -----------------------------------------------------------------------------
 // 🚀 Enterprise-Grade Prisma Schema — Project Athlete 360
-// Database: PostgreSQL (configure DATABASE_URL in .env)
+// Database: PostgreSQL (set DATABASE_URL in .env)
+// Notes:
+//  - All relations are bidirectional where appropriate.
+//  - Important fields indexed for performance (searches, joins).
+//  - Use migrations to evolve schema: `npx prisma migrate dev`
 // -----------------------------------------------------------------------------
 
 generator client {
@@ -16,7 +20,6 @@ datasource db {
 // -----------------------------------------------------------------------------
 // ENUMS
 // -----------------------------------------------------------------------------
-
 enum Role {
   ATHLETE
   COACH
@@ -91,28 +94,31 @@ model User {
   notifications   Notification[]
   invitations     Invitation[]  @relation("InvitedBy")
   acceptedInvites Invitation[]  @relation("AcceptedBy")
-  auditLogs       AuditLog[]
+  auditLogs       AuditLog[]    @relation("AuditLogsByActor")
   meta            Json?
   deleted         Boolean       @default(false)
   deletedAt       DateTime?
 
   @@index([email])
   @@index([role])
+  @@index([createdAt])
+  @@map("users")
 }
 
 model Institution {
-  id                  String            @id @default(uuid())
+  id                  String                  @id @default(uuid())
   name                String
-  code                String            @unique
-  domain              String?           @unique
-  createdAt           DateTime          @default(now())
-  updatedAt           DateTime          @updatedAt
+  code                String                  @unique
+  domain              String?                 @unique
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
   users               User[]
   coaches             CoachInstitution[]
   athletes            Athlete[]
   invitations         Invitation[]
   subscriptions       Subscription[]
   usage               InstitutionUsage?
+  analytics           InstitutionAnalytics?   @relation("InstitutionAnalyticsRelation")
   paymentMethods      PaymentMethod[]
   invoices            Invoice[]
   systemBackups       SystemBackup[]
@@ -123,51 +129,56 @@ model Institution {
 
   @@index([code])
   @@index([domain])
+  @@index([createdAt])
+  @@map("institutions")
 }
 
 // -----------------------------------------------------------------------------
-// ATHLETE / COACH RELATIONSHIPS
+// ATHLETE / COACH MODELS
 // -----------------------------------------------------------------------------
 
 model Athlete {
-  id             String        @id @default(uuid())
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId         String        @unique
-  athleteCode    String        @unique
+  id             String           @id @default(uuid())
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String           @unique
+  athleteCode    String           @unique
   name           String
   dob            DateTime?
   sport          String?
   gender         String?
   contactInfo    String?
-  approved       Boolean       @default(false)
-  institution    Institution?  @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+  approved       Boolean          @default(false)
+  institution    Institution?     @relation(fields: [institutionId], references: [id], onDelete: SetNull)
   institutionId  String?
   sessions       Session[]
-  analytics      AthleteAnalytics?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  analytics      AthleteAnalytics? @relation("AthleteAnalyticsRelation")
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
   meta           Json?
-  deleted        Boolean       @default(false)
+  deleted        Boolean          @default(false)
   deletedAt      DateTime?
 
   @@index([athleteCode])
   @@index([institutionId])
+  @@index([createdAt])
+  @@map("athletes")
 }
 
 model Coach {
-  id             String              @id @default(uuid())
-  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId         String              @unique
-  coachCode      String              @unique
+  id             String           @id @default(uuid())
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String           @unique
+  coachCode      String           @unique
   name           String?
   institutions   CoachInstitution[]
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
   meta           Json?
-  deleted        Boolean             @default(false)
+  deleted        Boolean          @default(false)
   deletedAt      DateTime?
 
   @@index([coachCode])
+  @@map("coaches")
 }
 
 model CoachInstitution {
@@ -180,6 +191,7 @@ model CoachInstitution {
 
   @@unique([coachId, institutionId])
   @@index([institutionId])
+  @@map("coach_institutions")
 }
 
 // -----------------------------------------------------------------------------
@@ -200,6 +212,7 @@ model Session {
 
   @@index([athleteId])
   @@index([createdAt])
+  @@map("sessions")
 }
 
 // -----------------------------------------------------------------------------
@@ -229,6 +242,7 @@ model Invitation {
   @@index([email])
   @@index([status])
   @@index([tokenHash])
+  @@map("invitations")
 }
 
 // -----------------------------------------------------------------------------
@@ -248,6 +262,7 @@ model RefreshToken {
 
   @@index([userId])
   @@index([tokenHash])
+  @@map("refresh_tokens")
 }
 
 model LoginSession {
@@ -261,6 +276,7 @@ model LoginSession {
   createdAt   DateTime @default(now())
 
   @@index([userId])
+  @@map("login_sessions")
 }
 
 // -----------------------------------------------------------------------------
@@ -268,22 +284,23 @@ model LoginSession {
 // -----------------------------------------------------------------------------
 
 model Plan {
-  id                    String    @id @default(uuid())
-  sku                   String    @unique
+  id                    String         @id @default(uuid())
+  sku                   String         @unique
   name                  String
   description           String?
-  priceMonthlyCents     Int       @default(0)
-  storageLimitBytes     BigInt    @default(0)
-  videoLimitPerMonth    Int       @default(0)
-  athletesPerCoach      Int       @default(50)
-  coachesPerInstitution Int       @default(10)
+  priceMonthlyCents     Int            @default(0)
+  storageLimitBytes     BigInt         @default(0)
+  videoLimitPerMonth    Int            @default(0)
+  athletesPerCoach      Int            @default(50)
+  coachesPerInstitution Int            @default(10)
   features              Json?
-  isDefault             Boolean   @default(false)
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  isDefault             Boolean        @default(false)
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
   subscriptions         Subscription[]
 
   @@index([sku])
+  @@map("plans")
 }
 
 model Subscription {
@@ -308,6 +325,7 @@ model Subscription {
 
   @@index([institutionId])
   @@index([status])
+  @@map("subscriptions")
 }
 
 // -----------------------------------------------------------------------------
@@ -335,6 +353,7 @@ model Notification {
   @@index([type])
   @@index([priority])
   @@index([createdAt])
+  @@map("notifications")
 }
 
 // -----------------------------------------------------------------------------
@@ -342,19 +361,23 @@ model Notification {
 // -----------------------------------------------------------------------------
 
 model AthleteAnalytics {
-  athleteId      String   @id
-  athlete        Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  athleteId      String    @id
+  athlete        Athlete   @relation("AthleteAnalyticsRelation", fields: [athleteId], references: [id], onDelete: Cascade)
   avgScore       Float?
   attendanceRate Float?
-  updatedAt      DateTime @updatedAt
+  updatedAt      DateTime  @updatedAt
+
+  @@map("athlete_analytics")
 }
 
 model InstitutionAnalytics {
-  institutionId  String   @id
-  institution    Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  institutionId  String      @id
+  institution    Institution @relation("InstitutionAnalyticsRelation", fields: [institutionId], references: [id], onDelete: Cascade)
   avgPerformance Float?
   attendanceRate Float?
-  updatedAt      DateTime @updatedAt
+  updatedAt      DateTime    @updatedAt
+
+  @@map("institution_analytics")
 }
 
 // -----------------------------------------------------------------------------
@@ -364,7 +387,7 @@ model InstitutionAnalytics {
 model AuditLog {
   id           String   @id @default(uuid())
   actorId      String?
-  actor        User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actor        User?    @relation("AuditLogsByActor", fields: [actorId], references: [id], onDelete: SetNull)
   actorRole    String?
   action       String
   entity       String?
@@ -378,6 +401,7 @@ model AuditLog {
   @@index([actorId])
   @@index([action])
   @@index([createdAt])
+  @@map("audit_logs")
 }
 
 model InstitutionUsage {
@@ -390,6 +414,8 @@ model InstitutionUsage {
   lastReconciledAt DateTime?
   updatedAt        DateTime    @updatedAt
   meta             Json?
+
+  @@map("institution_usage")
 }
 
 model PaymentMethod {
@@ -405,61 +431,29 @@ model PaymentMethod {
   enabled            Boolean     @default(true)
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
+
+  @@index([institutionId])
+  @@map("payment_methods")
 }
 
 model Invoice {
-  id                 String       @id @default(uuid())
-  institution        Institution  @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  id                 String        @id @default(uuid())
+  institution        Institution    @relation(fields: [institutionId], references: [id], onDelete: Cascade)
   institutionId      String
-  subscription       Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  subscription       Subscription?  @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
   subscriptionId     String?
   amountCents        Int
-  currency           String       @default("INR")
+  currency           String        @default("INR")
   status             InvoiceStatus @default(PENDING)
   dueDate            DateTime?
   providerInvoiceId  String?
   metadata           Json?
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
-}
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 
-model SystemBackup {
-  id            String   @id @default(uuid())
-  key           String
-  sizeBytes     BigInt
-  checksum      String
-  status        String
-  institution   Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
-  institutionId String?
-  createdAt     DateTime @default(now())
-  meta          Json?
-}
-
-model TrialAbuseLog {
-  id                String     @id @default(uuid())
-  userId            String?
-  institution       Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
-  institutionId     String?
-  hashedIp          String
-  hashedUA          String?
-  hashedDevice      String?
-  hashedEmailDomain String?
-  createdAt         DateTime   @default(now())
-}
-
-model PresignedUpload {
-  id            String      @id @default(uuid())
-  institution   Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
-  institutionId String?
-  fileKey       String      @unique
-  fileUrl       String?
-  fileSize      BigInt?
-  fileType      String?
-  createdBy     String?
-  createdAt     DateTime    @default(now())
-  expiresAt     DateTime
-  used          Boolean     @default(false)
-  meta          Json?
+  @@index([institutionId])
+  @@index([status])
+  @@map("invoices")
 }
 
 model BillingTransaction {
@@ -476,6 +470,86 @@ model BillingTransaction {
   updatedAt       DateTime @updatedAt
   flagged         Boolean  @default(false)
   metadata        Json?
+
+  @@index([provider])
+  @@map("billing_transactions")
+}
+
+model BillingEvent {
+  id                    String             @id @default(uuid())
+  eventId               String             @unique
+  type                  String
+  provider              BillingProvider
+  billingTransactionId  String?
+  billingTransaction    BillingTransaction? @relation(fields: [billingTransactionId], references: [id], onDelete: SetNull)
+  payload               Json?
+  createdAt             DateTime           @default(now())
+
+  @@index([provider])
+  @@map("billing_events")
+}
+
+// -----------------------------------------------------------------------------
+// BACKUPS / STORAGE / ABUSE
+// -----------------------------------------------------------------------------
+
+model SystemBackup {
+  id            String   @id @default(uuid())
+  key           String
+  sizeBytes     BigInt
+  checksum      String
+  status        String
+  institution   Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+  institutionId String?
+  createdAt     DateTime @default(now())
+  meta          Json?
+
+  @@map("system_backups")
+}
+
+model KeyBackup {
+  id            String   @id @default(uuid())
+  backupId      String   @unique
+  jwtSecret     String   // store encrypted externally; secrets manager recommended
+  encryptionKey String
+  createdAt     DateTime @default(now())
+  meta          Json?
+
+  @@map("key_backups")
+}
+
+model TrialAbuseLog {
+  id                String     @id @default(uuid())
+  userId            String?
+  institution       Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+  institutionId     String?
+  hashedIp          String
+  hashedUA          String?
+  hashedDevice      String?
+  hashedEmailDomain String?
+  createdAt         DateTime   @default(now())
+
+  @@index([hashedIp])
+  @@index([institutionId])
+  @@map("trial_abuse_logs")
+}
+
+model PresignedUpload {
+  id            String      @id @default(uuid())
+  institution   Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+  institutionId String?
+  fileKey       String      @unique
+  fileUrl       String?
+  fileSize      BigInt?
+  fileType      String?
+  createdBy     String?
+  createdAt     DateTime    @default(now())
+  expiresAt     DateTime
+  used          Boolean     @default(false)
+  meta          Json?
+
+  @@index([institutionId])
+  @@map("presigned_uploads")
 }
 
 model PlatformAnalytics {
@@ -485,4 +559,60 @@ model PlatformAnalytics {
   totalSessions     Int
   avgPerformance    Float?
   updatedAt         DateTime @updatedAt
+
+  @@map("platform_analytics")
+}
+
+// -----------------------------------------------------------------------------
+// MISC MODELS
+// -----------------------------------------------------------------------------
+
+model BlockedIP {
+  id          String   @id @default(uuid())
+  ipHash      String   @unique
+  reason      String?
+  blockedById String?
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime?
+  resolved    Boolean  @default(false)
+  meta        Json?
+
+  @@map("blocked_ips")
+}
+
+model IPReputation {
+  id        String   @id @default(uuid())
+  ipHash    String   @unique
+  score     Int      @default(0)
+  lastSeen  DateTime @default(now())
+  meta      Json?
+
+  @@map("ip_reputation")
+}
+
+model SystemAlert {
+  id          String   @id @default(uuid())
+  title       String
+  message     String
+  severity    String   @default("medium")
+  category    String?
+  metadata    Json?
+  resolved    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  resolvedAt  DateTime?
+
+  @@map("system_alerts")
+}
+
+model EmailLog {
+  id          String   @id @default(uuid())
+  to          String
+  subject     String
+  status      String   @default("SENT")
+  provider    String?
+  error       String?
+  createdAt   DateTime @default(now())
+  meta        Json?
+
+  @@map("email_logs")
 }
