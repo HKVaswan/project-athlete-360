@@ -344,6 +344,7 @@ model Notification {
 
 model AthleteAnalytics {
   athleteId      String   @id
+  athlete        Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   avgScore       Float?
   attendanceRate Float?
   updatedAt      DateTime @updatedAt
