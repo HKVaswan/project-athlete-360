@@ -11,7 +11,7 @@
     "prepare": "husky install || true",
     "prisma:generate": "npx prisma generate",
     "prisma:migrate": "npx prisma migrate deploy",
-    "postinstall": "prisma generate && echo Prisma client generated successfully"
+    "postinstall": "npx prisma generate && echo Prisma client generated successfully"
   },
   "engines": {
     "node": ">=20.0.0 <26.0.0"
