@@ -9,14 +9,10 @@
     "test": "jest --passWithNoTests",
     "check": "npm run lint && npm run test",
     "prepare": "husky install || true",
-
     "prisma:generate": "npx prisma generate",
     "prisma:migrate": "npx prisma migrate deploy",
-
-    // 🔧 Important for Render and CI/CD builds
-    "postinstall": "prisma generate && echo '✅ Prisma client generated successfully'"
+    "postinstall": "prisma generate && echo Prisma client generated successfully"
   },
-
   "engines": {
     "node": ">=20.0.0 <26.0.0"
   }
