@@ -1,12 +1,12 @@
 {
   "compilerOptions": {
     /* === Core Build Settings === */
-    "target": "ES2020",
-    "module": "ESNext",
+    "target": "ES2022",
+    "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "outDir": "dist",
     "rootDir": "src",
-    "lib": ["ES2020", "DOM"],
+    "lib": ["ES2022"],
 
     /* === Strictness & Safety === */
     "strict": true,
@@ -20,7 +20,6 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
-    "allowJs": false,
     "skipLibCheck": true,
 
     /* === Decorators & Metadata (for DI or ORM) === */
@@ -35,11 +34,7 @@
     "pretty": true,
 
     /* === Type Roots (for custom types & global.d.ts) === */
-    "typeRoots": ["./src/types", "./node_modules/@types"],
-
-    /* === Advanced Node 20+ compatibility === */
-    "allowImportingTsExtensions": true,
-    "moduleDetection": "force"
+    "typeRoots": ["./src/types", "./node_modules/@types"]
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts"],
   "exclude": ["node_modules", "dist", "tests", "**/*.spec.ts"]
