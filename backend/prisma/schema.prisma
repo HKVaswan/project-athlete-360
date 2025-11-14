@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "node_modules/@prisma/client"
 }
 
 datasource db {
@@ -22,13 +21,6 @@ enum PaymentProvider {
   MANUAL
 }
 
-/*
- Roles are defined as identifiers that match exact string values used in code:
-  - athlete
-  - coach
-  - admin
-  - super_admin
-*/
 enum Role {
   athlete
   coach
@@ -47,27 +39,14 @@ model User {
   role           Role      @default(athlete)
   sessionVersion Int       @default(0)
   coachCode      String?   @unique
-  institutionId  String?   
+  institutionId  String?
   institution    Institution? @relation(fields: [institutionId], references: [id])
-
-  // One-to-one (Athlete) — Athlete defines the FK (userId)
-  athlete        Athlete?     @relation(name: "UserToAthlete")
-
-  // Sessions & invites
+  athlete        Athlete?
   sessions       Session[]
   invites        Invitation[]
-
-  // Messages
   messagesSent   Message[]    @relation("message_sender")
   messagesRecvd  Message[]    @relation("message_receiver")
-  messageReadReceipts MessageReadReceipt[]
-
-  // Audit / MFA / Tokens / Verifications
   audits         AuditEntry[] @relation("audit_actor")
-  mfaChallenges  MfaChallenge[]
-  passwordResetTokens PasswordResetToken[]
-  emailVerifications  EmailVerification[]
-
   @@index([institutionId])
 }
 
@@ -76,7 +55,7 @@ model Athlete {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   userId        String   @unique
-  user          User     @relation(name: "UserToAthlete", fields: [userId], references: [id])
+  user          User     @relation(fields: [userId], references: [id])
   athleteCode   String   @unique
   name          String?
   dob           DateTime?
@@ -89,22 +68,19 @@ model Athlete {
 }
 
 model Institution {
-  id          String    @id @default(uuid())
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  name        String
-  code        String    @unique
-  domain      String?   @unique
-  address     String?
-  active      Boolean   @default(true)
-  planTier    String?   // free / pro / enterprise or similar
-  users       User[]
-  athletes    Athlete[]
+  id            String         @id @default(uuid())
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  name          String
+  code          String         @unique
+  domain        String?        @unique
+  address       String?
+  active        Boolean        @default(true)
+  planTier      String?
+  users         User[]
+  athletes      Athlete[]
   subscriptions Subscription[]
-  institutionPlans InstitutionPlan[]
-  invitations Invitation[]
-  payments    Payment[]
-  quota       Int?      @default(0)
+  quota         Int?           @default(0)
 }
 
 model Session {
@@ -125,7 +101,7 @@ model MfaChallenge {
   code       String
   expiresAt  DateTime
   consumed   Boolean  @default(false)
-  createdAt  DateTime  @default(now())
+  createdAt  DateTime @default(now())
 }
 
 model PasswordResetToken {
@@ -201,35 +177,35 @@ model PaymentEvent {
 }
 
 model MessageThread {
-  id          String    @id @default(uuid())
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  subject     String?
-  messages    Message[]
+  id        String    @id @default(uuid())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  subject   String?
+  messages  Message[]
 }
 
 model Message {
-  id          String    @id @default(uuid())
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  threadId    String?
-  thread      MessageThread? @relation(fields: [threadId], references: [id])
-  senderId    String?
-  sender      User?      @relation("message_sender", fields: [senderId], references: [id])
-  receiverId  String?
-  receiver    User?      @relation("message_receiver", fields: [receiverId], references: [id])
-  body        String
-  metadata    Json?
+  id         String    @id @default(uuid())
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  threadId   String?
+  thread     MessageThread? @relation(fields: [threadId], references: [id])
+  senderId   String?
+  sender     User?      @relation("message_sender", fields: [senderId], references: [id])
+  receiverId String?
+  receiver   User?      @relation("message_receiver", fields: [receiverId], references: [id])
+  body       String
+  metadata   Json?
   readReceipts MessageReadReceipt[]
 }
 
 model MessageReadReceipt {
-  id         String   @id @default(uuid())
-  messageId  String
-  message    Message  @relation(fields: [messageId], references: [id])
-  userId     String
-  user       User     @relation(fields: [userId], references: [id])
-  readAt     DateTime @default(now())
+  id        String   @id @default(uuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  readAt    DateTime @default(now())
 }
 
 model Plan {
@@ -250,14 +226,13 @@ model InstitutionPlan {
   billingPeriodDays Int?
   priceCents        Int?
   currency          String?  @default("INR")
-  subscriptions     Subscription[]
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }
 
 model Subscription {
   id            String   @id @default(uuid())
-  institutionId  String
+  institutionId String
   institution   Institution @relation(fields: [institutionId], references: [id])
   planId        String
   plan          InstitutionPlan @relation(fields: [planId], references: [id])
