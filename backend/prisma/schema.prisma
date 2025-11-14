@@ -37,49 +37,49 @@ enum Role {
 }
 
 model User {
-  id             String    @id @default(uuid())
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  username       String?   @unique
-  email          String?   @unique
-  name           String?
-  passwordHash   String?
-  role           Role      @default(athlete)
-  sessionVersion Int       @default(0)
-  coachCode      String?   @unique
-  institutionId  String?
-  institution    Institution? @relation(fields: [institutionId], references: [id])
+  id                   String                 @id @default(uuid())
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  username             String?                @unique
+  email                String?                @unique
+  name                 String?
+  passwordHash         String?
+  role                 Role                   @default(athlete)
+  sessionVersion       Int                    @default(0)
+  coachCode            String?                @unique
+  institutionId        String?
+  institution          Institution?           @relation(fields: [institutionId], references: [id])
 
-  // One-to-one: Athlete holds the FK (Athlete.userId). This side is optional.
-  athlete        Athlete?
+  // One-to-one: Athlete holds FK (Athlete.userId). This side is optional.
+  athlete              Athlete?
 
   // Sessions, invites and messages
-  sessions       Session[]
-  invites        Invitation[]          // invitations created by this user
-  messagesSent   Message[]    @relation("message_sender")
-  messagesRecvd  Message[]    @relation("message_receiver")
+  sessions             Session[]
+  invites              Invitation[]           // invitations created by this user
+  messagesSent         Message[]              @relation("message_sender")
+  messagesRecvd        Message[]              @relation("message_receiver")
 
   // Audit entries where this user acted as actor (named relation)
-  audits         AuditEntry[] @relation("audit_actor")
+  audits               AuditEntry[]           @relation("audit_actor")
 
   // MFA / Tokens / Verifications
-  mfaChallenges         MfaChallenge[]
-  passwordResetTokens   PasswordResetToken[]
-  emailVerifications    EmailVerification[]
+  mfaChallenges        MfaChallenge[]
+  passwordResetTokens  PasswordResetToken[]
+  emailVerifications   EmailVerification[]
 
   // Read receipts for messages
-  messageReadReceipts   MessageReadReceipt[]
+  messageReadReceipts  MessageReadReceipt[]
 
   @@index([institutionId])
 }
 
 model Athlete {
-  id            String   @id @default(uuid())
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  userId        String   @unique
-  user          User     @relation(fields: [userId], references: [id])
-  athleteCode   String   @unique
+  id            String     @id @default(uuid())
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  userId        String     @unique
+  user          User       @relation(fields: [userId], references: [id])
+  athleteCode   String     @unique
   name          String?
   dob           DateTime?
   gender        String?
@@ -87,29 +87,28 @@ model Athlete {
   contactInfo   String?
   institutionId String?
   institution   Institution? @relation(fields: [institutionId], references: [id])
-  approved      Boolean  @default(false)
+  approved      Boolean    @default(false)
 }
 
 model Institution {
-  id          String    @id @default(uuid())
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  name        String
-  code        String    @unique
-  domain      String?   @unique
-  address     String?
-  active      Boolean   @default(true)
-  planTier    String?   // free / pro / enterprise or similar
-  quota       Int?      @default(0)
+  id                 String            @id @default(uuid())
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  name               String
+  code               String            @unique
+  domain             String?           @unique
+  address            String?
+  active             Boolean           @default(true)
+  planTier           String?           // free / pro / enterprise or similar
+  quota              Int?              @default(0)
 
   // Relations
-  users       User[]
-  athletes    Athlete[]
-  subscriptions Subscription[]
-  // Newly added reverse relations
-  invitations Invitation[]
-  payments    Payment[]
-  institutionPlans InstitutionPlan[]
+  users              User[]
+  athletes           Athlete[]
+  subscriptions      Subscription[]
+  invitations        Invitation[]
+  payments           Payment[]
+  institutionPlans   InstitutionPlan[]
 }
 
 model Session {
@@ -154,17 +153,17 @@ model EmailVerification {
 }
 
 model Invitation {
-  id            String   @id @default(uuid())
-  createdAt     DateTime @default(now())
+  id            String      @id @default(uuid())
+  createdAt     DateTime    @default(now())
   email         String?
   phone         String?
-  code          String   @unique
+  code          String      @unique
   role          Role
   inviterId     String?
-  inviter       User?    @relation(fields: [inviterId], references: [id])
+  inviter       User?       @relation(fields: [inviterId], references: [id])
   institutionId String?
   institution   Institution? @relation(fields: [institutionId], references: [id])
-  used          Boolean  @default(false)
+  used          Boolean     @default(false)
   expiresAt     DateTime?
 }
 
@@ -214,17 +213,17 @@ model MessageThread {
 }
 
 model Message {
-  id          String    @id @default(uuid())
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  threadId    String?
-  thread      MessageThread? @relation(fields: [threadId], references: [id])
-  senderId    String?
-  sender      User?      @relation("message_sender", fields: [senderId], references: [id])
-  receiverId  String?
-  receiver    User?      @relation("message_receiver", fields: [receiverId], references: [id])
-  body        String
-  metadata    Json?
+  id           String    @id @default(uuid())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  threadId     String?
+  thread       MessageThread? @relation(fields: [threadId], references: [id])
+  senderId     String?
+  sender       User?      @relation("message_sender", fields: [senderId], references: [id])
+  receiverId   String?
+  receiver     User?      @relation("message_receiver", fields: [receiverId], references: [id])
+  body         String
+  metadata     Json?
   readReceipts MessageReadReceipt[]
 }
 
