@@ -1,15 +1,6 @@
-// prisma/schema.prisma
-// -----------------------------------------------------------------------------
-// 🚀 Enterprise-Grade Prisma Schema — Project Athlete 360
-// Database: PostgreSQL (set DATABASE_URL in .env)
-// Notes:
-//  - All relations are bidirectional where appropriate.
-//  - Important fields indexed for performance (searches, joins).
-//  - Use migrations to evolve schema: `npx prisma migrate dev`
-// -----------------------------------------------------------------------------
-
 generator client {
   provider = "prisma-client-js"
+  output   = "node_modules/@prisma/client"
 }
 
 datasource db {
@@ -17,605 +8,247 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// -----------------------------------------------------------------------------
-// ENUMS
-// -----------------------------------------------------------------------------
-enum Role {
-  ATHLETE
-  COACH
-  ADMIN
-  SUPER_ADMIN
-  SYSTEM
-}
-
-enum SubscriptionStatus {
-  TRIALING
-  ACTIVE
-  PAST_DUE
-  CANCELED
-  SUSPENDED
-  EXPIRED
-}
-
-enum InvoiceStatus {
-  DRAFT
+enum PaymentStatus {
   PENDING
-  PAID
+  COMPLETED
   FAILED
-  VOID
+  REFUNDED
+  CANCELLED
 }
 
-enum InvitationStatus {
-  PENDING
-  ACCEPTED
-  REVOKED
-  EXPIRED
-}
-
-enum Attendance {
-  PRESENT
-  ABSENT
-  EXCUSED
-}
-
-enum BillingProvider {
+enum PaymentProvider {
   STRIPE
   RAZORPAY
   MANUAL
 }
 
-enum BillingTransactionStatus {
-  PENDING
-  SUCCEEDED
-  FAILED
-  REFUNDED
-  FLAGGED
+/*
+ Roles are defined as identifiers that match exact string values used in code:
+  - athlete
+  - coach
+  - admin
+  - super_admin
+*/
+enum Role {
+  athlete
+  coach
+  admin
+  super_admin
 }
 
-// -----------------------------------------------------------------------------
-// CORE MODELS
-// -----------------------------------------------------------------------------
-
 model User {
-  id              String        @id @default(uuid())
-  username        String        @unique
-  email           String?       @unique
-  passwordHash    String
-  name            String?
-  role            Role          @default(ATHLETE)
-  institution     Institution?  @relation(fields: [institutionId], references: [id], onDelete: SetNull)
-  institutionId   String?
-  athlete         Athlete?
-  coach           Coach?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  loginSessions   LoginSession[]
-  refreshTokens   RefreshToken[]
-  notifications   Notification[]
-  invitations     Invitation[]  @relation("InvitedBy")
-  acceptedInvites Invitation[]  @relation("AcceptedBy")
-  auditLogs       AuditLog[]    @relation("AuditLogsByActor")
-  meta            Json?
-  deleted         Boolean       @default(false)
-  deletedAt       DateTime?
+  id             String    @id @default(uuid())
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  username       String?   @unique
+  email          String?   @unique
+  name           String?
+  passwordHash   String?
+  role           Role      @default(athlete)
+  sessionVersion Int       @default(0)
+  coachCode      String?   @unique
+  institutionId  String?   
+  institution    Institution? @relation(fields: [institutionId], references: [id])
+  athlete        Athlete?     @relation(fields: [], references: [])
+  sessions       Session[]
+  invites        Invitation[]
+  // relations
+  messagesSent   Message[]    @relation("message_sender")
+  messagesRecvd  Message[]    @relation("message_receiver")
+  audits         AuditEntry[] @relation("audit_actor")
+  @@index([institutionId])
+}
 
-  @@index([email])
-  @@index([role])
-  @@index([createdAt])
-  @@map("users")
+model Athlete {
+  id            String   @id @default(uuid())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id])
+  athleteCode   String   @unique
+  name          String?
+  dob           DateTime?
+  gender        String?
+  sport         String?
+  contactInfo   String?
+  institutionId String?
+  institution   Institution? @relation(fields: [institutionId], references: [id])
+  approved      Boolean  @default(false)
 }
 
 model Institution {
-  id                  String                  @id @default(uuid())
-  name                String
-  code                String                  @unique
-  domain              String?                 @unique
-  createdAt           DateTime                @default(now())
-  updatedAt           DateTime                @updatedAt
-  users               User[]
-  coaches             CoachInstitution[]
-  athletes            Athlete[]
-  invitations         Invitation[]
-  subscriptions       Subscription[]
-  usage               InstitutionUsage?
-  analytics           InstitutionAnalytics?   @relation("InstitutionAnalyticsRelation")
-  paymentMethods      PaymentMethod[]
-  invoices            Invoice[]
-  systemBackups       SystemBackup[]
-  trialAbuseLogs      TrialAbuseLog[]
-  presignedUploads    PresignedUpload[]
-  billingTransactions BillingTransaction[]
-  meta                Json?
-
-  @@index([code])
-  @@index([domain])
-  @@index([createdAt])
-  @@map("institutions")
+  id          String    @id @default(uuid())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  name        String
+  code        String    @unique
+  domain      String?   @unique
+  address     String?
+  active      Boolean   @default(true)
+  planTier    String?   // free / pro / enterprise or similar
+  users       User[]
+  athletes    Athlete[]
+  subscriptions Subscription[]
+  quota       Int?      @default(0)
 }
-
-// -----------------------------------------------------------------------------
-// ATHLETE / COACH MODELS
-// -----------------------------------------------------------------------------
-
-model Athlete {
-  id             String           @id @default(uuid())
-  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId         String           @unique
-  athleteCode    String           @unique
-  name           String
-  dob            DateTime?
-  sport          String?
-  gender         String?
-  contactInfo    String?
-  approved       Boolean          @default(false)
-  institution    Institution?     @relation(fields: [institutionId], references: [id], onDelete: SetNull)
-  institutionId  String?
-  sessions       Session[]
-  analytics      AthleteAnalytics? @relation("AthleteAnalyticsRelation")
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  meta           Json?
-  deleted        Boolean          @default(false)
-  deletedAt      DateTime?
-
-  @@index([athleteCode])
-  @@index([institutionId])
-  @@index([createdAt])
-  @@map("athletes")
-}
-
-model Coach {
-  id             String           @id @default(uuid())
-  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId         String           @unique
-  coachCode      String           @unique
-  name           String?
-  institutions   CoachInstitution[]
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  meta           Json?
-  deleted        Boolean          @default(false)
-  deletedAt      DateTime?
-
-  @@index([coachCode])
-  @@map("coaches")
-}
-
-model CoachInstitution {
-  id             String      @id @default(uuid())
-  coach          Coach       @relation(fields: [coachId], references: [id], onDelete: Cascade)
-  coachId        String
-  institution    Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
-  institutionId  String
-  createdAt      DateTime    @default(now())
-
-  @@unique([coachId, institutionId])
-  @@index([institutionId])
-  @@map("coach_institutions")
-}
-
-// -----------------------------------------------------------------------------
-// SESSIONS / PERFORMANCE
-// -----------------------------------------------------------------------------
 
 model Session {
-  id               String      @id @default(uuid())
-  athlete          Athlete     @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  athleteId        String
-  coachId          String?
-  attendance       Attendance?
-  performanceScore Float?
-  notes            String?
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
-  meta             Json?
-
-  @@index([athleteId])
-  @@index([createdAt])
-  @@map("sessions")
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime?
+  ip         String?
+  ua         String?
+  valid      Boolean  @default(true)
 }
 
-// -----------------------------------------------------------------------------
-// INVITATIONS
-// -----------------------------------------------------------------------------
+model MfaChallenge {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  code       String
+  expiresAt  DateTime
+  consumed   Boolean  @default(false)
+  createdAt  DateTime  @default(now())
+}
+
+model PasswordResetToken {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  token      String   @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+}
+
+model EmailVerification {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  token      String   @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+}
 
 model Invitation {
-  id              String            @id @default(uuid())
-  email           String
-  role            Role
-  tokenHash       String
-  invitedBy       User              @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: Cascade)
-  invitedById     String
-  institution     Institution       @relation(fields: [institutionId], references: [id], onDelete: Cascade)
-  institutionId   String
-  acceptedBy      User?             @relation("AcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
-  acceptedById    String?
-  status          InvitationStatus  @default(PENDING)
-  message         String?
-  expiresAt       DateTime
-  acceptedAt      DateTime?
-  revokedAt       DateTime?
-  revokeReason    String?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-
-  @@index([email])
-  @@index([status])
-  @@index([tokenHash])
-  @@map("invitations")
+  id            String   @id @default(uuid())
+  createdAt     DateTime @default(now())
+  email         String?
+  phone         String?
+  code          String   @unique
+  role          Role
+  inviterId     String?
+  inviter       User?    @relation(fields: [inviterId], references: [id])
+  institutionId String?
+  institution   Institution? @relation(fields:[institutionId], references:[id])
+  used          Boolean  @default(false)
+  expiresAt     DateTime?
 }
 
-// -----------------------------------------------------------------------------
-// SECURITY / AUTHENTICATION
-// -----------------------------------------------------------------------------
-
-model RefreshToken {
-  id          String   @id @default(uuid())
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId      String
-  tokenHash   String
-  deviceInfo  String?
-  issuedAt    DateTime @default(now())
-  expiresAt   DateTime
-  revoked     Boolean  @default(false)
-  createdAt   DateTime @default(now())
-
-  @@index([userId])
-  @@index([tokenHash])
-  @@map("refresh_tokens")
+model AuditEntry {
+  id         String   @id @default(uuid())
+  createdAt  DateTime @default(now())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id], name: "audit_actor")
+  action     String
+  resource   String?
+  meta       Json?
+  ip         String?
+  severity   String?
 }
 
-model LoginSession {
-  id          String   @id @default(uuid())
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId      String
-  ipAddress   String?
-  userAgent   String?
-  loggedInAt  DateTime @default(now())
-  meta        Json?
-  createdAt   DateTime @default(now())
-
-  @@index([userId])
-  @@map("login_sessions")
+model Payment {
+  id                String         @id @default(uuid())
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  institutionId     String?
+  institution       Institution?   @relation(fields: [institutionId], references: [id])
+  amountCents       Int
+  currency          String         @default("INR")
+  status            PaymentStatus  @default(PENDING)
+  provider          PaymentProvider
+  providerPaymentId String?        @unique
+  metadata          Json?
+  events            PaymentEvent[]
+  notes             String?
 }
 
-// -----------------------------------------------------------------------------
-// BILLING / PLANS
-// -----------------------------------------------------------------------------
+model PaymentEvent {
+  id        String   @id @default(uuid())
+  paymentId String
+  payment   Payment  @relation(fields: [paymentId], references: [id])
+  eventType String
+  payload   Json?
+  createdAt DateTime @default(now())
+}
+
+model MessageThread {
+  id          String    @id @default(uuid())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  subject     String?
+  messages    Message[]
+}
+
+model Message {
+  id          String    @id @default(uuid())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  threadId    String?
+  thread      MessageThread? @relation(fields: [threadId], references: [id])
+  senderId    String?
+  sender      User?      @relation("message_sender", fields: [senderId], references: [id])
+  receiverId  String?
+  receiver    User?      @relation("message_receiver", fields: [receiverId], references: [id])
+  body        String
+  metadata    Json?
+  readReceipts MessageReadReceipt[]
+}
+
+model MessageReadReceipt {
+  id         String   @id @default(uuid())
+  messageId  String
+  message    Message  @relation(fields: [messageId], references: [id])
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  readAt     DateTime @default(now())
+}
 
 model Plan {
-  id                    String         @id @default(uuid())
-  sku                   String         @unique
-  name                  String
-  description           String?
-  priceMonthlyCents     Int            @default(0)
-  storageLimitBytes     BigInt         @default(0)
-  videoLimitPerMonth    Int            @default(0)
-  athletesPerCoach      Int            @default(50)
-  coachesPerInstitution Int            @default(10)
-  features              Json?
-  isDefault             Boolean        @default(false)
-  createdAt             DateTime       @default(now())
-  updatedAt             DateTime       @updatedAt
-  subscriptions         Subscription[]
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
 
-  @@index([sku])
-  @@map("plans")
+model InstitutionPlan {
+  id                String   @id @default(uuid())
+  institutionId     String
+  institution       Institution @relation(fields: [institutionId], references: [id])
+  name              String
+  maxCoaches        Int      @default(0)
+  maxAthletes       Int      @default(0)
+  billingPeriodDays Int?
+  priceCents        Int?
+  currency          String?  @default("INR")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 model Subscription {
-  id                      String             @id @default(uuid())
-  institution              Institution        @relation(fields: [institutionId], references: [id], onDelete: Cascade)
-  institutionId            String
-  plan                     Plan               @relation(fields: [planId], references: [id], onDelete: Restrict)
-  planId                   String
-  status                   SubscriptionStatus @default(TRIALING)
-  startDate                DateTime           @default(now())
-  endDate                  DateTime?
-  nextBillingDate          DateTime?
-  paymentProvider          BillingProvider?
-  providerCustomerId       String?
-  providerSubscriptionId   String?
-  usedFreeTrial            Boolean            @default(false)
-  autoRenew                Boolean            @default(true)
-  canceledAt               DateTime?
-  invoices                 Invoice[]
-  createdAt                DateTime           @default(now())
-  updatedAt                DateTime           @updatedAt
-
-  @@index([institutionId])
-  @@index([status])
-  @@map("subscriptions")
-}
-
-// -----------------------------------------------------------------------------
-// NOTIFICATIONS
-// -----------------------------------------------------------------------------
-
-model Notification {
-  id             String    @id @default(uuid())
-  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId         String
-  title          String
-  message        String
-  type           String    @default("GENERAL")
-  priority       String    @default("normal")
-  channel        String?
-  read           Boolean   @default(false)
-  readAt         DateTime?
-  delivered      Boolean   @default(false)
-  deliveredAt    DateTime?
-  metadata       Json?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  @@index([userId])
-  @@index([type])
-  @@index([priority])
-  @@index([createdAt])
-  @@map("notifications")
-}
-
-// -----------------------------------------------------------------------------
-// ANALYTICS
-// -----------------------------------------------------------------------------
-
-model AthleteAnalytics {
-  athleteId      String    @id
-  athlete        Athlete   @relation("AthleteAnalyticsRelation", fields: [athleteId], references: [id], onDelete: Cascade)
-  avgScore       Float?
-  attendanceRate Float?
-  updatedAt      DateTime  @updatedAt
-
-  @@map("athlete_analytics")
-}
-
-model InstitutionAnalytics {
-  institutionId  String      @id
-  institution    Institution @relation("InstitutionAnalyticsRelation", fields: [institutionId], references: [id], onDelete: Cascade)
-  avgPerformance Float?
-  attendanceRate Float?
-  updatedAt      DateTime    @updatedAt
-
-  @@map("institution_analytics")
-}
-
-// -----------------------------------------------------------------------------
-// SYSTEM / BILLING / SECURITY MODELS
-// -----------------------------------------------------------------------------
-
-model AuditLog {
-  id           String   @id @default(uuid())
-  actorId      String?
-  actor        User?    @relation("AuditLogsByActor", fields: [actorId], references: [id], onDelete: SetNull)
-  actorRole    String?
-  action       String
-  entity       String?
-  entityId     String?
-  details      Json?
-  metadata     Json?
-  chainHash    String
-  previousHash String?
-  createdAt    DateTime @default(now())
-
-  @@index([actorId])
-  @@index([action])
-  @@index([createdAt])
-  @@map("audit_logs")
-}
-
-model InstitutionUsage {
-  institution      Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
-  institutionId    String      @id
-  storageBytes     BigInt      @default(0)
-  videoCountMonth  Int         @default(0)
-  athletesCount    Int         @default(0)
-  coachesCount     Int         @default(0)
-  lastReconciledAt DateTime?
-  updatedAt        DateTime    @updatedAt
-  meta             Json?
-
-  @@map("institution_usage")
-}
-
-model PaymentMethod {
-  id                 String      @id @default(uuid())
-  institution        Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
-  institutionId      String
-  provider           BillingProvider
-  providerPaymentId  String
-  cardBrand          String?
-  last4              String?
-  expMonth           Int?
-  expYear            Int?
-  enabled            Boolean     @default(true)
-  createdAt          DateTime    @default(now())
-  updatedAt          DateTime    @updatedAt
-
-  @@index([institutionId])
-  @@map("payment_methods")
-}
-
-model Invoice {
-  id                 String        @id @default(uuid())
-  institution        Institution    @relation(fields: [institutionId], references: [id], onDelete: Cascade)
-  institutionId      String
-  subscription       Subscription?  @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
-  subscriptionId     String?
-  amountCents        Int
-  currency           String        @default("INR")
-  status             InvoiceStatus @default(PENDING)
-  dueDate            DateTime?
-  providerInvoiceId  String?
-  metadata           Json?
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
-
-  @@index([institutionId])
-  @@index([status])
-  @@map("invoices")
-}
-
-model BillingTransaction {
-  id              String             @id @default(uuid())
-  provider        BillingProvider
-  transactionId   String             @unique
-  institution     Institution?       @relation(fields: [institutionId], references: [id], onDelete: SetNull)
-  institutionId   String?
-  amountPaid      Float
-  currency        String             @default("INR")
-  status          BillingTransactionStatus
-  reconciledAt    DateTime?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-  flagged         Boolean            @default(false)
-  metadata        Json?
-
-  // 🔥 Add this relation (fixes missing opposite field)
-  billingEvents   BillingEvent[]     @relation("TransactionToEvent")
-
-  @@index([provider])
-  @@map("billing_transactions")
-}
-
-model BillingEvent {
-  id                    String             @id @default(uuid())
-  eventId               String             @unique
-  type                  String
-  provider              BillingProvider
-  billingTransactionId  String?
-  billingTransaction    BillingTransaction? @relation("TransactionToEvent", fields: [billingTransactionId], references: [id], onDelete: SetNull)
-  payload               Json?
-  createdAt             DateTime           @default(now())
-
-  @@index([provider])
-  @@map("billing_events")
-}
-
-// -----------------------------------------------------------------------------
-// BACKUPS / STORAGE / ABUSE
-// -----------------------------------------------------------------------------
-
-model SystemBackup {
   id            String   @id @default(uuid())
-  key           String
-  sizeBytes     BigInt
-  checksum      String
-  status        String
-  institution   Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
-  institutionId String?
+  institutionId  String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  planId        String
+  plan          InstitutionPlan @relation(fields: [planId], references: [id])
+  startsAt      DateTime
+  endsAt        DateTime?
+  active        Boolean  @default(true)
+  autoRenew     Boolean  @default(false)
   createdAt     DateTime @default(now())
-  meta          Json?
-
-  @@map("system_backups")
-}
-
-model KeyBackup {
-  id            String   @id @default(uuid())
-  backupId      String   @unique
-  jwtSecret     String   // store encrypted externally; secrets manager recommended
-  encryptionKey String
-  createdAt     DateTime @default(now())
-  meta          Json?
-
-  @@map("key_backups")
-}
-
-model TrialAbuseLog {
-  id                String     @id @default(uuid())
-  userId            String?
-  institution       Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
-  institutionId     String?
-  hashedIp          String
-  hashedUA          String?
-  hashedDevice      String?
-  hashedEmailDomain String?
-  createdAt         DateTime   @default(now())
-
-  @@index([hashedIp])
-  @@index([institutionId])
-  @@map("trial_abuse_logs")
-}
-
-model PresignedUpload {
-  id            String      @id @default(uuid())
-  institution   Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
-  institutionId String?
-  fileKey       String      @unique
-  fileUrl       String?
-  fileSize      BigInt?
-  fileType      String?
-  createdBy     String?
-  createdAt     DateTime    @default(now())
-  expiresAt     DateTime
-  used          Boolean     @default(false)
-  meta          Json?
-
-  @@index([institutionId])
-  @@map("presigned_uploads")
-}
-
-model PlatformAnalytics {
-  id                Int     @id @default(1)
-  totalAthletes     Int
-  totalInstitutions Int
-  totalSessions     Int
-  avgPerformance    Float?
-  updatedAt         DateTime @updatedAt
-
-  @@map("platform_analytics")
-}
-
-// -----------------------------------------------------------------------------
-// MISC MODELS
-// -----------------------------------------------------------------------------
-
-model BlockedIP {
-  id          String   @id @default(uuid())
-  ipHash      String   @unique
-  reason      String?
-  blockedById String?
-  createdAt   DateTime @default(now())
-  expiresAt   DateTime?
-  resolved    Boolean  @default(false)
-  meta        Json?
-
-  @@map("blocked_ips")
-}
-
-model IPReputation {
-  id        String   @id @default(uuid())
-  ipHash    String   @unique
-  score     Int      @default(0)
-  lastSeen  DateTime @default(now())
-  meta      Json?
-
-  @@map("ip_reputation")
-}
-
-model SystemAlert {
-  id          String   @id @default(uuid())
-  title       String
-  message     String
-  severity    String   @default("medium")
-  category    String?
-  metadata    Json?
-  resolved    Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  resolvedAt  DateTime?
-
-  @@map("system_alerts")
-}
-
-model EmailLog {
-  id          String   @id @default(uuid())
-  to          String
-  subject     String
-  status      String   @default("SENT")
-  provider    String?
-  error       String?
-  createdAt   DateTime @default(now())
-  meta        Json?
-
-  @@map("email_logs")
+  updatedAt     DateTime @updatedAt
 }
