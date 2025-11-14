@@ -1,46 +1,19 @@
-// src/services/superAdminAlerts.service.ts
-import { prisma } from "../prismaClient";
+// src/services/adminNotification.service.ts
 import logger from "../logger";
 
-export type SystemAlert = {
-  title: string;
-  message: string;
-  severity?: "info" | "warn" | "critical";
-  metadata?: Record<string, any>;
-};
-
-class SuperAdminAlertsService {
-  async createSuperAdminAlert(alert: SystemAlert) {
-    // Lightweight DB-backed alert (create a Payment-like record or special table later)
-    try {
-      // Keep it simple: write to AuditEntry for now
-      const entry = await prisma.auditEntry.create({
-        data: {
-          actorId: null,
-          action: "SUPER_ADMIN_ALERT",
-          resource: alert.title,
-          meta: { message: alert.message, severity: alert.severity, metadata: alert.metadata },
-        },
-      });
-      logger.info("[SuperAdminAlerts] created", { id: entry.id, severity: alert.severity });
-      return entry;
-    } catch (err: any) {
-      logger.error("[SuperAdminAlerts] create failed", { error: err.message });
-      return undefined;
-    }
+class AdminNotificationService {
+  async sendToAdmin(adminId: string, subject: string, body: string) {
+    // Replace: integrate with email/SMS/Slack
+    logger.info("[AdminNotification] sendToAdmin", { adminId, subject });
+    return { ok: true };
   }
 
-  async dispatchSuperAdminAlert(alert: SystemAlert) {
-    // placeholder: send to external channels (email/Slack) later
-    logger.warn("[SuperAdminAlerts] dispatch", alert);
-    return this.createSuperAdminAlert(alert);
-  }
-
-  async sendSystemAlert(alert: SystemAlert) {
-    // compatibility surface for workers that call sendSystemAlert
-    return this.dispatchSuperAdminAlert(alert);
+  async broadcast(subject: string, body: string) {
+    logger.info("[AdminNotification] broadcast", { subject });
+    return { ok: true };
   }
 }
 
-export const superAdminAlertsService = new SuperAdminAlertsService();
-export default superAdminAlertsService;
+const adminNotificationService = new AdminNotificationService();
+export default adminNotificationService;
+export { adminNotificationService };
