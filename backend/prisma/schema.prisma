@@ -49,13 +49,25 @@ model User {
   coachCode      String?   @unique
   institutionId  String?   
   institution    Institution? @relation(fields: [institutionId], references: [id])
-  athlete        Athlete?     @relation(fields: [], references: [])
+
+  // One-to-one (Athlete) — Athlete defines the FK (userId)
+  athlete        Athlete?     @relation(name: "UserToAthlete")
+
+  // Sessions & invites
   sessions       Session[]
   invites        Invitation[]
-  // relations
+
+  // Messages
   messagesSent   Message[]    @relation("message_sender")
   messagesRecvd  Message[]    @relation("message_receiver")
+  messageReadReceipts MessageReadReceipt[]
+
+  // Audit / MFA / Tokens / Verifications
   audits         AuditEntry[] @relation("audit_actor")
+  mfaChallenges  MfaChallenge[]
+  passwordResetTokens PasswordResetToken[]
+  emailVerifications  EmailVerification[]
+
   @@index([institutionId])
 }
 
@@ -64,7 +76,7 @@ model Athlete {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   userId        String   @unique
-  user          User     @relation(fields: [userId], references: [id])
+  user          User     @relation(name: "UserToAthlete", fields: [userId], references: [id])
   athleteCode   String   @unique
   name          String?
   dob           DateTime?
@@ -89,6 +101,9 @@ model Institution {
   users       User[]
   athletes    Athlete[]
   subscriptions Subscription[]
+  institutionPlans InstitutionPlan[]
+  invitations Invitation[]
+  payments    Payment[]
   quota       Int?      @default(0)
 }
 
@@ -235,6 +250,7 @@ model InstitutionPlan {
   billingPeriodDays Int?
   priceCents        Int?
   currency          String?  @default("INR")
+  subscriptions     Subscription[]
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }
