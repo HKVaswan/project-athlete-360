@@ -1,41 +1,30 @@
 {
   "compilerOptions": {
-    /* === Core Build Settings === */
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "outDir": "dist",
     "rootDir": "src",
-    "lib": ["ES2022"],
-
-    /* === Strictness & Safety === */
+    "outDir": "dist",
+    "lib": ["ES2022", "DOM"],
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
-
-    /* === Module Interoperability === */
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
-
-    /* === Decorators & Metadata (for DI or ORM) === */
+    "allowJs": false,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-
-    /* === Source Maps for Debugging === */
     "sourceMap": true,
-
-    /* === Output Cleanliness === */
     "removeComments": true,
     "pretty": true,
-
-    /* === Type Roots (for custom types & global.d.ts) === */
-    "typeRoots": ["./src/types", "./node_modules/@types"]
+    "typeRoots": ["./src/types", "./node_modules/@types"],
+    "types": ["node"]
   },
-  "include": ["src/**/*.ts", "src/**/*.d.ts"],
+  "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist", "tests", "**/*.spec.ts"]
 }
