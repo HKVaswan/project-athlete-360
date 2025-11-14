@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "node_modules/@prisma/client"
 }
 
 datasource db {
@@ -21,6 +22,13 @@ enum PaymentProvider {
   MANUAL
 }
 
+/*
+ Roles are defined as identifiers that match exact string values used in code:
+  - athlete
+  - coach
+  - admin
+  - super_admin
+*/
 enum Role {
   athlete
   coach
@@ -41,12 +49,27 @@ model User {
   coachCode      String?   @unique
   institutionId  String?
   institution    Institution? @relation(fields: [institutionId], references: [id])
+
+  // One-to-one: Athlete holds the FK (Athlete.userId). This side is optional.
   athlete        Athlete?
+
+  // Sessions, invites and messages
   sessions       Session[]
-  invites        Invitation[]
+  invites        Invitation[]          // invitations created by this user
   messagesSent   Message[]    @relation("message_sender")
   messagesRecvd  Message[]    @relation("message_receiver")
+
+  // Audit entries where this user acted as actor (named relation)
   audits         AuditEntry[] @relation("audit_actor")
+
+  // MFA / Tokens / Verifications
+  mfaChallenges         MfaChallenge[]
+  passwordResetTokens   PasswordResetToken[]
+  emailVerifications    EmailVerification[]
+
+  // Read receipts for messages
+  messageReadReceipts   MessageReadReceipt[]
+
   @@index([institutionId])
 }
 
@@ -68,19 +91,25 @@ model Athlete {
 }
 
 model Institution {
-  id            String         @id @default(uuid())
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  name          String
-  code          String         @unique
-  domain        String?        @unique
-  address       String?
-  active        Boolean        @default(true)
-  planTier      String?
-  users         User[]
-  athletes      Athlete[]
+  id          String    @id @default(uuid())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  name        String
+  code        String    @unique
+  domain      String?   @unique
+  address     String?
+  active      Boolean   @default(true)
+  planTier    String?   // free / pro / enterprise or similar
+  quota       Int?      @default(0)
+
+  // Relations
+  users       User[]
+  athletes    Athlete[]
   subscriptions Subscription[]
-  quota         Int?           @default(0)
+  // Newly added reverse relations
+  invitations Invitation[]
+  payments    Payment[]
+  institutionPlans InstitutionPlan[]
 }
 
 model Session {
@@ -101,7 +130,7 @@ model MfaChallenge {
   code       String
   expiresAt  DateTime
   consumed   Boolean  @default(false)
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
 }
 
 model PasswordResetToken {
@@ -134,7 +163,7 @@ model Invitation {
   inviterId     String?
   inviter       User?    @relation(fields: [inviterId], references: [id])
   institutionId String?
-  institution   Institution? @relation(fields:[institutionId], references:[id])
+  institution   Institution? @relation(fields: [institutionId], references: [id])
   used          Boolean  @default(false)
   expiresAt     DateTime?
 }
@@ -177,35 +206,35 @@ model PaymentEvent {
 }
 
 model MessageThread {
-  id        String    @id @default(uuid())
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  subject   String?
-  messages  Message[]
+  id          String    @id @default(uuid())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  subject     String?
+  messages    Message[]
 }
 
 model Message {
-  id         String    @id @default(uuid())
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  threadId   String?
-  thread     MessageThread? @relation(fields: [threadId], references: [id])
-  senderId   String?
-  sender     User?      @relation("message_sender", fields: [senderId], references: [id])
-  receiverId String?
-  receiver   User?      @relation("message_receiver", fields: [receiverId], references: [id])
-  body       String
-  metadata   Json?
+  id          String    @id @default(uuid())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  threadId    String?
+  thread      MessageThread? @relation(fields: [threadId], references: [id])
+  senderId    String?
+  sender      User?      @relation("message_sender", fields: [senderId], references: [id])
+  receiverId  String?
+  receiver    User?      @relation("message_receiver", fields: [receiverId], references: [id])
+  body        String
+  metadata    Json?
   readReceipts MessageReadReceipt[]
 }
 
 model MessageReadReceipt {
-  id        String   @id @default(uuid())
-  messageId String
-  message   Message  @relation(fields: [messageId], references: [id])
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  readAt    DateTime @default(now())
+  id         String   @id @default(uuid())
+  messageId  String
+  message    Message  @relation(fields: [messageId], references: [id])
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  readAt     DateTime @default(now())
 }
 
 model Plan {
@@ -228,11 +257,14 @@ model InstitutionPlan {
   currency          String?  @default("INR")
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+
+  // reverse relation
+  subscriptions Subscription[]
 }
 
 model Subscription {
   id            String   @id @default(uuid())
-  institutionId String
+  institutionId  String
   institution   Institution @relation(fields: [institutionId], references: [id])
   planId        String
   plan          InstitutionPlan @relation(fields: [planId], references: [id])
