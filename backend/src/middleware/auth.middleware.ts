@@ -1,258 +1,66 @@
-/**
- * src/middleware/auth.middleware.ts
- * ------------------------------------------------------------------------
- * Enterprise-grade Authentication Middleware
- * ------------------------------------------------------------------------
- * ✅ Secure JWT verification + MFA enforcement
- * ✅ Handles impersonation safely
- * ✅ Enforces institution/subscription limits
- * ✅ Integrates audit logging and plan validation
- * ✅ Supports multi-tenant session isolation
- * ✅ Super Admin safety validation
- */
-
+// src/middleware/auth.middleware.ts
 import { Request, Response, NextFunction } from "express";
-import jwt, { JwtPayload } from "jsonwebtoken";
-import logger from "../logger";
+import jwt from "jsonwebtoken";
 import prisma from "../prismaClient";
-import {
-  getUserSessionVersion,
-  isTokenRevoked,
-} from "../services/session.service";
-import { recordAuditEvent } from "../services/audit.service";
-import { Errors, ApiError } from "../utils/errors";
-import { verifyMfaSession } from "../services/mfa.service";
-import { ensureSuperAdmin } from "../lib/securityManager";
-import { subscriptionService } from "../services/subscription.service";
-import { institutionUsageRepo } from "../repositories/institutionUsage.repo";
+import { config } from "../config";
+import { Errors } from "../utils/errors";
+import logger from "../logger";
 
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  throw new Error("JWT_SECRET not configured.");
+export interface AuthPayload {
+  userId: string;
+  username?: string;
+  role?: string;
+  mfaVerified?: boolean;
+  impersonatedBy?: string | null;
+  sessionVersion?: number;
 }
 
-// ───────────────────────────────
-// 🔒 Authenticated Request Type
-// ───────────────────────────────
 export interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
-    username: string;
-    role: "athlete" | "coach" | "admin" | "super_admin";
-    email?: string;
-    institutionId?: string;
-    impersonatedBy?: string;
+    username?: string;
+    role?: string;
     sessionVersion?: number;
-    mfaVerified?: boolean;
   };
-  isImpersonation?: boolean;
 }
 
-// ───────────────────────────────
-// 🔑 Authentication Middleware
-// ───────────────────────────────
-export const requireAuth = async (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-) => {
+export const requireAuth = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith("Bearer ")) {
-      throw Errors.Auth("Missing or invalid authorization header.");
-    }
+    const header = req.headers.authorization || req.headers["x-access-token"];
+    if (!header) throw Errors.Auth("Authorization token missing");
 
-    const token = authHeader.split(" ")[1];
-    let decoded: JwtPayload;
-
+    const token = (header as string).replace(/^Bearer\s+/i, "");
+    let decoded: AuthPayload | null = null;
     try {
-      decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+      decoded = jwt.verify(token, config.jwt.secret) as AuthPayload;
     } catch (err) {
-      logger.warn("[AUTH] Invalid/expired JWT", { ip: req.ip });
-      throw Errors.Auth("Session expired or invalid token.");
+      throw Errors.Auth("Invalid or expired token");
     }
 
-    // Validate session & revocation
-    const [revoked, sessionVersion] = await Promise.all([
-      isTokenRevoked(decoded.userId, token),
-      getUserSessionVersion(decoded.userId),
-    ]);
+    if (!decoded?.userId) throw Errors.Auth("Invalid token payload");
 
-    if (revoked || sessionVersion !== decoded.sessionVersion) {
-      await recordAuditEvent({
-        actorId: decoded.userId,
-        actorRole: decoded.role,
-        action: "SECURITY_EVENT",
-        details: {
-          reason: "revoked_token",
-          ip: req.ip,
-          ua: req.get("user-agent"),
-        },
-      });
-      throw Errors.Auth("Session revoked or replaced. Please re-login.");
+    const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
+    if (!user) throw Errors.Auth("User not found");
+
+    // session version check (to invalidate tokens after password reset/logout-all)
+    if (typeof decoded.sessionVersion === "number" && decoded.sessionVersion !== user.sessionVersion) {
+      throw Errors.Auth("Token session version mismatch (stale token)");
     }
 
-    // Attach user
+    // attach
     req.user = {
-      id: decoded.userId || decoded.id,
-      username: decoded.username,
-      role: decoded.role,
-      email: decoded.email,
-      institutionId: decoded.institutionId,
-      impersonatedBy: decoded.impersonatedBy,
-      sessionVersion: decoded.sessionVersion || 0,
-      mfaVerified: decoded.mfaVerified || false,
+      id: user.id,
+      username: user.username ?? undefined,
+      role: user.role as unknown as string,
+      sessionVersion: user.sessionVersion,
     };
 
-    // ───────────────────────────────
-    // 🕵️ Impersonation Tracking
-    // ───────────────────────────────
-    if (decoded.impersonatedBy) {
-      req.isImpersonation = true;
-      await recordAuditEvent({
-        actorId: decoded.impersonatedBy,
-        actorRole: "super_admin",
-        targetId: decoded.userId,
-        action: "IMPERSONATION_SESSION",
-        details: {
-          route: req.originalUrl,
-          ip: req.ip,
-          ua: req.get("user-agent"),
-        },
-      });
-    }
-
-    // ───────────────────────────────
-    // 🔐 Enforce MFA for Super Admin
-    // ───────────────────────────────
-    if (decoded.role === "super_admin") {
-      const validMfa =
-        decoded.mfaVerified || (await verifyMfaSession(decoded.userId));
-      if (!validMfa) {
-        await recordAuditEvent({
-          actorId: decoded.userId,
-          actorRole: "super_admin",
-          action: "SECURITY_EVENT",
-          details: { reason: "missing_mfa", ip: req.ip },
-        });
-        throw Errors.Forbidden("MFA verification required for Super Admin.");
-      }
-    }
-
-    // ───────────────────────────────
-    // 🧩 Institution Plan & Account Check
-    // ───────────────────────────────
-    if (["admin", "coach", "athlete"].includes(decoded.role)) {
-      const institution = await prisma.institution.findUnique({
-        where: { id: decoded.institutionId },
-        include: { subscription: true },
-      });
-
-      if (!institution) throw Errors.Forbidden("Institution not found.");
-
-      // Enforce frozen/suspended states
-      if (institution.status === "frozen") {
-        throw Errors.Forbidden(
-          "Institution account is temporarily frozen. Contact support."
-        );
-      }
-      if (institution.status === "suspended") {
-        throw Errors.Forbidden(
-          "Institution account suspended due to non-payment or abuse."
-        );
-      }
-
-      // Validate subscription status
-      const active = await subscriptionService.validateSubscription(
-        institution.id
-      );
-      if (!active) {
-        throw Errors.Forbidden(
-          "Institution subscription expired. Please renew to continue."
-        );
-      }
-
-      // Prevent exceeding quota before proceeding
-      const usage = await institutionUsageRepo.getUsageSummary(
-        institution.id
-      );
-      if (usage && usage.percentUsed >= 100) {
-        throw Errors.Forbidden(
-          "Institution quota exceeded. Upgrade your plan to continue."
-        );
-      }
-    }
-
-    // ───────────────────────────────
-    // 🌐 IP / Device Anomaly Detection (Optional future)
-    // ───────────────────────────────
-    // Future enhancement: track user device fingerprint & geo-location anomalies
-
     next();
   } catch (err: any) {
-    logger.error("[AUTH] Middleware Error", {
-      message: err.message,
-      route: req.originalUrl,
-      ip: req.ip,
-    });
-
-    if (err instanceof ApiError) {
-      return res.status(err.statusCode).json(err.toJSON());
-    }
-
-    res.status(500).json({
+    logger.warn("[AUTH] requireAuth failed", { err: err?.message || err });
+    return res.status(err?.status || 401).json({
       success: false,
-      code: "AUTH_INTERNAL_ERROR",
-      message: "Internal authentication error.",
+      message: err?.message || "Unauthorized",
     });
-  }
-};
-
-// ───────────────────────────────
-// 🧩 Role-Based Access Middleware
-// ───────────────────────────────
-export const requireRole =
-  (roles: string[]) =>
-  (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    if (!req.user) throw Errors.Auth("User not authenticated.");
-
-    if (!roles.includes(req.user.role)) {
-      logger.warn("[AUTH] Access denied for role", {
-        role: req.user.role,
-        required: roles,
-        userId: req.user.id,
-      });
-
-      throw Errors.Forbidden(`Access denied. Required: ${roles.join(", ")}`);
-    }
-
-    next();
-  };
-
-// ───────────────────────────────
-// 🧠 Super Admin Only
-// ───────────────────────────────
-export const requireSuperAdmin = (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    if (!req.user || req.user.role !== "super_admin") {
-      throw Errors.Forbidden("Super Admin privileges required.");
-    }
-
-    if (!req.user.mfaVerified) {
-      throw Errors.Forbidden("Super Admin MFA verification required.");
-    }
-
-    ensureSuperAdmin(req.user.role);
-    next();
-  } catch (err: any) {
-    logger.warn(`[AUTH] Super Admin access denied: ${err.message}`);
-    if (err instanceof ApiError) {
-      return res.status(err.statusCode).json(err.toJSON());
-    }
-    res.status(403).json({ success: false, message: "Access denied." });
   }
 };
