@@ -1,0 +1,282 @@
+{
+  "id": null,
+  "uid": "pa360-api-system-health",
+  "title": "Project Athlete 360 - API & System Health Dashboard (Merged)",
+  "tags": ["project-athlete-360", "api", "observability", "system", "prometheus"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 2,
+  "refresh": "10s",
+  "style": "dark",
+  "panels": [
+    {
+      "type": "row",
+      "title": "🎯 API Performance Overview",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "type": "stat",
+      "title": "Total API Requests (Last 5m)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(increase(pa360_http_requests_total[5m]))",
+          "legendFormat": "All Requests"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 1, "w": 6, "h": 4 },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "color": { "mode": "palette-classic" } }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "API Request Rate (req/s)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "rate(pa360_http_requests_total[1m])",
+          "legendFormat": "{{method}} {{route}}"
+        }
+      ],
+      "gridPos": { "x": 6, "y": 1, "w": 18, "h": 6 },
+      "lines": true,
+      "fill": 1,
+      "linewidth": 2,
+      "yaxes": [
+        { "format": "reqps", "logBase": 1 },
+        { "format": "short" }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Request Latency (p95 by Route)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(pa360_http_request_duration_seconds_bucket[5m])) by (le, route))",
+          "legendFormat": "{{route}}"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 7, "w": 12, "h": 7 },
+      "lines": true,
+      "fill": 1,
+      "linewidth": 2,
+      "yaxes": [
+        { "format": "s" },
+        { "format": "short" }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Error Rate Breakdown (4xx & 5xx)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "(sum(rate(pa360_http_requests_total{status_code=~\"5..\"}[5m])) / sum(rate(pa360_http_requests_total[5m]))) * 100",
+          "legendFormat": "5xx Server Errors"
+        },
+        {
+          "expr": "(sum(rate(pa360_http_requests_total{status_code=~\"4..\"}[5m])) / sum(rate(pa360_http_requests_total[5m]))) * 100",
+          "legendFormat": "4xx Client Errors"
+        }
+      ],
+      "gridPos": { "x": 12, "y": 7, "w": 12, "h": 7 },
+      "lines": true,
+      "fill": 1,
+      "linewidth": 2,
+      "yaxes": [
+        { "format": "percent" },
+        { "format": "short" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "🧠 Core System Health",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 }
+    },
+    {
+      "type": "gauge",
+      "title": "CPU Usage (%)",
+      "id": 4,
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "avg(pa360_system_cpu_usage_percent)",
+          "legendFormat": "CPU Usage"
+        }
+      ],
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 15 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 75 },
+              { "color": "red", "value": 90 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "gauge",
+      "title": "Memory Usage (%)",
+      "id": 5,
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "avg(pa360_system_memory_usage_percent)",
+          "legendFormat": "Memory Usage"
+        }
+      ],
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 15 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 80 },
+              { "color": "red", "value": 95 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Database Query Latency (Avg)",
+      "id": 6,
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "avg_over_time(pa360_db_query_latency_seconds[5m])",
+          "legendFormat": "DB latency (s)"
+        }
+      ],
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 15 },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "color": { "mode": "continuous-YlOrRd" } }
+      }
+    },
+    {
+      "type": "row",
+      "title": "📦 Worker & AI Activity",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 21 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Active Jobs per Queue",
+      "id": 7,
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "pa360_worker_jobs_active",
+          "legendFormat": "{{queue_name}}"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "AI Activity Events Rate",
+      "id": 8,
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "rate(pa360_ai_activity_total[5m])",
+          "legendFormat": "{{type}}"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "color": { "mode": "continuous-RdYlBu" }
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "📃 Debugging Tables",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 }
+    },
+    {
+      "type": "table",
+      "title": "Top Slow API Routes (p95)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "topk(5, histogram_quantile(0.95, sum(rate(pa360_http_request_duration_seconds_bucket[5m])) by (le, route)))",
+          "legendFormat": "{{route}}"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 31, "w": 12, "h": 7 },
+      "options": { "showHeader": true }
+    },
+    {
+      "type": "table",
+      "title": "Error Breakdown by Route (5xx)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "topk(10, sum(rate(pa360_http_requests_total{status_code=~\"5..\"}[5m])) by (route))",
+          "legendFormat": "{{route}}"
+        }
+      ],
+      "gridPos": { "x": 12, "y": 31, "w": 12, "h": 7 },
+      "options": { "showHeader": true }
+    }
+  ],
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": ["10s", "30s", "1m", "5m", "15m", "1h"]
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "route",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(pa360_http_requests_total, route)",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "label": "API Route"
+      },
+      {
+        "name": "instance",
+        "type": "query",
+        "datasource": "Prometheus",
+        "definition": "label_values(pa360_http_requests_total, instance)",
+        "refresh": 1,
+        "includeAll": true,
+        "label": "Instance"
+      }
+    ]
+  }
+}
