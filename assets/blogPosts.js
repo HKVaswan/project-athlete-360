@@ -7,7 +7,7 @@ export const blogPosts = [
         image: 'https://images.pexels.com/photos/9519544/pexels-photo-9519544.jpeg',  
         authorName: 'H.K. Vaswan',
         authorImage: 'https://i.ibb.co/x8MnfSsr/CC-20250801-141736.png',
-        authorBio: ''
+        authorBio: 'Sports Science Educator| BPES | MPES (pursuing)| Former Endurance Runner'
     },
     {
         filename: 'optimizing-hydration.md',
@@ -17,7 +17,7 @@ export const blogPosts = [
         image: 'https://images.pexels.com/photos/416528/pexels-photo-416528.jpeg',
         authorName: 'H.K. Vaswan',
         authorImage: 'https://i.ibb.co/x8MnfSsr/CC-20250801-141736.png',
-        authorBio: ''
+        authorBio: 'Sports Science Educator| BPES | MPES (pursuing)| Former Endurance Runner'
     },
     {
     filename: 'managing-pressure-burnout.md',
@@ -27,6 +27,6 @@ export const blogPosts = [
     image: 'https://images.pexels.com/photos/22028306/pexels-photo-22028306.jpeg',
     authorName: 'H.K. Vaswan',
     authorImage: 'https://i.ibb.co/x8MnfSsr/CC-20250801-141736.png',
-    authorBio: ''
+    authorBio: 'Sports Science Educator| BPES | MPES (pursuing)| Former Endurance Runner'
     }
 ];
