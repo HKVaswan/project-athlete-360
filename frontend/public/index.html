@@ -1,0 +1,2020 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="PA360 Proton — The affordable sports institute management platform. Manage athletes, track performance, record attendance and competition results. Start free for 14 days." />
+  <meta name="keywords" content="sports institute management, athlete tracking, performance management, sports software, PA360, Project Athlete 360" />
+  <meta name="author" content="Project Athlete 360" />
+
+  <!-- Open Graph (for social sharing) -->
+  <meta property="og:title" content="PA360 Proton — Manage Better. Perform Better." />
+  <meta property="og:description" content="The complete sports institute record management platform. Built for coaches, designed for athletes." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://www.projectathlete360.in" />
+
+  <title>PA360 Proton — Manage Better. Perform Better.</title>
+
+  <!-- Global CSS -->
+  <link rel="stylesheet" href="../css/global.css" />
+
+  <!-- Page-specific styles -->
+  <style>
+    /* ============================================================
+       HERO SECTION
+       ============================================================ */
+    .hero {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      padding-top: var(--nav-height);
+      overflow: hidden;
+    }
+
+    /* Animated background grid */
+    .hero-bg {
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(180deg, rgba(45,58,140,0.15) 0%, transparent 60%),
+        radial-gradient(ellipse 80% 60% at 60% 40%, rgba(45,58,140,0.12) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 40% at 80% 20%, rgba(163,230,53,0.06) 0%, transparent 60%);
+      z-index: 0;
+    }
+
+    /* Grid lines */
+    .hero-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(26,42,69,0.4) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(26,42,69,0.4) 1px, transparent 1px);
+      background-size: 60px 60px;
+      z-index: 0;
+      mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
+    }
+
+    /* Glowing orb */
+    .hero-orb {
+      position: absolute;
+      top: 20%;
+      right: 10%;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(45,58,140,0.3) 0%, transparent 70%);
+      z-index: 0;
+      animation: float 8s ease-in-out infinite;
+    }
+
+    .hero-orb-2 {
+      position: absolute;
+      bottom: 10%;
+      left: 5%;
+      width: 300px;
+      height: 300px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(163,230,53,0.07) 0%, transparent 70%);
+      z-index: 0;
+      animation: float 12s ease-in-out infinite reverse;
+    }
+
+    .hero .container {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-16);
+      align-items: center;
+      padding-top: var(--space-16);
+      padding-bottom: var(--space-16);
+    }
+
+    .hero-content {
+      max-width: 600px;
+    }
+
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      margin-bottom: var(--space-6);
+    }
+
+    .hero-eyebrow-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--color-accent);
+      animation: pulse-glow 2s ease-in-out infinite;
+    }
+
+    .hero-title {
+      font-family: var(--font-display);
+      font-size: clamp(44px, 6vw, 80px);
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: -0.01em;
+      margin-bottom: var(--space-6);
+    }
+
+    .hero-title .line-accent {
+      color: var(--color-accent);
+      display: block;
+    }
+
+    .hero-subtitle {
+      font-size: clamp(16px, 2vw, 19px);
+      color: var(--color-text-secondary);
+      line-height: 1.7;
+      margin-bottom: var(--space-8);
+      max-width: 480px;
+    }
+
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      flex-wrap: wrap;
+      margin-bottom: var(--space-10);
+    }
+
+    .hero-note {
+      font-size: 13px;
+      color: var(--color-text-muted);
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+
+    .hero-note svg {
+      color: var(--color-accent);
+      flex-shrink: 0;
+    }
+
+    /* Hero stats */
+    .hero-stats {
+      display: flex;
+      gap: var(--space-8);
+      padding-top: var(--space-8);
+      border-top: 1px solid var(--color-bg-border);
+    }
+
+    .hero-stat-value {
+      font-family: var(--font-display);
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--color-accent);
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .hero-stat-label {
+      font-size: 12px;
+      color: var(--color-text-muted);
+      font-family: var(--font-mono);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    /* Hero visual — dashboard mockup */
+    .hero-visual {
+      position: relative;
+    }
+
+    .dashboard-mockup {
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(163,230,53,0.1);
+      animation: float 6s ease-in-out infinite;
+    }
+
+    .mockup-bar {
+      background: var(--color-bg-elevated);
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid var(--color-bg-border);
+    }
+
+    .mockup-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .mockup-dot:nth-child(1) { background: #ef4444; }
+    .mockup-dot:nth-child(2) { background: #f59e0b; }
+    .mockup-dot:nth-child(3) { background: #22c55e; }
+
+    .mockup-url {
+      flex: 1;
+      background: var(--color-bg);
+      border-radius: var(--radius-sm);
+      padding: 4px 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--color-text-muted);
+      margin-left: 8px;
+    }
+
+    .mockup-body {
+      padding: 20px;
+    }
+
+    .mockup-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .mockup-title {
+      font-family: var(--font-display);
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--color-text-primary);
+    }
+
+    .mockup-badge {
+      background: var(--color-accent-glow);
+      color: var(--color-accent);
+      font-size: 10px;
+      font-family: var(--font-mono);
+      padding: 3px 8px;
+      border-radius: var(--radius-full);
+      border: 1px solid rgba(163,230,53,0.3);
+    }
+
+    .mockup-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .mockup-stat {
+      background: var(--color-bg-elevated);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      border: 1px solid var(--color-bg-border);
+    }
+
+    .mockup-stat-val {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--color-text-primary);
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .mockup-stat-val.green { color: var(--color-accent); }
+    .mockup-stat-val.blue  { color: #7b8fde; }
+
+    .mockup-stat-lbl {
+      font-size: 10px;
+      color: var(--color-text-muted);
+      font-family: var(--font-mono);
+      letter-spacing: 0.06em;
+    }
+
+    /* mini chart bars */
+    .mockup-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 4px;
+      height: 48px;
+      margin-bottom: 16px;
+      padding: 8px;
+      background: var(--color-bg-elevated);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--color-bg-border);
+    }
+
+    .mockup-bar-item {
+      flex: 1;
+      background: var(--color-primary);
+      border-radius: 2px;
+      opacity: 0.7;
+      transition: opacity 0.3s;
+    }
+
+    .mockup-bar-item.accent { background: var(--color-accent); opacity: 1; }
+
+    .mockup-athletes {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .mockup-athlete-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px;
+      background: var(--color-bg-elevated);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--color-bg-border);
+    }
+
+    .mockup-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .mockup-athlete-name {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--color-text-primary);
+      flex: 1;
+    }
+
+    .mockup-athlete-sport {
+      font-size: 10px;
+      color: var(--color-text-muted);
+      font-family: var(--font-mono);
+    }
+
+    .mockup-attend {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--color-accent);
+      font-family: var(--font-mono);
+    }
+
+    /* Floating badge on mockup */
+    .mockup-float-badge {
+      position: absolute;
+      bottom: -20px;
+      left: -20px;
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-lg);
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .mockup-float-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-md);
+      background: var(--color-accent-glow);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .mockup-float-text strong {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--color-text-primary);
+    }
+
+    .mockup-float-text span {
+      font-size: 11px;
+      color: var(--color-text-muted);
+    }
+
+    /* ============================================================
+       TRUST BAR
+       ============================================================ */
+    .trust-bar {
+      padding: var(--space-8) 0;
+      border-top: 1px solid var(--color-bg-border);
+      border-bottom: 1px solid var(--color-bg-border);
+    }
+
+    .trust-bar-inner {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-12);
+      flex-wrap: wrap;
+    }
+
+    .trust-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      color: var(--color-text-muted);
+      font-size: 14px;
+    }
+
+    .trust-item svg {
+      color: var(--color-accent);
+      flex-shrink: 0;
+    }
+
+    /* ============================================================
+       FEATURES SECTION
+       ============================================================ */
+    .features-section {
+      padding: var(--space-24) 0;
+    }
+
+    .section-header {
+      text-align: center;
+      margin-bottom: var(--space-16);
+    }
+
+    .section-header .text-label {
+      margin-bottom: var(--space-3);
+      display: block;
+    }
+
+    .section-header h2 {
+      font-size: clamp(32px, 4vw, 52px);
+      margin-bottom: var(--space-4);
+    }
+
+    .section-header p {
+      color: var(--color-text-secondary);
+      font-size: 17px;
+      max-width: 560px;
+      margin: 0 auto;
+      line-height: 1.7;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-6);
+    }
+
+    .feature-card {
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-8);
+      transition: all var(--transition-base);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--color-accent), transparent);
+      opacity: 0;
+      transition: opacity var(--transition-base);
+    }
+
+    .feature-card:hover {
+      border-color: rgba(163,230,53,0.2);
+      transform: translateY(-4px);
+      box-shadow: 0 16px 48px rgba(0,0,0,0.3);
+    }
+
+    .feature-card:hover::before {
+      opacity: 1;
+    }
+
+    .feature-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: var(--radius-md);
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-bg-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      margin-bottom: var(--space-5);
+      transition: all var(--transition-base);
+    }
+
+    .feature-card:hover .feature-icon {
+      background: var(--color-accent-glow);
+      border-color: rgba(163,230,53,0.3);
+    }
+
+    .feature-card h3 {
+      font-size: 20px;
+      margin-bottom: var(--space-3);
+    }
+
+    .feature-card p {
+      color: var(--color-text-secondary);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    /* ============================================================
+       HOW IT WORKS
+       ============================================================ */
+    .how-section {
+      padding: var(--space-24) 0;
+      background: var(--color-bg-surface);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .how-section::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: radial-gradient(ellipse 60% 60% at 50% 50%, rgba(45,58,140,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .steps-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--space-6);
+      position: relative;
+    }
+
+    .steps-grid::before {
+      content: '';
+      position: absolute;
+      top: 28px;
+      left: calc(12.5% + 24px);
+      right: calc(12.5% + 24px);
+      height: 1px;
+      background: linear-gradient(90deg, var(--color-accent), var(--color-primary), var(--color-accent));
+      opacity: 0.3;
+    }
+
+    .step {
+      text-align: center;
+      position: relative;
+    }
+
+    .step-number {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: var(--color-bg-elevated);
+      border: 2px solid var(--color-bg-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--color-accent);
+      margin: 0 auto var(--space-5);
+      position: relative;
+      z-index: 1;
+      transition: all var(--transition-base);
+    }
+
+    .step:hover .step-number {
+      background: var(--color-accent-glow);
+      border-color: var(--color-accent);
+      box-shadow: var(--shadow-accent);
+    }
+
+    .step h3 {
+      font-size: 17px;
+      margin-bottom: var(--space-2);
+    }
+
+    .step p {
+      font-size: 14px;
+      color: var(--color-text-secondary);
+      line-height: 1.6;
+    }
+
+    /* ============================================================
+       ROLES SECTION
+       ============================================================ */
+    .roles-section {
+      padding: var(--space-24) 0;
+    }
+
+    .roles-tabs {
+      display: flex;
+      gap: var(--space-2);
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-2);
+      margin-bottom: var(--space-8);
+      overflow-x: auto;
+    }
+
+    .role-tab {
+      flex: 1;
+      padding: 12px 20px;
+      border-radius: var(--radius-md);
+      font-family: var(--font-display);
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      transition: all var(--transition-base);
+      white-space: nowrap;
+      text-align: center;
+      border: none;
+      background: none;
+    }
+
+    .role-tab.active {
+      background: var(--color-accent);
+      color: #080d1a;
+    }
+
+    .role-tab:not(.active):hover {
+      color: var(--color-text-primary);
+      background: var(--color-bg-elevated);
+    }
+
+    .role-panel {
+      display: none;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-12);
+      align-items: center;
+    }
+
+    .role-panel.active {
+      display: grid;
+    }
+
+    .role-panel-content h3 {
+      font-size: clamp(24px, 3vw, 36px);
+      margin-bottom: var(--space-4);
+    }
+
+    .role-panel-content p {
+      color: var(--color-text-secondary);
+      font-size: 16px;
+      line-height: 1.7;
+      margin-bottom: var(--space-6);
+    }
+
+    .role-features {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+
+    .role-feature-item {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-3);
+      font-size: 15px;
+      color: var(--color-text-secondary);
+    }
+
+    .role-feature-item::before {
+      content: '✓';
+      color: var(--color-accent);
+      font-weight: 700;
+      font-size: 14px;
+      margin-top: 2px;
+      flex-shrink: 0;
+    }
+
+    .role-visual {
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-xl);
+      padding: var(--space-6);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .role-visual-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-5);
+      padding-bottom: var(--space-4);
+      border-bottom: 1px solid var(--color-bg-border);
+    }
+
+    .role-visual-icon {
+      font-size: 24px;
+    }
+
+    .role-visual-title {
+      font-family: var(--font-display);
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .role-visual-items {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+
+    .role-visual-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-3) var(--space-4);
+      background: var(--color-bg-elevated);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--color-bg-border);
+    }
+
+    .role-visual-item-left {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    .rvi-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--color-accent);
+      flex-shrink: 0;
+    }
+
+    .rvi-dot.blue { background: #7b8fde; }
+    .rvi-dot.orange { background: var(--color-warning); }
+
+    .rvi-label {
+      font-size: 13px;
+      color: var(--color-text-secondary);
+    }
+
+    .rvi-value {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--color-accent);
+      font-weight: 500;
+    }
+
+    .rvi-value.blue { color: #7b8fde; }
+    .rvi-value.orange { color: var(--color-warning); }
+
+    /* ============================================================
+       PRICING SECTION
+       ============================================================ */
+    .pricing-section {
+      padding: var(--space-24) 0;
+      background: var(--color-bg-surface);
+    }
+
+    .pricing-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-4);
+      margin-bottom: var(--space-12);
+    }
+
+    .toggle-label {
+      font-size: 15px;
+      color: var(--color-text-secondary);
+      font-weight: 500;
+    }
+
+    .toggle-label.active {
+      color: var(--color-text-primary);
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 52px;
+      height: 28px;
+      cursor: pointer;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-full);
+      transition: all var(--transition-base);
+    }
+
+    .toggle-thumb {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--color-text-muted);
+      transition: all var(--transition-base);
+    }
+
+    .toggle-switch input:checked ~ .toggle-track {
+      background: var(--color-accent-glow);
+      border-color: var(--color-accent);
+    }
+
+    .toggle-switch input:checked ~ .toggle-thumb {
+      transform: translateX(24px);
+      background: var(--color-accent);
+    }
+
+    .save-badge {
+      background: var(--color-accent-glow);
+      color: var(--color-accent);
+      font-size: 11px;
+      font-family: var(--font-mono);
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+      border: 1px solid rgba(163,230,53,0.3);
+    }
+
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-6);
+      align-items: start;
+    }
+
+    .pricing-card {
+      background: var(--color-bg);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-xl);
+      padding: var(--space-8);
+      position: relative;
+      transition: all var(--transition-base);
+    }
+
+    .pricing-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .pricing-card.featured {
+      background: var(--color-bg-elevated);
+      border-color: var(--color-accent);
+      box-shadow: 0 0 0 1px rgba(163,230,53,0.2), var(--shadow-accent);
+    }
+
+    .pricing-featured-label {
+      position: absolute;
+      top: -14px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--color-accent);
+      color: #080d1a;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 4px 16px;
+      border-radius: var(--radius-full);
+      white-space: nowrap;
+    }
+
+    .pricing-plan-name {
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+      margin-bottom: var(--space-4);
+    }
+
+    .pricing-price {
+      margin-bottom: var(--space-2);
+    }
+
+    .price-amount {
+      font-family: var(--font-display);
+      font-size: 52px;
+      font-weight: 700;
+      line-height: 1;
+      color: var(--color-text-primary);
+    }
+
+    .price-currency {
+      font-size: 24px;
+      vertical-align: top;
+      margin-top: 8px;
+      display: inline-block;
+    }
+
+    .price-period {
+      font-size: 14px;
+      color: var(--color-text-muted);
+    }
+
+    .price-annual-note {
+      font-size: 13px;
+      color: var(--color-text-muted);
+      margin-bottom: var(--space-5);
+      min-height: 20px;
+    }
+
+    .price-annual-note.visible {
+      color: var(--color-accent);
+    }
+
+    .pricing-divider {
+      height: 1px;
+      background: var(--color-bg-border);
+      margin: var(--space-5) 0;
+    }
+
+    .pricing-limit {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-5);
+    }
+
+    .pricing-limit-item {
+      text-align: center;
+    }
+
+    .pricing-limit-val {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--color-accent);
+    }
+
+    .pricing-limit-lbl {
+      font-size: 11px;
+      color: var(--color-text-muted);
+      font-family: var(--font-mono);
+      letter-spacing: 0.06em;
+    }
+
+    .pricing-features {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      margin-bottom: var(--space-8);
+    }
+
+    .pricing-feature {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-3);
+      font-size: 14px;
+      color: var(--color-text-secondary);
+    }
+
+    .pricing-feature-check {
+      color: var(--color-accent);
+      font-size: 13px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .pricing-feature-x {
+      color: var(--color-text-muted);
+      font-size: 13px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .pricing-feature.disabled {
+      color: var(--color-text-muted);
+    }
+
+    .trial-note {
+      text-align: center;
+      margin-top: var(--space-8);
+      font-size: 14px;
+      color: var(--color-text-muted);
+    }
+
+    .trial-note strong {
+      color: var(--color-accent);
+    }
+
+    /* ============================================================
+       TESTIMONIALS / SOCIAL PROOF
+       ============================================================ */
+    .proof-section {
+      padding: var(--space-24) 0;
+    }
+
+    .proof-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-6);
+    }
+
+    .proof-card {
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-6);
+      transition: all var(--transition-base);
+    }
+
+    .proof-card:hover {
+      border-color: rgba(163,230,53,0.2);
+      transform: translateY(-3px);
+    }
+
+    .proof-stars {
+      color: var(--color-warning);
+      font-size: 14px;
+      letter-spacing: 2px;
+      margin-bottom: var(--space-4);
+    }
+
+    .proof-quote {
+      font-size: 15px;
+      color: var(--color-text-secondary);
+      line-height: 1.7;
+      margin-bottom: var(--space-5);
+      font-style: italic;
+    }
+
+    .proof-author {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    .proof-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--color-bg-elevated);
+      border: 2px solid var(--color-bg-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--color-accent);
+      flex-shrink: 0;
+    }
+
+    .proof-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-text-primary);
+    }
+
+    .proof-role {
+      font-size: 12px;
+      color: var(--color-text-muted);
+    }
+
+    /* ============================================================
+       CTA SECTION
+       ============================================================ */
+    .cta-section {
+      padding: var(--space-24) 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cta-section::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 70% 80% at 50% 50%, rgba(45,58,140,0.2) 0%, transparent 70%);
+    }
+
+    .cta-box {
+      position: relative;
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-xl);
+      padding: var(--space-16) var(--space-12);
+      text-align: center;
+      overflow: hidden;
+    }
+
+    .cta-box::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--color-accent), transparent);
+    }
+
+    .cta-box h2 {
+      font-size: clamp(32px, 4vw, 52px);
+      margin-bottom: var(--space-4);
+    }
+
+    .cta-box p {
+      color: var(--color-text-secondary);
+      font-size: 17px;
+      max-width: 480px;
+      margin: 0 auto var(--space-8);
+      line-height: 1.7;
+    }
+
+    .cta-actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-4);
+      flex-wrap: wrap;
+    }
+
+    .cta-note {
+      margin-top: var(--space-5);
+      font-size: 13px;
+      color: var(--color-text-muted);
+    }
+
+    /* ============================================================
+       RESPONSIVE — LANDING PAGE SPECIFIC
+       ============================================================ */
+    @media (max-width: 1024px) {
+      .features-grid { grid-template-columns: repeat(2, 1fr); }
+      .steps-grid { grid-template-columns: repeat(2, 1fr); }
+      .steps-grid::before { display: none; }
+      .pricing-grid { grid-template-columns: 1fr; max-width: 440px; margin: 0 auto; }
+      .proof-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 768px) {
+      .hero .container { grid-template-columns: 1fr; }
+      .hero-visual { display: none; }
+      .hero-content { max-width: 100%; }
+      .hero-stats { gap: var(--space-6); }
+      .features-grid { grid-template-columns: 1fr; }
+      .steps-grid { grid-template-columns: 1fr; }
+      .role-panel.active { grid-template-columns: 1fr; }
+      .proof-grid { grid-template-columns: 1fr; }
+      .trust-bar-inner { gap: var(--space-6); flex-direction: column; align-items: flex-start; padding-left: var(--space-4); }
+      .cta-box { padding: var(--space-10) var(--space-6); }
+      .roles-tabs { gap: var(--space-1); }
+      .role-tab { padding: 10px 12px; font-size: 13px; }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ============================================================
+       NAVIGATION
+       ============================================================ -->
+  <nav class="navbar" id="navbar">
+    <div class="container">
+      <!-- Logo -->
+      <a href="index.html" class="nav-logo">
+        <img
+          src="https://i.ibb.co/DfrpZZsP/file-0000000012c461f8b82b9a906c1fd5d7-2.png"
+          alt="PA360 Proton Logo"
+          style="height:40px; width:auto;"
+          onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+        />
+        <span class="nav-logo-text" style="display:none;">PA360 <span>Proton</span></span>
+      </a>
+
+      <!-- Desktop Nav Links -->
+      <ul class="nav-links" id="navLinks">
+        <li><a href="#features" class="nav-link">Features</a></li>
+        <li><a href="#how-it-works" class="nav-link">How It Works</a></li>
+        <li><a href="#pricing" class="nav-link">Pricing</a></li>
+        <li><a href="blog.html" class="nav-link">Blog</a></li>
+        <li><a href="about.html" class="nav-link">About</a></li>
+        <li><a href="../app/admin/dashboard.html" class="btn btn-primary btn-sm">Start Free Trial</a></li>
+      </ul>
+
+      <!-- Desktop Actions -->
+      <div class="nav-actions">
+        <a href="login.html" class="btn btn-secondary btn-sm">Log In</a>
+      </div>
+
+      <!-- Mobile Toggle -->
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ============================================================
+       HERO
+       ============================================================ -->
+  <section class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-grid"></div>
+    <div class="hero-orb"></div>
+    <div class="hero-orb-2"></div>
+
+    <div class="container">
+      <!-- Left — Content -->
+      <div class="hero-content">
+        <div class="hero-eyebrow animate-fade-up">
+          <div class="hero-eyebrow-dot"></div>
+          <span class="badge badge-accent">14-Day Free Trial — No Card Required</span>
+        </div>
+
+        <h1 class="hero-title animate-fade-up delay-1">
+          Sports Management
+          <span class="line-accent">Made Affordable.</span>
+        </h1>
+
+        <p class="hero-subtitle animate-fade-up delay-2">
+          PA360 Proton gives sports institutes everything they need to manage athletes, track performance, record attendance, and grow champions — at a price that actually makes sense.
+        </p>
+
+        <div class="hero-actions animate-fade-up delay-3">
+          <a href="pricing.html" class="btn btn-primary btn-lg">Start Free for 14 Days</a>
+          <a href="#how-it-works" class="btn btn-secondary btn-lg">See How It Works</a>
+        </div>
+
+        <div class="hero-note animate-fade-up delay-4">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          No credit card required &nbsp;·&nbsp;
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left:4px">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          &nbsp; Cancel anytime &nbsp;·&nbsp;
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left:4px">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          &nbsp; Full access from day one
+        </div>
+
+        <div class="hero-stats animate-fade-up delay-5">
+          <div>
+            <div class="hero-stat-value">15+</div>
+            <div class="hero-stat-label">Sports Supported</div>
+          </div>
+          <div>
+            <div class="hero-stat-value">4</div>
+            <div class="hero-stat-label">Role Dashboards</div>
+          </div>
+          <div>
+            <div class="hero-stat-value">$24</div>
+            <div class="hero-stat-label">Starting / Month</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right — Dashboard Mockup -->
+      <div class="hero-visual animate-fade-up delay-2">
+        <div class="dashboard-mockup">
+          <div class="mockup-bar">
+            <div class="mockup-dot"></div>
+            <div class="mockup-dot"></div>
+            <div class="mockup-dot"></div>
+            <div class="mockup-url">pa360proton.projectathlete360.in/app/admin</div>
+          </div>
+          <div class="mockup-body">
+            <div class="mockup-header">
+              <div class="mockup-title">Institute Dashboard</div>
+              <div class="mockup-badge">Live</div>
+            </div>
+            <div class="mockup-stats">
+              <div class="mockup-stat">
+                <div class="mockup-stat-val green">142</div>
+                <div class="mockup-stat-lbl">Athletes</div>
+              </div>
+              <div class="mockup-stat">
+                <div class="mockup-stat-val blue">91%</div>
+                <div class="mockup-stat-lbl">Attendance</div>
+              </div>
+              <div class="mockup-stat">
+                <div class="mockup-stat-val">12</div>
+                <div class="mockup-stat-lbl">Coaches</div>
+              </div>
+            </div>
+            <!-- Mini chart -->
+            <div class="mockup-chart">
+              <div class="mockup-bar-item" style="height:30%"></div>
+              <div class="mockup-bar-item" style="height:55%"></div>
+              <div class="mockup-bar-item" style="height:40%"></div>
+              <div class="mockup-bar-item" style="height:70%"></div>
+              <div class="mockup-bar-item" style="height:50%"></div>
+              <div class="mockup-bar-item" style="height:80%"></div>
+              <div class="mockup-bar-item accent" style="height:95%"></div>
+            </div>
+            <!-- Athletes list -->
+            <div class="mockup-athletes">
+              <div class="mockup-athlete-row">
+                <div class="mockup-avatar" style="background:linear-gradient(135deg,#2d3a8c,#a3e635);"></div>
+                <div class="mockup-athlete-name">Rahul Sharma</div>
+                <div class="mockup-athlete-sport">Cricket</div>
+                <div class="mockup-attend">98%</div>
+              </div>
+              <div class="mockup-athlete-row">
+                <div class="mockup-avatar" style="background:linear-gradient(135deg,#a3e635,#2d3a8c);"></div>
+                <div class="mockup-athlete-name">Priya Mehta</div>
+                <div class="mockup-athlete-sport">Athletics</div>
+                <div class="mockup-attend">94%</div>
+              </div>
+              <div class="mockup-athlete-row">
+                <div class="mockup-avatar" style="background:linear-gradient(135deg,#4a5568,#a3e635);"></div>
+                <div class="mockup-athlete-name">Arjun Singh</div>
+                <div class="mockup-athlete-sport">Football</div>
+                <div class="mockup-attend">87%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Floating badge -->
+        <div class="mockup-float-badge">
+          <div class="mockup-float-icon">🏆</div>
+          <div class="mockup-float-text">
+            <strong>New Personal Best!</strong>
+            <span>Rahul — 100m Sprint</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       TRUST BAR
+       ============================================================ -->
+  <div class="trust-bar">
+    <div class="container">
+      <div class="trust-bar-inner">
+        <div class="trust-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          Affordable for every institute
+        </div>
+        <div class="trust-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          15+ sports supported out of the box
+        </div>
+        <div class="trust-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          Role-based dashboards for everyone
+        </div>
+        <div class="trust-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          Secure & reliable — built to last
+        </div>
+        <div class="trust-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          By Project Athlete 360
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       FEATURES
+       ============================================================ -->
+  <section class="features-section" id="features">
+    <div class="container">
+      <div class="section-header reveal">
+        <span class="text-label">Everything You Need</span>
+        <h2>A complete platform for<br /><span class="gradient-text">every part of your institute</span></h2>
+        <p>From enrollment to competition results — PA360 Proton handles every aspect of sports management in one place.</p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card reveal delay-1">
+          <div class="feature-icon">👤</div>
+          <h3>Athlete Profiles</h3>
+          <p>Complete athlete records — personal details, sport, enrollment date, emergency contacts, medical notes, and a unique athlete ID for every member.</p>
+        </div>
+        <div class="feature-card reveal delay-2">
+          <div class="feature-icon">📊</div>
+          <h3>Performance Tracking</h3>
+          <p>Log sport-specific metrics for every session. Visual progress charts show improvement over time. 15+ sports supported with predefined metrics.</p>
+        </div>
+        <div class="feature-card reveal delay-3">
+          <div class="feature-icon">✅</div>
+          <h3>Attendance Management</h3>
+          <p>Mark daily attendance in seconds. Track streaks, absences, and percentages. Get alerted when athletes fall below your threshold.</p>
+        </div>
+        <div class="feature-card reveal delay-1">
+          <div class="feature-icon">🏆</div>
+          <h3>Competition & Events</h3>
+          <p>Log tournament results, mark event winners, and track competition history. A full calendar keeps coaches and athletes always informed.</p>
+        </div>
+        <div class="feature-card reveal delay-2">
+          <div class="feature-icon">🏅</div>
+          <h3>Leaderboards & Badges</h3>
+          <p>Motivate athletes with class and institute-wide leaderboards. Automated and coach-awarded badges reward effort and achievement.</p>
+        </div>
+        <div class="feature-card reveal delay-3">
+          <div class="feature-icon">📢</div>
+          <h3>Announcements</h3>
+          <p>Send targeted announcements to athletes, coaches, or your entire institute. Everyone stays informed, every time.</p>
+        </div>
+        <div class="feature-card reveal delay-1">
+          <div class="feature-icon">📄</div>
+          <h3>Reports & Exports</h3>
+          <p>Generate clean PDF reports for any athlete — attendance, performance, grades, competition history. Perfect for scholarship applications and selection trials.</p>
+        </div>
+        <div class="feature-card reveal delay-2">
+          <div class="feature-icon">🔒</div>
+          <h3>Role-Based Access</h3>
+          <p>Four tailored dashboards — Super Admin, Institute Admin, Coach, and Athlete. Everyone sees exactly what they need, nothing more.</p>
+        </div>
+        <div class="feature-card reveal delay-3">
+          <div class="feature-icon">📈</div>
+          <h3>Fitness Grading</h3>
+          <p>Assign numeric grades (1–10) for fitness tests alongside performance metrics. A complete picture of every athlete's development.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       HOW IT WORKS
+       ============================================================ -->
+  <section class="how-section" id="how-it-works">
+    <div class="container">
+      <div class="section-header reveal">
+        <span class="text-label">Simple by Design</span>
+        <h2>Up and running in <span class="gradient-text">minutes</span></h2>
+        <p>No technical knowledge required. Your institute can be fully set up and managing athletes the same day you sign up.</p>
+      </div>
+
+      <div class="steps-grid">
+        <div class="step reveal delay-1">
+          <div class="step-number">01</div>
+          <h3>Choose Your Plan</h3>
+          <p>Pick Starter, Pro, or Elite based on your institute size. Start with a 14-day free trial — no card needed.</p>
+        </div>
+        <div class="step reveal delay-2">
+          <div class="step-number">02</div>
+          <h3>Set Up Your Institute</h3>
+          <p>Add your sports, enroll your coaches and trainers. Each gets login credentials automatically via email.</p>
+        </div>
+        <div class="step reveal delay-3">
+          <div class="step-number">03</div>
+          <h3>Enroll Your Athletes</h3>
+          <p>Coaches enroll their assigned athletes. Every athlete gets their own profile, ID, and personal dashboard.</p>
+        </div>
+        <div class="step reveal delay-4">
+          <div class="step-number">04</div>
+          <h3>Start Managing</h3>
+          <p>Mark attendance, log performance, track competitions, and watch your athletes grow — all in one place.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       ROLES SECTION
+       ============================================================ -->
+  <section class="roles-section" id="roles">
+    <div class="container">
+      <div class="section-header reveal">
+        <span class="text-label">Built for Everyone</span>
+        <h2>A dashboard for <span class="gradient-text">every role</span></h2>
+        <p>Whether you're managing an institute or training for a championship — PA360 Proton has a dashboard built exactly for you.</p>
+      </div>
+
+      <div class="roles-tabs reveal">
+        <button class="role-tab active" onclick="switchRole('admin')">🏛️ Institute Admin</button>
+        <button class="role-tab" onclick="switchRole('coach')">🎽 Coach / Trainer</button>
+        <button class="role-tab" onclick="switchRole('athlete')">🏃 Athlete</button>
+      </div>
+
+      <!-- Admin Panel -->
+      <div class="role-panel active" id="panel-admin">
+        <div class="role-panel-content">
+          <h3>Full control of your institute</h3>
+          <p>Institute admins get a powerful overview of everything happening across their institute — from coach activity to athlete performance — with the tools to act on it.</p>
+          <div class="role-features">
+            <div class="role-feature-item">Enroll and manage all coaches and trainers</div>
+            <div class="role-feature-item">View attendance across the entire institute</div>
+            <div class="role-feature-item">Monitor performance trends across all athletes</div>
+            <div class="role-feature-item">Send announcements to coaches and athletes</div>
+            <div class="role-feature-item">Generate institute-wide and individual reports</div>
+            <div class="role-feature-item">Manage subscription and billing</div>
+          </div>
+        </div>
+        <div class="role-visual">
+          <div class="role-visual-header">
+            <span class="role-visual-icon">🏛️</span>
+            <span class="role-visual-title">Admin Overview</span>
+            <span class="badge badge-accent" style="margin-left:auto;">Live</span>
+          </div>
+          <div class="role-visual-items">
+            <div class="role-visual-item">
+              <div class="role-visual-item-left"><div class="rvi-dot"></div><span class="rvi-label">Total Athletes</span></div>
+              <span class="rvi-value">142</span>
+            </div>
+            <div class="role-visual-item">
+              <div class="role-visual-item-left"><div class="rvi-dot blue"></div><span class="rvi-label">Active Coaches</span></div>
+              <span class="rvi-value blue">12</span>
+            </div>
+            <div class="role-visual-item">
+              <div class="role-visual-item-left"><div class="rvi-dot"></div><span class="rvi-label">Today's Attendance</span></div>
+              <span class="rvi-value">91%</span>
+            </div>
+            <div class="role-visual-item">
+              <div class="role-visual-item-left"><div class="rvi-dot orange"></div><span class="rvi-label">Upcoming Events</span></div>
+              <span class="rvi-value orange">3 this week</span>
+            </div>
+            <div class="role-visual-item">
+              <div class="role-visual-item-left"><div class="rvi-dot"></div><span class="rvi-label">Plan Usage</span></div>
+              <span class="rvi-value">142 / 200</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Coach Panel -->
+      <div class="role-panel" id="panel-coach">
+        <div class="role-panel-content">
+          <h3>Everything a coach needs, daily</h3>
+          <p>Coaches get a focused dashboard centered entirely on their athletes — attendance, performance logging, competition results, and leaderboards, all in one fast interface.</p>
+          <div class="role-features">
+            <div class="role-feature-item">Enroll and manage assigned athletes</div>
+            <div class="role-feature-item">Mark daily attendance with one tap per athlete</div>
+            <div class="role-feature-item">Log sport-specific performance entries</div>
+            <div class="role-feature-item">Create events and competitions on a visual calendar</div>
+            <div class="role-feature-item">Issue warnings and manage discipline records</div>
+            <div class="role-feature-item">View class and institute leaderboards</div>
+          </div>
+        </div>
+        <div class="role-visual">
+          <div class="role-visual-header">
+            <span class="role-visual-icon">🎽</span>
+            <span class="role-visual-title">Coach Dashboard</span>
+            <span class="badge badge-primary" style="margin-left:auto;">Today</span>
+          </div>
+          <div class="role-visual-items">
+            <div class="role-visual-item">
+              <div class="role-visual-item-left"><div class="rvi-dot"></div><span class="rvi-label">My Athletes</span></div>
+              <span class="rvi-value">24</span>
+            </div>
+            <div class="role-visual-item">
+              <div class="role-visual-item-left"><div class="rvi-dot blue"></div><span class="rvi-label">Attendance Marked</span></div>
+              <span class="rvi-value blue">22 / 24</span>
+            </div>
+            <div class="role-visual-item">
+              <div class="role-visual-item-left"><div class="rvi-dot"></div><span class="rvi-label">Performance Entries</span></div>
+              <span class="rvi-value">18 today</span>
+            </div>
+            <div class="role-visual-item">
+              <div class="role-visual-item-left"><div class="rvi-dot orange"></div><span class="rvi-label">Active Warnings</span></div>
+              <span class="rvi-value orange">2</span>
+            </div>
+            <div class="role-visual-item">
+              <div class="role-visual-item-left"><div class="rvi-dot"></div><span class="rvi-label">Next Event</span></div>
+              <span class="rvi-value">In 3 days</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Athlete Panel -->
+      <div class="role-panel" id="panel-athlete">
+        <div class="role-panel-content">
+          <h3>Your personal sports journey</h3>
+          <p>Athletes get a clean, motivating personal dashboard — their performance history, attendance record, competition results, leaderboard rank, and achievements all in one place.</p>
+          <div class="role-features">
+            <div class="role-feature-item">View full attendance history and streaks</div>
+            <div class="role-feature-item">Track performance progress with visual charts</div>
+            <div class="role-feature-item">See personal bests and fitness grades</div>
+            <div class="role-feature-item">View competition results and upcoming events</div>
+            <div class="role-feature-item">Check leaderboard rank — class and institute-wide</div>
+            <div class="role-feature-item">Download personal reports as PDF</div>
+          </div>
+        </div>
+        <div class="role-visual">
+          <div class="role-visual-header">
+            <span class="role-visual-icon">🏃</span>
+            <span class="role-visual-title">My Dashboard</span>
+            <span class="badge badge-accent" style="margin-left:auto;">Rank #3</span>
+          </div>
+          <div class="role-visual-items">
+            <div class="role-visual-item">
+              <div class="role-visual-item-left"><div class="rvi-dot"></div><span class="rvi-label">Attendance This Month</span></div>
+              <span class="rvi-value">94%</span>
+            </div>
+            <div class="role-visual-item">
+              <div class="role-visual-item-left"><div class="rvi-dot blue"></div><span class="rvi-label">Current Streak</span></div>
+              <span class="rvi-value blue">12 days</span>
+            </div>
+            <div class="role-visual-item">
+              <div class="role-visual-item-left"><div class="rvi-dot"></div><span class="rvi-label">Personal Best — 100m</span></div>
+              <span class="rvi-value">11.4s 🏅</span>
+            </div>
+            <div class="role-visual-item">
+              <div class="role-visual-item-left"><div class="rvi-dot orange"></div><span class="rvi-label">Next Competition</span></div>
+              <span class="rvi-value orange">District Meet</span>
+            </div>
+            <div class="role-visual-item">
+              <div class="role-visual-item-left"><div class="rvi-dot"></div><span class="rvi-label">Badges Earned</span></div>
+              <span class="rvi-value">7 🏆</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       PRICING
+       ============================================================ -->
+  <section class="pricing-section" id="pricing">
+    <div class="container">
+      <div class="section-header reveal">
+        <span class="text-label">Simple Pricing</span>
+        <h2>Affordable for every institute.<br /><span class="gradient-text">No hidden fees.</span></h2>
+        <p>Fair pricing that scales with your institute. Start free, upgrade when you're ready.</p>
+      </div>
+
+      <!-- Toggle -->
+      <div class="pricing-toggle reveal">
+        <span class="toggle-label active" id="label-monthly">Monthly</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="billingToggle" onchange="toggleBilling()" />
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+        <span class="toggle-label" id="label-annual">Annual</span>
+        <span class="save-badge">Save 25%</span>
+      </div>
+
+      <div class="pricing-grid">
+        <!-- Starter -->
+        <div class="pricing-card reveal delay-1">
+          <div class="pricing-plan-name">🥉 Starter</div>
+          <div class="pricing-price">
+            <span class="price-currency">$</span><span class="price-amount" id="price-starter">24</span>
+            <span class="price-period">/month</span>
+          </div>
+          <div class="price-annual-note" id="note-starter"></div>
+          <div class="pricing-limit">
+            <div class="pricing-limit-item">
+              <div class="pricing-limit-val">50</div>
+              <div class="pricing-limit-lbl">Athletes</div>
+            </div>
+            <div class="pricing-limit-item">
+              <div class="pricing-limit-val">5</div>
+              <div class="pricing-limit-lbl">Coaches</div>
+            </div>
+            <div class="pricing-limit-item">
+              <div class="pricing-limit-val">1</div>
+              <div class="pricing-limit-lbl">Sport</div>
+            </div>
+          </div>
+          <div class="pricing-divider"></div>
+          <div class="pricing-features">
+            <div class="pricing-feature"><span class="pricing-feature-check">✓</span> Athlete profiles & enrollment</div>
+            <div class="pricing-feature"><span class="pricing-feature-check">✓</span> Attendance management</div>
+            <div class="pricing-feature"><span class="pricing-feature-check">✓</span> Performance tracking</div>
+            <div class="pricing-feature"><span class="pricing-feature-check">✓</span> Leaderboards & badges</div>
+            <div class="pricing-feature"><span class="pricing-feature-check">✓</span> Basic PDF reports</div>
+            <div class="pricing-feature"><span class="pricing-feature-check">✓</span> Email support</div>
+            <div class="pricing-feature disabled"><span class="pricing-feature-x">✗</span> Competition panel</div>
+            <div class="pricing-feature disabled"><span class="pricing-feature-x">✗</span> Advanced reports</div>
+            <div class="pricing-feature disabled"><span class="pricing-feature-x">✗</span> Institute branding</div>
+          </div>
+          <a href="pricing.html" class="btn btn-secondary w-full">Start Free Trial</a>
+        </div>
+
+        <!-- Pro (Featured) -->
+        <div class="pricing-card featured reveal delay-2">
+          <div class="pricing-featured-label">Most Popular</div>
+          <div class="pricing-plan-name">🥈 Pro</div>
+          <div class="pricing-price">
+            <span class="price-currency">$</span><span class="price-amount" id="price-pro">59</span>
+            <span class="price-period">/month</span>
+          </div>
+          <div class="price-annual-note" id="note-pro"></div>
+          <div class="pricing-limit">
+            <div class="pricing-limit-item">
+              <div class="pricing-limit-val">200</div>
+              <div class="pricing-limit-lbl">Athletes</div>
+            </div>
+            <div class="pricing-limit-item">
+              <div class="pricing-limit-val">20</div>
+              <div class="pricing-limit-lbl">Coaches</div>
+            </div>
+            <div class="pricing-limit-item">
+              <div class="pricing-limit-val">∞</div>
+              <div class="pricing-limit-lbl">Sports</div>
+            </div>
+          </div>
+          <div class="pricing-divider"></div>
+          <div class="pricing-features">
+            <div class="pricing-feature"><span class="pricing-feature-check">✓</span> Everything in Starter</div>
+            <div class="pricing-feature"><span class="pricing-feature-check">✓</span> Multiple sports + custom metrics</div>
+            <div class="pricing-feature"><span class="pricing-feature-check">✓</span> Competition panel & full calendar</div>
+            <div class="pricing-feature"><span class="pricing-feature-check">✓</span> Advanced reports (CSV + PDF)</div>
+            <div class="pricing-feature"><span class="pricing-feature-check">✓</span> Attendance threshold alerts</div>
+            <div class="pricing-feature"><span class="pricing-feature-check">✓</span> Institute branding on reports</div>
+            <div class="pricing-feature"><span class="pricing-feature-check">✓</span> Priority email support</div>
+            <div class="pricing-feature disabled"><span class="pricing-feature-x">✗</span> Bulk CSV import</div>
+            <div class="pricing-feature disabled"><span class="pricing-feature-x">✗</span> Full analytics dashboard</div>
+          </div>
+          <a href="pricing.html" class="btn btn-primary w-full">Start Free Trial</a>
+        </div>
+
+        <!-- Elite -->
+        <div class="pricing-card reveal delay-3">
+          <div class="pricing-plan-name">🥇 Elite</div>
+          <div class="pricing-price">
+            <span class="price-currency">$</span><span class="price-amount" id="price-elite">129</span>
+            <span class="price-period">/month</span>
+          </div>
+          <div class="price-annual-note" id="note-elite"></div>
+          <div class="pricing-limit">
+            <div class="pricing-limit-item">
+              <div class="pricing-limit-val">∞</div>
+              <div class="pricing-limit-lbl">Athletes</div>
+            </div>
+            <div class="pricing-limit-item">
+              <div class="pricing-limit-val">∞</div>
+              <div class="pricing-limit-lbl">Coaches</div>
+            </div>
+            <div class="pricing-limit-item">
+              <div class="pricing-limit-val">∞</div>
+              <div class="pricing-limit-lbl">Sports</div>
+            </div>
+          </div>
+          <div class="pricing-divider"></div>
+          <div class="pricing-features">
+            <div class="pricing-feature"><span class="pricing-feature-check">✓</span> Everything in Pro</div>
+            <div class="pricing-feature"><span class="pricing-feature-check">✓</span> Unlimited athletes & coaches</div>
+            <div class="pricing-feature"><span class="pricing-feature-check">✓</span> Full analytics dashboard</div>
+            <div class="pricing-feature"><span class="pricing-feature-check">✓</span> Bulk data import via CSV</div>
+            <div class="pricing-feature"><span class="pricing-feature-check">✓</span> Full data export & backup</div>
+            <div class="pricing-feature"><span class="pricing-feature-check">✓</span> Early access to new features</div>
+            <div class="pricing-feature"><span class="pricing-feature-check">✓</span> Dedicated support</div>
+            <div class="pricing-feature"><span class="pricing-feature-check">✓</span> Custom sport metric library</div>
+            <div class="pricing-feature"><span class="pricing-feature-check">✓</span> Unlimited sport categories</div>
+          </div>
+          <a href="pricing.html" class="btn btn-secondary w-full">Start Free Trial</a>
+        </div>
+      </div>
+
+      <p class="trial-note reveal">
+        All plans include a <strong>14-day free trial</strong>. No credit card required to start.
+        Upgrade, downgrade, or cancel anytime.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       SOCIAL PROOF
+       ============================================================ -->
+  <section class="proof-section">
+    <div class="container">
+      <div class="section-header reveal">
+        <span class="text-label">Early Feedback</span>
+        <h2>What institutes are <span class="gradient-text">saying</span></h2>
+      </div>
+
+      <div class="proof-grid">
+        <div class="proof-card reveal delay-1">
+          <div class="proof-stars">★★★★★</div>
+          <p class="proof-quote">"Finally a platform that doesn't cost a fortune. We manage 80 athletes across cricket, football, and athletics — all in one place. The coach dashboards save hours every week."</p>
+          <div class="proof-author">
+            <div class="proof-avatar">R</div>
+            <div>
+              <div class="proof-name">Rajesh Kumar</div>
+              <div class="proof-role">Director, Sunrise Sports Academy</div>
+            </div>
+          </div>
+        </div>
+        <div class="proof-card reveal delay-2">
+          <div class="proof-stars">★★★★★</div>
+          <p class="proof-quote">"The attendance widget alone changed how our coaches work. Mark 30 athletes in under 2 minutes. The leaderboard keeps the athletes motivated — they check it every day."</p>
+          <div class="proof-author">
+            <div class="proof-avatar">A</div>
+            <div>
+              <div class="proof-name">Anita Sharma</div>
+              <div class="proof-role">Head Coach, Champions Athletics Club</div>
+            </div>
+          </div>
+        </div>
+        <div class="proof-card reveal delay-3">
+          <div class="proof-stars">★★★★★</div>
+          <p class="proof-quote">"Our athletes love seeing their personal bests and badge collection. Parents are asking us how we generate such professional PDF reports. This platform made us look world-class."</p>
+          <div class="proof-author">
+            <div class="proof-avatar">M</div>
+            <div>
+              <div class="proof-name">Mohammed Irfan</div>
+              <div class="proof-role">Admin, Al-Noor Sports Institute</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       CTA
+       ============================================================ -->
+  <section class="cta-section">
+    <div class="container">
+      <div class="cta-box reveal">
+        <span class="text-label" style="display:block; margin-bottom:var(--space-4);">Get Started Today</span>
+        <h2>Ready to manage<br /><span class="gradient-text">your athletes better?</span></h2>
+        <p>Join institutes already using PA360 Proton to save time, motivate athletes, and grow their programs. Start free — no card required.</p>
+        <div class="cta-actions">
+          <a href="pricing.html" class="btn btn-primary btn-lg">Start Your 14-Day Free Trial</a>
+          <a href="about.html" class="btn btn-secondary btn-lg">Learn More About Us</a>
+        </div>
+        <p class="cta-note">No credit card · Cancel anytime · Full access from day one</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       FOOTER
+       ============================================================ -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <!-- Brand -->
+        <div class="footer-brand">
+          <div class="nav-logo" style="margin-bottom:var(--space-4);">
+            <img
+              src="https://i.ibb.co/7t3vcXR2/file-000000006b0461fda5c0be6634559fd5-2.jpg"
+              alt="Project Athlete 360"
+              style="height:36px; width:auto;"
+              onerror="this.style.display='none';"
+            />
+          </div>
+          <p>PA360 Proton is a product of Project Athlete 360 — dedicated to making sports management affordable and accessible for every institute.</p>
+          <div class="social-links">
+            <a href="https://www.instagram.com/projectathlete360" target="_blank" rel="noopener" class="social-link" title="Instagram">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+            </a>
+            <a href="https://x.com/theathlete360" target="_blank" rel="noopener" class="social-link" title="X / Twitter">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            </a>
+            <a href="https://www.youtube.com/@projectathlete360" target="_blank" rel="noopener" class="social-link" title="YouTube">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46a2.78 2.78 0 0 0-1.95 1.96A29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58A2.78 2.78 0 0 0 3.41 19.6C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.95A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"></path><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02"></polygon></svg>
+            </a>
+            <a href="https://m.facebook.com/projectathlete360" target="_blank" rel="noopener" class="social-link" title="Facebook">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
+            </a>
+            <a href="https://www.linkedin.com/company/project-athlete-360" target="_blank" rel="noopener" class="social-link" title="LinkedIn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg>
+            </a>
+            <a href="https://medium.com/@projectathlete360" target="_blank" rel="noopener" class="social-link" title="Medium">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M13.54 12a6.8 6.8 0 01-6.77 6.82A6.8 6.8 0 010 12a6.8 6.8 0 016.77-6.82A6.8 6.8 0 0113.54 12zM20.96 12c0 3.54-1.51 6.42-3.38 6.42-1.87 0-3.39-2.88-3.39-6.42s1.52-6.42 3.39-6.42 3.38 2.88 3.38 6.42M24 12c0 3.17-.53 5.75-1.19 5.75-.66 0-1.19-2.58-1.19-5.75s.53-5.75 1.19-5.75C23.47 6.25 24 8.83 24 12z"/></svg>
+            </a>
+            <a href="https://creators.spotify.com/pod/profile/project-athlete-360" target="_blank" rel="noopener" class="social-link" title="Spotify">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M8 11.973c2.5-1.473 5.5-.973 7.5.527M7 15c2.5-1.5 6-1 8 1M9 9c2.5-1 5.5-.5 8 1.5"></path></svg>
+            </a>
+          </div>
+        </div>
+
+        <!-- Product -->
+        <div>
+          <div class="footer-heading">Product</div>
+          <ul class="footer-links">
+            <li><a href="#features">Features</a></li>
+            <li><a href="pricing.html">Pricing</a></li>
+            <li><a href="#how-it-works">How It Works</a></li>
+            <li><a href="login.html">Log In</a></li>
+            <li><a href="pricing.html">Start Free Trial</a></li>
+          </ul>
+        </div>
+
+        <!-- Company -->
+        <div>
+          <div class="footer-heading">Company</div>
+          <ul class="footer-links">
+            <li><a href="about.html">About PA360</a></li>
+            <li><a href="blog.html">Blog</a></li>
+            <li><a href="mailto:projectathlete360@gmail.com">Contact Us</a></li>
+          </ul>
+        </div>
+
+        <!-- Legal -->
+        <div>
+          <div class="footer-heading">Legal</div>
+          <ul class="footer-links">
+            <li><a href="#">Privacy Policy</a></li>
+            <li><a href="#">Terms of Service</a></li>
+            <li><a href="#">Refund Policy</a></li>
+            <li><a href="#">Cookie Policy</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <p>© 2025 Project Athlete 360. All rights reserved. PA360 Proton is a product of Project Athlete 360.</p>
+        <p>Made with ❤️ for athletes everywhere.</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ============================================================
+       JAVASCRIPT
+       ============================================================ -->
+  <script>
+    // --- Navbar scroll effect ---
+    const navbar = document.getElementById('navbar');
+    window.addEventListener('scroll', () => {
+      navbar.classList.toggle('scrolled', window.scrollY > 20);
+    });
+
+    // --- Mobile menu toggle ---
+    const navToggle = document.getElementById('navToggle');
+    const navLinks  = document.getElementById('navLinks');
+
+    navToggle.addEventListener('click', () => {
+      navToggle.classList.toggle('active');
+      navLinks.classList.toggle('open');
+    });
+
+    // Close mobile menu when a link is clicked
+    navLinks.querySelectorAll('a').forEach(link => {
+      link.addEventListener('click', () => {
+        navToggle.classList.remove('active');
+        navLinks.classList.remove('open');
+      });
+    });
+
+    // --- Smooth scroll for anchor links ---
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function (e) {
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          e.preventDefault();
+          const offset = 80;
+          window.scrollTo({
+            top: target.getBoundingClientRect().top + window.scrollY - offset,
+            behavior: 'smooth'
+          });
+        }
+      });
+    });
+
+    // --- Scroll reveal ---
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+    // --- Role tabs ---
+    function switchRole(role) {
+      document.querySelectorAll('.role-tab').forEach(tab => tab.classList.remove('active'));
+      document.querySelectorAll('.role-panel').forEach(panel => panel.classList.remove('active'));
+      event.currentTarget.classList.add('active');
+      document.getElementById('panel-' + role).classList.add('active');
+    }
+
+    // --- Pricing toggle ---
+    const prices = {
+      starter: { monthly: 24,  annual: 18  },
+      pro:     { monthly: 59,  annual: 44  },
+      elite:   { monthly: 129, annual: 97  }
+    };
+
+    function toggleBilling() {
+      const isAnnual = document.getElementById('billingToggle').checked;
+      const labelMonthly = document.getElementById('label-monthly');
+      const labelAnnual  = document.getElementById('label-annual');
+
+      labelMonthly.classList.toggle('active', !isAnnual);
+      labelAnnual.classList.toggle('active', isAnnual);
+
+      ['starter', 'pro', 'elite'].forEach(plan => {
+        const priceEl = document.getElementById('price-' + plan);
+        const noteEl  = document.getElementById('note-' + plan);
+        const annualTotal = prices[plan].annual * 12;
+
+        priceEl.textContent = isAnnual ? prices[plan].annual : prices[plan].monthly;
+        if (isAnnual) {
+          noteEl.textContent = `$${annualTotal}/year — billed annually`;
+          noteEl.classList.add('visible');
+        } else {
+          noteEl.textContent = '';
+          noteEl.classList.remove('visible');
+        }
+      });
+    }
+  </script>
+
+</body>
+</html>
