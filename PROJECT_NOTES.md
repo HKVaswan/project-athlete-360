@@ -1193,11 +1193,18 @@ Admin cancels
 EXTRA ADDITION
 
 Frontend   → Vercel          (free forever)
+
 Backend    → Render          (free tier → $7/mo when ready)
+
 Database   → Neon            (free forever → $19/mo when ready)
+
 Email      → Resend          (free forever → $20/mo when ready)
+
 Payments   → Stripe          (no monthly fee — 2.9% + $0.30 per transaction)
+
 Domain     → projectathlete360.in (already owned)
+
+
 ---
 
 *Document version: Final — Session 4.1*
