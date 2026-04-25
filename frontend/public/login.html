@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Log in to PA360 Proton — Sports institute management platform by Project Athlete 360." />
+  <title>Log In — PA360 Proton</title>
+
+  <link rel="stylesheet" href="../css/global.css" />
+
+  <style>
+    /* ============================================================
+       LOGIN PAGE LAYOUT
+       ============================================================ */
+    .login-page {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+    }
+
+    /* ============================================================
+       LEFT PANEL — Branding
+       ============================================================ */
+    .login-left {
+      position: relative;
+      background: var(--color-bg-surface);
+      border-right: 1px solid var(--color-bg-border);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: var(--space-10) var(--space-12);
+      overflow: hidden;
+    }
+
+    /* Animated background */
+    .login-left-bg {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 20% 20%, rgba(45,58,140,0.25) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 60% at 80% 80%, rgba(163,230,53,0.06) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .login-left-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(26,42,69,0.35) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(26,42,69,0.35) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: radial-gradient(ellipse 100% 100% at 30% 40%, black 20%, transparent 80%);
+    }
+
+    /* Glowing orb */
+    .login-orb {
+      position: absolute;
+      top: 30%;
+      left: 20%;
+      width: 320px;
+      height: 320px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(45,58,140,0.25) 0%, transparent 70%);
+      animation: float 8s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    .login-left-content {
+      position: relative;
+      z-index: 1;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    /* Logo in left panel */
+    .login-brand {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-16);
+    }
+
+    .login-brand img {
+      height: 44px;
+      width: auto;
+    }
+
+    .login-brand-text {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--color-text-primary);
+      letter-spacing: 0.04em;
+    }
+
+    .login-brand-text span {
+      color: var(--color-accent);
+    }
+
+    /* Main left copy */
+    .login-hero-copy {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .login-hero-copy .text-label {
+      margin-bottom: var(--space-4);
+      display: block;
+    }
+
+    .login-hero-copy h1 {
+      font-size: clamp(32px, 3.5vw, 52px);
+      line-height: 1.05;
+      margin-bottom: var(--space-5);
+    }
+
+    .login-hero-copy p {
+      font-size: 15px;
+      color: var(--color-text-secondary);
+      line-height: 1.7;
+      max-width: 380px;
+      margin-bottom: var(--space-10);
+    }
+
+    /* Role pills */
+    .role-pills {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      max-width: 340px;
+    }
+
+    .role-pill {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-4);
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-md);
+      transition: all var(--transition-base);
+    }
+
+    .role-pill:hover {
+      border-color: rgba(163,230,53,0.2);
+      background: rgba(163,230,53,0.04);
+    }
+
+    .role-pill-icon {
+      font-size: 18px;
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-sm);
+      background: var(--color-bg-elevated);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .role-pill-text strong {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--color-text-primary);
+      margin-bottom: 1px;
+    }
+
+    .role-pill-text span {
+      font-size: 11px;
+      color: var(--color-text-muted);
+      font-family: var(--font-mono);
+      letter-spacing: 0.04em;
+    }
+
+    /* Bottom left — stats */
+    .login-left-footer {
+      display: flex;
+      gap: var(--space-8);
+      padding-top: var(--space-8);
+      border-top: 1px solid var(--color-bg-border);
+      margin-top: var(--space-10);
+    }
+
+    .login-stat-val {
+      font-family: var(--font-display);
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--color-accent);
+      line-height: 1;
+      margin-bottom: 3px;
+    }
+
+    .login-stat-lbl {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+    }
+
+    /* ============================================================
+       RIGHT PANEL — Form
+       ============================================================ */
+    .login-right {
+      background: var(--color-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-10) var(--space-12);
+      position: relative;
+    }
+
+    .login-form-wrap {
+      width: 100%;
+      max-width: 420px;
+    }
+
+    /* Form header */
+    .form-header {
+      margin-bottom: var(--space-8);
+    }
+
+    .form-header h2 {
+      font-size: 32px;
+      margin-bottom: var(--space-2);
+    }
+
+    .form-header p {
+      font-size: 14px;
+      color: var(--color-text-secondary);
+    }
+
+    .form-header p a {
+      color: var(--color-accent);
+      font-weight: 500;
+      transition: opacity var(--transition-fast);
+    }
+
+    .form-header p a:hover {
+      opacity: 0.8;
+    }
+
+    /* Views — login / forgot password / reset sent */
+    .form-view {
+      display: none;
+    }
+
+    .form-view.active {
+      display: block;
+    }
+
+    /* Form elements */
+    .form-group {
+      margin-bottom: var(--space-5);
+    }
+
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--color-text-secondary);
+      margin-bottom: var(--space-2);
+      letter-spacing: 0.02em;
+    }
+
+    .form-input-wrap {
+      position: relative;
+    }
+
+    .form-input {
+      width: 100%;
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-md);
+      padding: 13px 16px 13px 44px;
+      font-size: 15px;
+      color: var(--color-text-primary);
+      transition: all var(--transition-base);
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    .form-input::placeholder {
+      color: var(--color-text-muted);
+    }
+
+    .form-input:focus {
+      border-color: var(--color-accent);
+      background: var(--color-bg-elevated);
+      box-shadow: 0 0 0 3px rgba(163,230,53,0.08);
+    }
+
+    .form-input.error {
+      border-color: var(--color-danger);
+      box-shadow: 0 0 0 3px rgba(239,68,68,0.08);
+    }
+
+    .form-input-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--color-text-muted);
+      pointer-events: none;
+      transition: color var(--transition-fast);
+    }
+
+    .form-input:focus ~ .form-input-icon,
+    .form-input-wrap:focus-within .form-input-icon {
+      color: var(--color-accent);
+    }
+
+    /* Password toggle */
+    .password-toggle {
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      transition: color var(--transition-fast);
+    }
+
+    .password-toggle:hover {
+      color: var(--color-text-primary);
+    }
+
+    /* Error message */
+    .form-error {
+      font-size: 12px;
+      color: var(--color-danger);
+      margin-top: var(--space-2);
+      display: none;
+      align-items: center;
+      gap: var(--space-1);
+    }
+
+    .form-error.visible {
+      display: flex;
+    }
+
+    /* Remember me + forgot */
+    .form-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-6);
+    }
+
+    .remember-wrap {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      cursor: pointer;
+    }
+
+    .remember-wrap input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--color-accent);
+      cursor: pointer;
+    }
+
+    .remember-label {
+      font-size: 13px;
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .forgot-link {
+      font-size: 13px;
+      color: var(--color-accent);
+      font-weight: 500;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      font-family: var(--font-body);
+      transition: opacity var(--transition-fast);
+    }
+
+    .forgot-link:hover {
+      opacity: 0.8;
+    }
+
+    /* Submit button */
+    .btn-login {
+      width: 100%;
+      padding: 14px;
+      font-size: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-login .btn-spinner {
+      display: none;
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(8,13,26,0.3);
+      border-top-color: #080d1a;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    .btn-login.loading .btn-text { display: none; }
+    .btn-login.loading .btn-spinner { display: block; }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Global form error banner */
+    .form-banner {
+      padding: 12px 16px;
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      margin-bottom: var(--space-5);
+      display: none;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    .form-banner.error {
+      background: rgba(239,68,68,0.08);
+      border: 1px solid rgba(239,68,68,0.2);
+      color: #fca5a5;
+      display: flex;
+    }
+
+    .form-banner.success {
+      background: rgba(34,197,94,0.08);
+      border: 1px solid rgba(34,197,94,0.2);
+      color: #86efac;
+      display: flex;
+    }
+
+    /* Divider */
+    .form-divider {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin: var(--space-6) 0;
+    }
+
+    .form-divider::before,
+    .form-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--color-bg-border);
+    }
+
+    .form-divider span {
+      font-size: 12px;
+      color: var(--color-text-muted);
+      font-family: var(--font-mono);
+      letter-spacing: 0.08em;
+      white-space: nowrap;
+    }
+
+    /* Trial CTA */
+    .trial-cta {
+      text-align: center;
+      padding: var(--space-5);
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-lg);
+      transition: border-color var(--transition-base);
+    }
+
+    .trial-cta:hover {
+      border-color: rgba(163,230,53,0.2);
+    }
+
+    .trial-cta p {
+      font-size: 13px;
+      color: var(--color-text-secondary);
+      margin-bottom: var(--space-3);
+    }
+
+    .trial-cta p strong {
+      color: var(--color-accent);
+    }
+
+    /* Security note */
+    .security-note {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-2);
+      margin-top: var(--space-6);
+      font-size: 12px;
+      color: var(--color-text-muted);
+    }
+
+    .security-note svg {
+      color: var(--color-accent);
+      flex-shrink: 0;
+    }
+
+    /* Back button */
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: 13px;
+      color: var(--color-text-muted);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      font-family: var(--font-body);
+      margin-bottom: var(--space-6);
+      transition: color var(--transition-fast);
+    }
+
+    .back-btn:hover {
+      color: var(--color-text-primary);
+    }
+
+    /* Success icon */
+    .success-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: rgba(34,197,94,0.1);
+      border: 2px solid rgba(34,197,94,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto var(--space-5);
+      font-size: 28px;
+    }
+
+    /* Top right — mobile logo */
+    .mobile-logo {
+      display: none;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-8);
+    }
+
+    .mobile-logo img {
+      height: 36px;
+      width: auto;
+    }
+
+    .mobile-logo-text {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .mobile-logo-text span { color: var(--color-accent); }
+
+    /* ============================================================
+       RESPONSIVE
+       ============================================================ */
+    @media (max-width: 900px) {
+      .login-page { grid-template-columns: 1fr; }
+      .login-left { display: none; }
+      .login-right {
+        min-height: 100vh;
+        padding: var(--space-8) var(--space-6);
+        align-items: flex-start;
+        padding-top: var(--space-12);
+      }
+      .mobile-logo { display: flex; }
+      .login-form-wrap { max-width: 100%; }
+    }
+
+    @media (max-width: 480px) {
+      .login-right { padding: var(--space-8) var(--space-5); }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="login-page">
+
+    <!-- ============================================================
+         LEFT PANEL
+         ============================================================ -->
+    <div class="login-left">
+      <div class="login-left-bg"></div>
+      <div class="login-left-grid"></div>
+      <div class="login-orb"></div>
+
+      <div class="login-left-content">
+        <!-- Brand -->
+        <div class="login-brand animate-fade-up">
+          <img
+            src="../assets/images/logo-icon.png"
+            alt="PA360 Proton"
+            onerror="this.style.display='none';"
+          />
+          <span class="login-brand-text">PA360 <span>Proton</span></span>
+        </div>
+
+        <!-- Hero copy -->
+        <div class="login-hero-copy">
+          <span class="text-label animate-fade-up delay-1">Welcome back</span>
+          <h1 class="animate-fade-up delay-2">
+            Your athletes<br />are waiting.<span style="color:var(--color-accent);">_</span>
+          </h1>
+          <p class="animate-fade-up delay-3">
+            Log in to manage your institute, track performance, and keep your athletes on the path to excellence.
+          </p>
+
+          <!-- Role pills -->
+          <div class="role-pills animate-fade-up delay-4">
+            <div class="role-pill">
+              <div class="role-pill-icon">🏛️</div>
+              <div class="role-pill-text">
+                <strong>Institute Admin</strong>
+                <span>Manage coaches, athletes & reports</span>
+              </div>
+            </div>
+            <div class="role-pill">
+              <div class="role-pill-icon">🎽</div>
+              <div class="role-pill-text">
+                <strong>Coach / Trainer</strong>
+                <span>Log performance & attendance</span>
+              </div>
+            </div>
+            <div class="role-pill">
+              <div class="role-pill-icon">🏃</div>
+              <div class="role-pill-text">
+                <strong>Athlete</strong>
+                <span>Track progress & view leaderboard</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom stats -->
+        <div class="login-left-footer animate-fade-up delay-5">
+          <div>
+            <div class="login-stat-val">15+</div>
+            <div class="login-stat-lbl">Sports Supported</div>
+          </div>
+          <div>
+            <div class="login-stat-val">4</div>
+            <div class="login-stat-lbl">Role Dashboards</div>
+          </div>
+          <div>
+            <div class="login-stat-val">100%</div>
+            <div class="login-stat-lbl">Data Secure</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         RIGHT PANEL — FORM
+         ============================================================ -->
+    <div class="login-right">
+      <div class="login-form-wrap">
+
+        <!-- Mobile logo (shown only on small screens) -->
+        <div class="mobile-logo">
+          <img
+            src="../assets/images/logo-icon.png"
+            alt="PA360 Proton"
+            onerror="this.style.display='none';"
+          />
+          <span class="mobile-logo-text">PA360 <span>Proton</span></span>
+        </div>
+
+        <!-- ======================================================
+             VIEW 1 — LOGIN FORM
+             ====================================================== -->
+        <div class="form-view active" id="view-login">
+
+          <div class="form-header">
+            <h2>Welcome back</h2>
+            <p>New to PA360 Proton? <a href="pricing.html">Start your free trial →</a></p>
+          </div>
+
+          <!-- Error banner -->
+          <div class="form-banner" id="login-banner"></div>
+
+          <form id="loginForm" novalidate>
+
+            <!-- Email -->
+            <div class="form-group">
+              <label class="form-label" for="login-email">Email Address</label>
+              <div class="form-input-wrap">
+                <input
+                  type="email"
+                  id="login-email"
+                  class="form-input"
+                  placeholder="your@email.com"
+                  autocomplete="email"
+                  required
+                />
+                <span class="form-input-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                </span>
+              </div>
+              <div class="form-error" id="email-error">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                Please enter a valid email address
+              </div>
+            </div>
+
+            <!-- Password -->
+            <div class="form-group">
+              <label class="form-label" for="login-password">Password</label>
+              <div class="form-input-wrap">
+                <input
+                  type="password"
+                  id="login-password"
+                  class="form-input"
+                  placeholder="Enter your password"
+                  autocomplete="current-password"
+                  required
+                />
+                <span class="form-input-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                </span>
+                <button type="button" class="password-toggle" onclick="togglePassword('login-password', this)" aria-label="Toggle password visibility">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="eye-icon"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                </button>
+              </div>
+              <div class="form-error" id="password-error">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                Please enter your password
+              </div>
+            </div>
+
+            <!-- Remember + Forgot -->
+            <div class="form-row">
+              <label class="remember-wrap">
+                <input type="checkbox" id="remember-me" />
+                <span class="remember-label">Remember me</span>
+              </label>
+              <button type="button" class="forgot-link" onclick="showView('view-forgot')">
+                Forgot password?
+              </button>
+            </div>
+
+            <!-- Submit -->
+            <button type="submit" class="btn btn-primary btn-login" id="loginBtn">
+              <span class="btn-text">Log In to PA360 Proton</span>
+              <span class="btn-spinner"></span>
+            </button>
+
+          </form>
+
+          <div class="form-divider">
+            <span>Don't have an account yet?</span>
+          </div>
+
+          <div class="trial-cta">
+            <p>Start your <strong>14-day free trial</strong> — no credit card required.</p>
+            <a href="pricing.html" class="btn btn-secondary w-full">View Plans & Sign Up</a>
+          </div>
+
+          <div class="security-note">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            Secured with 256-bit encryption · Your data is always protected
+          </div>
+
+        </div>
+
+        <!-- ======================================================
+             VIEW 2 — FORGOT PASSWORD
+             ====================================================== -->
+        <div class="form-view" id="view-forgot">
+
+          <button class="back-btn" onclick="showView('view-login')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            Back to login
+          </button>
+
+          <div class="form-header">
+            <h2>Reset password</h2>
+            <p>Enter your email and we'll send you a reset link valid for 1 hour.</p>
+          </div>
+
+          <!-- Banner -->
+          <div class="form-banner" id="forgot-banner"></div>
+
+          <form id="forgotForm" novalidate>
+
+            <div class="form-group">
+              <label class="form-label" for="forgot-email">Email Address</label>
+              <div class="form-input-wrap">
+                <input
+                  type="email"
+                  id="forgot-email"
+                  class="form-input"
+                  placeholder="your@email.com"
+                  autocomplete="email"
+                  required
+                />
+                <span class="form-input-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                </span>
+              </div>
+              <div class="form-error" id="forgot-email-error">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                Please enter a valid email address
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-login" id="forgotBtn">
+              <span class="btn-text">Send Reset Link</span>
+              <span class="btn-spinner"></span>
+            </button>
+
+          </form>
+
+          <div class="security-note" style="margin-top:var(--space-6);">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            Reset links expire after 1 hour for your security
+          </div>
+
+        </div>
+
+        <!-- ======================================================
+             VIEW 3 — RESET EMAIL SENT
+             ====================================================== -->
+        <div class="form-view" id="view-sent">
+          <div style="text-align:center; padding: var(--space-8) 0;">
+
+            <div class="success-icon">✉️</div>
+
+            <h2 style="margin-bottom:var(--space-3);">Check your email</h2>
+            <p style="color:var(--color-text-secondary); font-size:15px; line-height:1.7; margin-bottom:var(--space-6);">
+              We've sent a password reset link to<br />
+              <strong id="sent-email" style="color:var(--color-accent);"></strong>
+            </p>
+            <p style="color:var(--color-text-muted); font-size:13px; line-height:1.6; margin-bottom:var(--space-8);">
+              The link expires in 1 hour. If you don't see the email, check your spam folder.
+            </p>
+
+            <button class="btn btn-secondary w-full" onclick="showView('view-login')" style="margin-bottom:var(--space-4);">
+              Back to Login
+            </button>
+
+            <button
+              class="forgot-link"
+              style="font-size:13px; color:var(--color-text-muted);"
+              onclick="showView('view-forgot')"
+            >
+              Didn't receive it? Try again
+            </button>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============================================================
+       JAVASCRIPT
+       ============================================================ -->
+  <script>
+    // --- View switcher ---
+    function showView(viewId) {
+      document.querySelectorAll('.form-view').forEach(v => v.classList.remove('active'));
+      document.getElementById(viewId).classList.add('active');
+      // Clear banners and errors when switching
+      clearErrors();
+    }
+
+    // --- Password toggle ---
+    function togglePassword(inputId, btn) {
+      const input = document.getElementById(inputId);
+      const isPassword = input.type === 'password';
+      input.type = isPassword ? 'text' : 'password';
+      btn.innerHTML = isPassword
+        ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`
+        : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+    }
+
+    // --- Validation helpers ---
+    function isValidEmail(email) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+    }
+
+    function showFieldError(inputId, errorId) {
+      document.getElementById(inputId).classList.add('error');
+      document.getElementById(errorId).classList.add('visible');
+    }
+
+    function clearFieldError(inputId, errorId) {
+      document.getElementById(inputId).classList.remove('error');
+      document.getElementById(errorId).classList.remove('visible');
+    }
+
+    function clearErrors() {
+      ['login-email','login-password','forgot-email'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('error');
+      });
+      ['email-error','password-error','forgot-email-error'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('visible');
+      });
+      ['login-banner','forgot-banner'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.className = 'form-banner'; el.textContent = ''; }
+      });
+    }
+
+    function showBanner(bannerId, type, message) {
+      const banner = document.getElementById(bannerId);
+      banner.className = `form-banner ${type}`;
+      banner.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        ${message}
+      `;
+    }
+
+    function setLoading(btnId, loading) {
+      const btn = document.getElementById(btnId);
+      btn.classList.toggle('loading', loading);
+      btn.disabled = loading;
+    }
+
+    // --- Clear errors on input ---
+    document.getElementById('login-email').addEventListener('input', () => clearFieldError('login-email', 'email-error'));
+    document.getElementById('login-password').addEventListener('input', () => clearFieldError('login-password', 'password-error'));
+    document.getElementById('forgot-email').addEventListener('input', () => clearFieldError('forgot-email', 'forgot-email-error'));
+
+    // --- LOGIN FORM SUBMIT ---
+    document.getElementById('loginForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      const email    = document.getElementById('login-email').value.trim();
+      const password = document.getElementById('login-password').value;
+      let valid = true;
+
+      // Validate email
+      if (!isValidEmail(email)) {
+        showFieldError('login-email', 'email-error');
+        valid = false;
+      }
+
+      // Validate password
+      if (!password) {
+        showFieldError('login-password', 'password-error');
+        valid = false;
+      }
+
+      if (!valid) return;
+
+      // Show loading
+      setLoading('loginBtn', true);
+
+      try {
+        // TODO Phase 4: Replace with real API call
+        // const res = await fetch('/api/auth/login', {
+        //   method: 'POST',
+        //   headers: { 'Content-Type': 'application/json' },
+        //   body: JSON.stringify({ email, password })
+        // });
+        // const data = await res.json();
+        // if (!res.ok) throw new Error(data.message || 'Login failed');
+        // localStorage.setItem('token', data.token);
+        // Redirect based on role in token
+        // redirectByRole(data.role);
+
+        // Placeholder simulation — remove in Phase 4
+        await new Promise(r => setTimeout(r, 1200));
+        showBanner('login-banner', 'error', 'Backend not connected yet. This will work in Phase 4.');
+
+      } catch (err) {
+        showBanner('login-banner', 'error', err.message || 'Something went wrong. Please try again.');
+      } finally {
+        setLoading('loginBtn', false);
+      }
+    });
+
+    // --- Role-based redirect (Phase 4) ---
+    function redirectByRole(role) {
+      const routes = {
+        superadmin: '../app/superadmin/dashboard.html',
+        admin:      '../app/admin/dashboard.html',
+        coach:      '../app/coach/dashboard.html',
+        athlete:    '../app/athlete/dashboard.html'
+      };
+      window.location.href = routes[role] || 'index.html';
+    }
+
+    // --- FORGOT PASSWORD FORM SUBMIT ---
+    document.getElementById('forgotForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      const email = document.getElementById('forgot-email').value.trim();
+
+      if (!isValidEmail(email)) {
+        showFieldError('forgot-email', 'forgot-email-error');
+        return;
+      }
+
+      setLoading('forgotBtn', true);
+
+      try {
+        // TODO Phase 4: Replace with real API call
+        // await fetch('/api/auth/forgot-password', {
+        //   method: 'POST',
+        //   headers: { 'Content-Type': 'application/json' },
+        //   body: JSON.stringify({ email })
+        // });
+
+        // Placeholder simulation — remove in Phase 4
+        await new Promise(r => setTimeout(r, 1000));
+        document.getElementById('sent-email').textContent = email;
+        showView('view-sent');
+
+      } catch (err) {
+        showBanner('forgot-banner', 'error', 'Something went wrong. Please try again.');
+      } finally {
+        setLoading('forgotBtn', false);
+      }
+    });
+  </script>
+
+</body>
+</html>
