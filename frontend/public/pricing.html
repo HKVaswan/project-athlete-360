@@ -1,0 +1,1373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="PA360 Proton Pricing — Affordable sports institute management. Start free for 14 days. Starter from $24/month. No hidden fees." />
+  <title>Pricing — PA360 Proton</title>
+
+  <link rel="stylesheet" href="../css/global.css" />
+
+  <style>
+    /* ============================================================
+       PRICING PAGE HERO
+       ============================================================ */
+    .pricing-hero {
+      padding: calc(var(--nav-height) + var(--space-16)) 0 var(--space-16);
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .pricing-hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 70% 60% at 50% 0%, rgba(45,58,140,0.2) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 40% at 80% 60%, rgba(163,230,53,0.05) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .pricing-hero-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(26,42,69,0.3) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(26,42,69,0.3) 1px, transparent 1px);
+      background-size: 60px 60px;
+      mask-image: radial-gradient(ellipse 80% 100% at 50% 0%, black 20%, transparent 80%);
+    }
+
+    .pricing-hero .container {
+      position: relative;
+      z-index: 1;
+    }
+
+    .pricing-hero h1 {
+      font-size: clamp(40px, 6vw, 72px);
+      margin-bottom: var(--space-4);
+      line-height: 1.05;
+    }
+
+    .pricing-hero p {
+      font-size: clamp(16px, 2vw, 19px);
+      color: var(--color-text-secondary);
+      max-width: 520px;
+      margin: 0 auto var(--space-8);
+      line-height: 1.7;
+    }
+
+    /* ============================================================
+       BILLING TOGGLE
+       ============================================================ */
+    .billing-toggle-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-4);
+      margin-bottom: var(--space-12);
+    }
+
+    .billing-label {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--color-text-muted);
+      transition: color var(--transition-base);
+    }
+
+    .billing-label.active {
+      color: var(--color-text-primary);
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 52px;
+      height: 28px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-full);
+      transition: all var(--transition-base);
+    }
+
+    .toggle-thumb {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--color-text-muted);
+      transition: all var(--transition-base);
+    }
+
+    .toggle-switch input:checked ~ .toggle-track {
+      background: var(--color-accent-glow);
+      border-color: var(--color-accent);
+    }
+
+    .toggle-switch input:checked ~ .toggle-thumb {
+      transform: translateX(24px);
+      background: var(--color-accent);
+    }
+
+    .annual-badge {
+      background: var(--color-accent-glow);
+      color: var(--color-accent);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: var(--radius-full);
+      border: 1px solid rgba(163,230,53,0.3);
+      font-weight: 500;
+    }
+
+    /* ============================================================
+       PLAN CARDS
+       ============================================================ */
+    .plans-section {
+      padding-bottom: var(--space-16);
+    }
+
+    .plans-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-6);
+      align-items: start;
+    }
+
+    .plan-card {
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-xl);
+      padding: var(--space-8);
+      position: relative;
+      transition: all var(--transition-base);
+    }
+
+    .plan-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .plan-card.featured {
+      background: var(--color-bg-elevated);
+      border-color: var(--color-accent);
+      box-shadow: 0 0 0 1px rgba(163,230,53,0.15), 0 24px 60px rgba(0,0,0,0.4);
+    }
+
+    .plan-featured-badge {
+      position: absolute;
+      top: -14px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--color-accent);
+      color: #080d1a;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 4px 16px;
+      border-radius: var(--radius-full);
+      white-space: nowrap;
+    }
+
+    .plan-emoji {
+      font-size: 28px;
+      margin-bottom: var(--space-3);
+      display: block;
+    }
+
+    .plan-name {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: var(--space-2);
+    }
+
+    .plan-tagline {
+      font-size: 13px;
+      color: var(--color-text-muted);
+      margin-bottom: var(--space-5);
+      line-height: 1.5;
+    }
+
+    .plan-price-wrap {
+      margin-bottom: var(--space-2);
+      display: flex;
+      align-items: flex-end;
+      gap: 4px;
+    }
+
+    .plan-currency {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--color-text-secondary);
+      line-height: 1.4;
+    }
+
+    .plan-price {
+      font-family: var(--font-display);
+      font-size: 56px;
+      font-weight: 700;
+      line-height: 1;
+      color: var(--color-text-primary);
+    }
+
+    .plan-period {
+      font-size: 14px;
+      color: var(--color-text-muted);
+      margin-bottom: 8px;
+    }
+
+    .plan-annual-note {
+      font-size: 12px;
+      color: var(--color-text-muted);
+      margin-bottom: var(--space-5);
+      min-height: 18px;
+      transition: color var(--transition-base);
+    }
+
+    .plan-annual-note.active {
+      color: var(--color-accent);
+    }
+
+    /* Limits bar */
+    .plan-limits {
+      display: flex;
+      justify-content: space-between;
+      background: var(--color-bg);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-4);
+      margin-bottom: var(--space-5);
+    }
+
+    .plan-limit-item {
+      text-align: center;
+      flex: 1;
+    }
+
+    .plan-limit-item:not(:last-child) {
+      border-right: 1px solid var(--color-bg-border);
+    }
+
+    .plan-limit-val {
+      font-family: var(--font-display);
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--color-accent);
+      line-height: 1;
+      margin-bottom: 3px;
+    }
+
+    .plan-limit-lbl {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+    }
+
+    .plan-divider {
+      height: 1px;
+      background: var(--color-bg-border);
+      margin: var(--space-5) 0;
+    }
+
+    /* Features list */
+    .plan-features {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      margin-bottom: var(--space-6);
+    }
+
+    .plan-feature {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-3);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .plan-feature.included {
+      color: var(--color-text-secondary);
+    }
+
+    .plan-feature.excluded {
+      color: var(--color-text-muted);
+    }
+
+    .feat-check {
+      color: var(--color-accent);
+      font-size: 13px;
+      margin-top: 1px;
+      flex-shrink: 0;
+    }
+
+    .feat-x {
+      color: var(--color-text-muted);
+      font-size: 13px;
+      margin-top: 1px;
+      flex-shrink: 0;
+    }
+
+    .plan-cta {
+      width: 100%;
+      text-align: center;
+    }
+
+    .plan-cta-note {
+      text-align: center;
+      font-size: 12px;
+      color: var(--color-text-muted);
+      margin-top: var(--space-3);
+    }
+
+    /* ============================================================
+       COMPARISON TABLE
+       ============================================================ */
+    .comparison-section {
+      padding: var(--space-16) 0;
+      background: var(--color-bg-surface);
+    }
+
+    .comparison-section .section-header {
+      text-align: center;
+      margin-bottom: var(--space-10);
+    }
+
+    .comparison-table-wrap {
+      overflow-x: auto;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--color-bg-border);
+    }
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    .comparison-table thead th {
+      padding: var(--space-5) var(--space-6);
+      text-align: center;
+      font-family: var(--font-display);
+      font-size: 16px;
+      font-weight: 700;
+      border-bottom: 1px solid var(--color-bg-border);
+      background: var(--color-bg-elevated);
+      white-space: nowrap;
+    }
+
+    .comparison-table thead th:first-child {
+      text-align: left;
+      width: 35%;
+    }
+
+    .comparison-table thead th.featured-col {
+      color: var(--color-accent);
+      position: relative;
+    }
+
+    .comparison-table thead th.featured-col::after {
+      content: 'Most Popular';
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      color: var(--color-accent);
+      font-weight: 400;
+      margin-top: 2px;
+    }
+
+    .comparison-table tbody tr {
+      border-bottom: 1px solid var(--color-bg-border);
+      transition: background var(--transition-fast);
+    }
+
+    .comparison-table tbody tr:last-child {
+      border-bottom: none;
+    }
+
+    .comparison-table tbody tr:hover {
+      background: rgba(255,255,255,0.02);
+    }
+
+    .comparison-table tbody tr.category-row {
+      background: var(--color-bg-elevated);
+    }
+
+    .comparison-table tbody tr.category-row td {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+      padding: var(--space-3) var(--space-6);
+      font-weight: 500;
+    }
+
+    .comparison-table tbody td {
+      padding: var(--space-4) var(--space-6);
+      vertical-align: middle;
+    }
+
+    .comparison-table tbody td:first-child {
+      color: var(--color-text-secondary);
+      font-size: 14px;
+    }
+
+    .comparison-table tbody td:not(:first-child) {
+      text-align: center;
+    }
+
+    .comparison-table tbody td.featured-col {
+      background: rgba(163,230,53,0.03);
+    }
+
+    .check-yes {
+      color: var(--color-accent);
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .check-no {
+      color: var(--color-bg-border);
+      font-size: 18px;
+    }
+
+    .check-text {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--color-text-secondary);
+    }
+
+    .check-text.accent {
+      color: var(--color-accent);
+      font-weight: 500;
+    }
+
+    /* ============================================================
+       FAQ SECTION
+       ============================================================ */
+    .faq-section {
+      padding: var(--space-24) 0;
+    }
+
+    .faq-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-4);
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .faq-item {
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      transition: border-color var(--transition-base);
+    }
+
+    .faq-item.open {
+      border-color: rgba(163,230,53,0.25);
+    }
+
+    .faq-question {
+      width: 100%;
+      padding: var(--space-5) var(--space-6);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-4);
+      background: none;
+      border: none;
+      cursor: pointer;
+      text-align: left;
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--color-text-primary);
+      font-family: var(--font-body);
+      transition: color var(--transition-fast);
+    }
+
+    .faq-question:hover {
+      color: var(--color-accent);
+    }
+
+    .faq-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-bg-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 14px;
+      color: var(--color-text-muted);
+      transition: all var(--transition-base);
+    }
+
+    .faq-item.open .faq-icon {
+      background: var(--color-accent-glow);
+      border-color: var(--color-accent);
+      color: var(--color-accent);
+      transform: rotate(45deg);
+    }
+
+    .faq-answer {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.35s ease, padding 0.35s ease;
+      padding: 0 var(--space-6);
+    }
+
+    .faq-answer-inner {
+      padding-bottom: var(--space-5);
+      font-size: 14px;
+      color: var(--color-text-secondary);
+      line-height: 1.7;
+    }
+
+    .faq-item.open .faq-answer {
+      max-height: 300px;
+    }
+
+    /* ============================================================
+       BOTTOM CTA
+       ============================================================ */
+    .pricing-cta {
+      padding: var(--space-20) 0;
+      background: var(--color-bg-surface);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .pricing-cta::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 60% 80% at 50% 50%, rgba(45,58,140,0.15) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .pricing-cta-box {
+      position: relative;
+      text-align: center;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .pricing-cta-box h2 {
+      font-size: clamp(30px, 4vw, 48px);
+      margin-bottom: var(--space-4);
+    }
+
+    .pricing-cta-box p {
+      color: var(--color-text-secondary);
+      font-size: 16px;
+      line-height: 1.7;
+      margin-bottom: var(--space-8);
+    }
+
+    .pricing-cta-actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-4);
+      flex-wrap: wrap;
+    }
+
+    .pricing-cta-note {
+      margin-top: var(--space-5);
+      font-size: 13px;
+      color: var(--color-text-muted);
+    }
+
+    /* Trust strip */
+    .trust-strip {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-8);
+      flex-wrap: wrap;
+      margin-top: var(--space-10);
+      padding-top: var(--space-8);
+      border-top: 1px solid var(--color-bg-border);
+    }
+
+    .trust-strip-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: 13px;
+      color: var(--color-text-muted);
+    }
+
+    .trust-strip-item svg {
+      color: var(--color-accent);
+    }
+
+    /* ============================================================
+       RESPONSIVE
+       ============================================================ */
+    @media (max-width: 1024px) {
+      .plans-grid { grid-template-columns: 1fr; max-width: 480px; margin: 0 auto; }
+      .faq-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 768px) {
+      .plans-grid { max-width: 100%; }
+      .comparison-table thead th,
+      .comparison-table tbody td { padding: var(--space-3) var(--space-4); }
+      .trust-strip { gap: var(--space-4); }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ============================================================
+       NAVIGATION
+       ============================================================ -->
+  <nav class="navbar" id="navbar">
+    <div class="container">
+      <a href="index.html" class="nav-logo">
+        <img
+          src="https://i.ibb.co/DfrpZZsP/file-0000000012c461f8b82b9a906c1fd5d7-2.png"
+          alt="PA360 Proton"
+          style="height:40px;width:auto;"
+          onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"
+        />
+        <span class="nav-logo-text" style="display:none;">PA360 <span>Proton</span></span>
+      </a>
+
+      <ul class="nav-links" id="navLinks">
+        <li><a href="index.html#features" class="nav-link">Features</a></li>
+        <li><a href="index.html#how-it-works" class="nav-link">How It Works</a></li>
+        <li><a href="pricing.html" class="nav-link" style="color:var(--color-accent);">Pricing</a></li>
+        <li><a href="blog.html" class="nav-link">Blog</a></li>
+        <li><a href="about.html" class="nav-link">About</a></li>
+        <li><a href="#plans" class="btn btn-primary btn-sm">Start Free Trial</a></li>
+      </ul>
+
+      <div class="nav-actions">
+        <a href="login.html" class="btn btn-secondary btn-sm">Log In</a>
+      </div>
+
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ============================================================
+       HERO
+       ============================================================ -->
+  <section class="pricing-hero">
+    <div class="pricing-hero-grid"></div>
+    <div class="container">
+      <span class="badge badge-accent animate-fade-up" style="margin-bottom:var(--space-5);display:inline-flex;">
+        14-Day Free Trial · No Credit Card Required
+      </span>
+      <h1 class="animate-fade-up delay-1">
+        Simple pricing.<br /><span class="gradient-text">No surprises.</span>
+      </h1>
+      <p class="animate-fade-up delay-2">
+        Affordable plans for every institute size. Start free, upgrade when you're ready. Cancel anytime — no questions asked.
+      </p>
+
+      <!-- Billing toggle -->
+      <div class="billing-toggle-wrap animate-fade-up delay-3">
+        <span class="billing-label active" id="lbl-monthly">Monthly</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="billingToggle" onchange="toggleBilling()" />
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+        <span class="billing-label" id="lbl-annual">Annual</span>
+        <span class="annual-badge">Save 25%</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       PLAN CARDS
+       ============================================================ -->
+  <section class="plans-section" id="plans">
+    <div class="container">
+      <div class="plans-grid">
+
+        <!-- Starter -->
+        <div class="plan-card reveal delay-1">
+          <span class="plan-emoji">🥉</span>
+          <div class="plan-name">Starter</div>
+          <div class="plan-tagline">For small academies and single-sport clubs just getting started.</div>
+          <div class="plan-price-wrap">
+            <span class="plan-currency">$</span>
+            <span class="plan-price" id="price-starter">24</span>
+            <span class="plan-period">/mo</span>
+          </div>
+          <div class="plan-annual-note" id="note-starter">&nbsp;</div>
+          <div class="plan-limits">
+            <div class="plan-limit-item">
+              <div class="plan-limit-val">50</div>
+              <div class="plan-limit-lbl">Athletes</div>
+            </div>
+            <div class="plan-limit-item">
+              <div class="plan-limit-val">5</div>
+              <div class="plan-limit-lbl">Coaches</div>
+            </div>
+            <div class="plan-limit-item">
+              <div class="plan-limit-val">1</div>
+              <div class="plan-limit-lbl">Sport</div>
+            </div>
+          </div>
+          <div class="plan-divider"></div>
+          <div class="plan-features">
+            <div class="plan-feature included"><span class="feat-check">✓</span> Athlete profiles & enrollment</div>
+            <div class="plan-feature included"><span class="feat-check">✓</span> Attendance management</div>
+            <div class="plan-feature included"><span class="feat-check">✓</span> Performance tracking</div>
+            <div class="plan-feature included"><span class="feat-check">✓</span> Events calendar</div>
+            <div class="plan-feature included"><span class="feat-check">✓</span> Leaderboards & badges</div>
+            <div class="plan-feature included"><span class="feat-check">✓</span> Basic PDF reports</div>
+            <div class="plan-feature included"><span class="feat-check">✓</span> Announcements</div>
+            <div class="plan-feature included"><span class="feat-check">✓</span> Email support</div>
+            <div class="plan-feature excluded"><span class="feat-x">✗</span> Competition panel</div>
+            <div class="plan-feature excluded"><span class="feat-x">✗</span> Advanced reports (CSV)</div>
+            <div class="plan-feature excluded"><span class="feat-x">✗</span> Institute branding</div>
+            <div class="plan-feature excluded"><span class="feat-x">✗</span> Multiple sports</div>
+          </div>
+          <a href="#" onclick="startTrial('starter')" class="btn btn-secondary plan-cta">Start Free Trial</a>
+          <div class="plan-cta-note">14 days free · No card needed</div>
+        </div>
+
+        <!-- Pro -->
+        <div class="plan-card featured reveal delay-2">
+          <div class="plan-featured-badge">Most Popular</div>
+          <span class="plan-emoji">🥈</span>
+          <div class="plan-name">Pro</div>
+          <div class="plan-tagline">For growing institutes managing multiple sports and coaches.</div>
+          <div class="plan-price-wrap">
+            <span class="plan-currency">$</span>
+            <span class="plan-price" id="price-pro">59</span>
+            <span class="plan-period">/mo</span>
+          </div>
+          <div class="plan-annual-note" id="note-pro">&nbsp;</div>
+          <div class="plan-limits">
+            <div class="plan-limit-item">
+              <div class="plan-limit-val">200</div>
+              <div class="plan-limit-lbl">Athletes</div>
+            </div>
+            <div class="plan-limit-item">
+              <div class="plan-limit-val">20</div>
+              <div class="plan-limit-lbl">Coaches</div>
+            </div>
+            <div class="plan-limit-item">
+              <div class="plan-limit-val">∞</div>
+              <div class="plan-limit-lbl">Sports</div>
+            </div>
+          </div>
+          <div class="plan-divider"></div>
+          <div class="plan-features">
+            <div class="plan-feature included"><span class="feat-check">✓</span> Everything in Starter</div>
+            <div class="plan-feature included"><span class="feat-check">✓</span> Multiple sports + custom metrics</div>
+            <div class="plan-feature included"><span class="feat-check">✓</span> Competition panel & full calendar</div>
+            <div class="plan-feature included"><span class="feat-check">✓</span> Advanced reports (CSV + PDF)</div>
+            <div class="plan-feature included"><span class="feat-check">✓</span> Attendance threshold alerts</div>
+            <div class="plan-feature included"><span class="feat-check">✓</span> Institute branding on reports</div>
+            <div class="plan-feature included"><span class="feat-check">✓</span> Priority email support</div>
+            <div class="plan-feature excluded"><span class="feat-x">✗</span> Bulk CSV import</div>
+            <div class="plan-feature excluded"><span class="feat-x">✗</span> Full analytics dashboard</div>
+            <div class="plan-feature excluded"><span class="feat-x">✗</span> Dedicated support</div>
+          </div>
+          <a href="#" onclick="startTrial('pro')" class="btn btn-primary plan-cta">Start Free Trial</a>
+          <div class="plan-cta-note">14 days free · No card needed</div>
+        </div>
+
+        <!-- Elite -->
+        <div class="plan-card reveal delay-3">
+          <span class="plan-emoji">🥇</span>
+          <div class="plan-name">Elite</div>
+          <div class="plan-tagline">For large national institutes and professional academies.</div>
+          <div class="plan-price-wrap">
+            <span class="plan-currency">$</span>
+            <span class="plan-price" id="price-elite">129</span>
+            <span class="plan-period">/mo</span>
+          </div>
+          <div class="plan-annual-note" id="note-elite">&nbsp;</div>
+          <div class="plan-limits">
+            <div class="plan-limit-item">
+              <div class="plan-limit-val">∞</div>
+              <div class="plan-limit-lbl">Athletes</div>
+            </div>
+            <div class="plan-limit-item">
+              <div class="plan-limit-val">∞</div>
+              <div class="plan-limit-lbl">Coaches</div>
+            </div>
+            <div class="plan-limit-item">
+              <div class="plan-limit-val">∞</div>
+              <div class="plan-limit-lbl">Sports</div>
+            </div>
+          </div>
+          <div class="plan-divider"></div>
+          <div class="plan-features">
+            <div class="plan-feature included"><span class="feat-check">✓</span> Everything in Pro</div>
+            <div class="plan-feature included"><span class="feat-check">✓</span> Unlimited athletes & coaches</div>
+            <div class="plan-feature included"><span class="feat-check">✓</span> Full analytics dashboard</div>
+            <div class="plan-feature included"><span class="feat-check">✓</span> Bulk data import via CSV</div>
+            <div class="plan-feature included"><span class="feat-check">✓</span> Full data export & backup</div>
+            <div class="plan-feature included"><span class="feat-check">✓</span> Early access to new features</div>
+            <div class="plan-feature included"><span class="feat-check">✓</span> Dedicated support</div>
+            <div class="plan-feature included"><span class="feat-check">✓</span> Custom sport metric library</div>
+            <div class="plan-feature included"><span class="feat-check">✓</span> Unlimited sport categories</div>
+          </div>
+          <a href="#" onclick="startTrial('elite')" class="btn btn-secondary plan-cta">Start Free Trial</a>
+          <div class="plan-cta-note">14 days free · No card needed</div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       FULL COMPARISON TABLE
+       ============================================================ -->
+  <section class="comparison-section">
+    <div class="container">
+      <div class="section-header reveal">
+        <span class="text-label">Full Comparison</span>
+        <h2>See exactly what's <span class="gradient-text">in each plan</span></h2>
+      </div>
+
+      <div class="comparison-table-wrap reveal">
+        <table class="comparison-table">
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th>🥉 Starter</th>
+              <th class="featured-col">🥈 Pro</th>
+              <th>🥇 Elite</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Limits -->
+            <tr class="category-row">
+              <td colspan="4">Platform Limits</td>
+            </tr>
+            <tr>
+              <td>Athletes</td>
+              <td><span class="check-text">Up to 50</span></td>
+              <td class="featured-col"><span class="check-text accent">Up to 200</span></td>
+              <td><span class="check-text accent">Unlimited</span></td>
+            </tr>
+            <tr>
+              <td>Coaches / Trainers</td>
+              <td><span class="check-text">Up to 5</span></td>
+              <td class="featured-col"><span class="check-text accent">Up to 20</span></td>
+              <td><span class="check-text accent">Unlimited</span></td>
+            </tr>
+            <tr>
+              <td>Sport Categories</td>
+              <td><span class="check-text">1</span></td>
+              <td class="featured-col"><span class="check-text accent">Multiple</span></td>
+              <td><span class="check-text accent">Unlimited</span></td>
+            </tr>
+
+            <!-- Core Features -->
+            <tr class="category-row">
+              <td colspan="4">Core Features</td>
+            </tr>
+            <tr>
+              <td>Athlete Profiles & Enrollment</td>
+              <td><span class="check-yes">✓</span></td>
+              <td class="featured-col"><span class="check-yes">✓</span></td>
+              <td><span class="check-yes">✓</span></td>
+            </tr>
+            <tr>
+              <td>Attendance Management</td>
+              <td><span class="check-yes">✓</span></td>
+              <td class="featured-col"><span class="check-yes">✓</span></td>
+              <td><span class="check-yes">✓</span></td>
+            </tr>
+            <tr>
+              <td>Performance Tracking</td>
+              <td><span class="check-yes">✓</span></td>
+              <td class="featured-col"><span class="check-yes">✓</span></td>
+              <td><span class="check-yes">✓</span></td>
+            </tr>
+            <tr>
+              <td>Fitness Test Grading (1–10)</td>
+              <td><span class="check-yes">✓</span></td>
+              <td class="featured-col"><span class="check-yes">✓</span></td>
+              <td><span class="check-yes">✓</span></td>
+            </tr>
+            <tr>
+              <td>Events Calendar</td>
+              <td><span class="check-yes">✓</span></td>
+              <td class="featured-col"><span class="check-yes">✓</span></td>
+              <td><span class="check-yes">✓</span></td>
+            </tr>
+            <tr>
+              <td>Leaderboards (Class & Institute)</td>
+              <td><span class="check-yes">✓</span></td>
+              <td class="featured-col"><span class="check-yes">✓</span></td>
+              <td><span class="check-yes">✓</span></td>
+            </tr>
+            <tr>
+              <td>Badges & Achievements</td>
+              <td><span class="check-yes">✓</span></td>
+              <td class="featured-col"><span class="check-yes">✓</span></td>
+              <td><span class="check-yes">✓</span></td>
+            </tr>
+            <tr>
+              <td>Announcements</td>
+              <td><span class="check-yes">✓</span></td>
+              <td class="featured-col"><span class="check-yes">✓</span></td>
+              <td><span class="check-yes">✓</span></td>
+            </tr>
+            <tr>
+              <td>Discipline Management (Warning / Suspension)</td>
+              <td><span class="check-yes">✓</span></td>
+              <td class="featured-col"><span class="check-yes">✓</span></td>
+              <td><span class="check-yes">✓</span></td>
+            </tr>
+            <tr>
+              <td>Basic PDF Reports</td>
+              <td><span class="check-yes">✓</span></td>
+              <td class="featured-col"><span class="check-yes">✓</span></td>
+              <td><span class="check-yes">✓</span></td>
+            </tr>
+
+            <!-- Pro Features -->
+            <tr class="category-row">
+              <td colspan="4">Pro & Above</td>
+            </tr>
+            <tr>
+              <td>Multiple Sport Categories</td>
+              <td><span class="check-no">—</span></td>
+              <td class="featured-col"><span class="check-yes">✓</span></td>
+              <td><span class="check-yes">✓</span></td>
+            </tr>
+            <tr>
+              <td>Custom Sport Metrics</td>
+              <td><span class="check-no">—</span></td>
+              <td class="featured-col"><span class="check-yes">✓</span></td>
+              <td><span class="check-yes">✓</span></td>
+            </tr>
+            <tr>
+              <td>Competition Panel & Results</td>
+              <td><span class="check-no">—</span></td>
+              <td class="featured-col"><span class="check-yes">✓</span></td>
+              <td><span class="check-yes">✓</span></td>
+            </tr>
+            <tr>
+              <td>Advanced Reports (CSV + PDF)</td>
+              <td><span class="check-no">—</span></td>
+              <td class="featured-col"><span class="check-yes">✓</span></td>
+              <td><span class="check-yes">✓</span></td>
+            </tr>
+            <tr>
+              <td>Attendance Threshold Alerts</td>
+              <td><span class="check-no">—</span></td>
+              <td class="featured-col"><span class="check-yes">✓</span></td>
+              <td><span class="check-yes">✓</span></td>
+            </tr>
+            <tr>
+              <td>Institute Branding on Reports</td>
+              <td><span class="check-no">—</span></td>
+              <td class="featured-col"><span class="check-yes">✓</span></td>
+              <td><span class="check-yes">✓</span></td>
+            </tr>
+
+            <!-- Elite Features -->
+            <tr class="category-row">
+              <td colspan="4">Elite Only</td>
+            </tr>
+            <tr>
+              <td>Full Analytics Dashboard</td>
+              <td><span class="check-no">—</span></td>
+              <td class="featured-col"><span class="check-no">—</span></td>
+              <td><span class="check-yes">✓</span></td>
+            </tr>
+            <tr>
+              <td>Bulk Athlete Import (CSV)</td>
+              <td><span class="check-no">—</span></td>
+              <td class="featured-col"><span class="check-no">—</span></td>
+              <td><span class="check-yes">✓</span></td>
+            </tr>
+            <tr>
+              <td>Full Data Export & Backup</td>
+              <td><span class="check-no">—</span></td>
+              <td class="featured-col"><span class="check-no">—</span></td>
+              <td><span class="check-yes">✓</span></td>
+            </tr>
+            <tr>
+              <td>Early Access to New Features</td>
+              <td><span class="check-no">—</span></td>
+              <td class="featured-col"><span class="check-no">—</span></td>
+              <td><span class="check-yes">✓</span></td>
+            </tr>
+
+            <!-- Support -->
+            <tr class="category-row">
+              <td colspan="4">Support</td>
+            </tr>
+            <tr>
+              <td>Support Type</td>
+              <td><span class="check-text">Email</span></td>
+              <td class="featured-col"><span class="check-text accent">Priority Email</span></td>
+              <td><span class="check-text accent">Dedicated</span></td>
+            </tr>
+            <tr>
+              <td>14-Day Free Trial</td>
+              <td><span class="check-yes">✓</span></td>
+              <td class="featured-col"><span class="check-yes">✓</span></td>
+              <td><span class="check-yes">✓</span></td>
+            </tr>
+            <tr>
+              <td>Cancel Anytime</td>
+              <td><span class="check-yes">✓</span></td>
+              <td class="featured-col"><span class="check-yes">✓</span></td>
+              <td><span class="check-yes">✓</span></td>
+            </tr>
+
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       FAQ
+       ============================================================ -->
+  <section class="faq-section">
+    <div class="container">
+      <div class="section-header text-center reveal" style="margin-bottom:var(--space-10);">
+        <span class="text-label">Common Questions</span>
+        <h2>Everything you need to <span class="gradient-text">know</span></h2>
+      </div>
+
+      <div class="faq-grid">
+
+        <div class="faq-item reveal delay-1">
+          <button class="faq-question" onclick="toggleFaq(this)">
+            Do I need a credit card to start the free trial?
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">No credit card is required to start your 14-day free trial. You'll only be asked for payment details when your trial ends and you choose to continue with a paid plan.</div>
+          </div>
+        </div>
+
+        <div class="faq-item reveal delay-2">
+          <button class="faq-question" onclick="toggleFaq(this)">
+            Can I upgrade or downgrade my plan later?
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">Yes. You can upgrade anytime — the new plan takes effect immediately and you're only charged the prorated difference. Downgrades take effect at your next renewal date so you keep your current features until then.</div>
+          </div>
+        </div>
+
+        <div class="faq-item reveal delay-3">
+          <button class="faq-question" onclick="toggleFaq(this)">
+            What happens if I exceed my athlete limit?
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">You'll receive an alert when you reach 80% of your athlete limit. At 100%, coaches won't be able to enroll new athletes until you upgrade. Existing athletes and all their data are completely unaffected.</div>
+          </div>
+        </div>
+
+        <div class="faq-item reveal delay-4">
+          <button class="faq-question" onclick="toggleFaq(this)">
+            Is my athletes' data safe and private?
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">Absolutely. We take data protection seriously — especially for minor athletes. Sensitive data like medical notes and emergency contacts are never exportable in bulk. All data access is logged and role-restricted. Coaches can only see their assigned athletes.</div>
+          </div>
+        </div>
+
+        <div class="faq-item reveal delay-1">
+          <button class="faq-question" onclick="toggleFaq(this)">
+            How do my coaches and athletes get access?
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">Once you sign up as an Institute Admin, you enroll your coaches directly from your dashboard. Coaches then enroll their athletes. Everyone receives login credentials automatically via email — no technical setup required.</div>
+          </div>
+        </div>
+
+        <div class="faq-item reveal delay-2">
+          <button class="faq-question" onclick="toggleFaq(this)">
+            Can I add sports that aren't in the default list?
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">Yes. Pro and Elite plans allow you to add custom sports with your own performance metrics. The platform comes with 15+ sports predefined including Cricket, Football, Swimming, Kabaddi, Badminton and more — you just add what you need on top.</div>
+          </div>
+        </div>
+
+        <div class="faq-item reveal delay-3">
+          <button class="faq-question" onclick="toggleFaq(this)">
+            What happens to my data if I cancel?
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">If you cancel, your access continues until the end of your billing period. Your data is preserved for 60 days after that — giving you time to resubscribe and pick up exactly where you left off. After 60 days, data is permanently deleted and you'll be notified 7 days in advance.</div>
+          </div>
+        </div>
+
+        <div class="faq-item reveal delay-4">
+          <button class="faq-question" onclick="toggleFaq(this)">
+            Do you offer refunds on annual plans?
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">Annual plans are non-refundable but you can cancel at any time. Your access will continue until the end of the annual period. We recommend starting with a monthly plan first if you're unsure — you can always switch to annual later for the 25% discount.</div>
+          </div>
+        </div>
+
+        <div class="faq-item reveal delay-1">
+          <button class="faq-question" onclick="toggleFaq(this)">
+            Is PA360 Proton suitable for school sports programs?
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">Yes — PA360 Proton is specifically designed with youth and school athletes in mind. We have built-in protections for minor athletes including mandatory parent/guardian contacts, restricted data access, and strict privacy controls to keep young athletes' information safe.</div>
+          </div>
+        </div>
+
+        <div class="faq-item reveal delay-2">
+          <button class="faq-question" onclick="toggleFaq(this)">
+            Can I contact support before purchasing?
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">Absolutely. Email us at projectathlete360@gmail.com with any questions before you sign up. We're happy to help you figure out which plan is right for your institute or answer any technical questions you might have.</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       BOTTOM CTA
+       ============================================================ -->
+  <section class="pricing-cta">
+    <div class="container">
+      <div class="pricing-cta-box reveal">
+        <span class="text-label" style="display:block;margin-bottom:var(--space-4);">Start Today</span>
+        <h2>Still not sure?<br /><span class="gradient-text">Try it free for 14 days.</span></h2>
+        <p>No credit card. No commitment. Full access to every feature in your chosen plan from day one. If it's not right for your institute, you pay nothing.</p>
+        <div class="pricing-cta-actions">
+          <a href="#plans" class="btn btn-primary btn-lg">Choose Your Plan</a>
+          <a href="mailto:projectathlete360@gmail.com" class="btn btn-secondary btn-lg">Talk to Us First</a>
+        </div>
+        <p class="pricing-cta-note">Questions? Email us at projectathlete360@gmail.com</p>
+
+        <div class="trust-strip">
+          <div class="trust-strip-item">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            No credit card to start
+          </div>
+          <div class="trust-strip-item">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            Cancel anytime
+          </div>
+          <div class="trust-strip-item">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            Data protected & secure
+          </div>
+          <div class="trust-strip-item">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            Upgrade or downgrade freely
+          </div>
+          <div class="trust-strip-item">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            By Project Athlete 360
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       FOOTER
+       ============================================================ -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <div class="nav-logo" style="margin-bottom:var(--space-4);">
+            <img src="https://i.ibb.co/7t3vcXR2/file-000000006b0461fda5c0be6634559fd5-2.jpg" alt="Project Athlete 360" style="height:36px;width:auto;" onerror="this.style.display='none';" />
+          </div>
+          <p>PA360 Proton is a product of Project Athlete 360 — dedicated to making sports management affordable and accessible for every institute.</p>
+          <div class="social-links">
+            <a href="https://www.instagram.com/projectathlete360" target="_blank" rel="noopener" class="social-link" title="Instagram"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg></a>
+            <a href="https://x.com/theathlete360" target="_blank" rel="noopener" class="social-link" title="X"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>
+            <a href="https://www.youtube.com/@projectathlete360" target="_blank" rel="noopener" class="social-link" title="YouTube"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46a2.78 2.78 0 0 0-1.95 1.96A29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58A2.78 2.78 0 0 0 3.41 19.6C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.95A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"></path><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02"></polygon></svg></a>
+            <a href="https://m.facebook.com/projectathlete360" target="_blank" rel="noopener" class="social-link" title="Facebook"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg></a>
+            <a href="https://www.linkedin.com/company/project-athlete-360" target="_blank" rel="noopener" class="social-link" title="LinkedIn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg></a>
+            <a href="https://medium.com/@projectathlete360" target="_blank" rel="noopener" class="social-link" title="Medium"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M13.54 12a6.8 6.8 0 01-6.77 6.82A6.8 6.8 0 010 12a6.8 6.8 0 016.77-6.82A6.8 6.8 0 0113.54 12zM20.96 12c0 3.54-1.51 6.42-3.38 6.42-1.87 0-3.39-2.88-3.39-6.42s1.52-6.42 3.39-6.42 3.38 2.88 3.38 6.42M24 12c0 3.17-.53 5.75-1.19 5.75-.66 0-1.19-2.58-1.19-5.75s.53-5.75 1.19-5.75C23.47 6.25 24 8.83 24 12z"/></svg></a>
+          </div>
+        </div>
+        <div>
+          <div class="footer-heading">Product</div>
+          <ul class="footer-links">
+            <li><a href="index.html#features">Features</a></li>
+            <li><a href="pricing.html">Pricing</a></li>
+            <li><a href="index.html#how-it-works">How It Works</a></li>
+            <li><a href="login.html">Log In</a></li>
+            <li><a href="#plans">Start Free Trial</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-heading">Company</div>
+          <ul class="footer-links">
+            <li><a href="about.html">About PA360</a></li>
+            <li><a href="blog.html">Blog</a></li>
+            <li><a href="mailto:projectathlete360@gmail.com">Contact Us</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-heading">Legal</div>
+          <ul class="footer-links">
+            <li><a href="#">Privacy Policy</a></li>
+            <li><a href="#">Terms of Service</a></li>
+            <li><a href="#">Refund Policy</a></li>
+            <li><a href="#">Cookie Policy</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>© 2025 Project Athlete 360. All rights reserved. PA360 Proton is a product of Project Athlete 360.</p>
+        <p>Made with ❤️ for athletes everywhere.</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ============================================================
+       JAVASCRIPT
+       ============================================================ -->
+  <script>
+    // --- Navbar scroll ---
+    const navbar = document.getElementById('navbar');
+    window.addEventListener('scroll', () => {
+      navbar.classList.toggle('scrolled', window.scrollY > 20);
+    });
+
+    // --- Mobile menu ---
+    const navToggle = document.getElementById('navToggle');
+    const navLinks  = document.getElementById('navLinks');
+    navToggle.addEventListener('click', () => {
+      navToggle.classList.toggle('active');
+      navLinks.classList.toggle('open');
+    });
+    navLinks.querySelectorAll('a').forEach(link => {
+      link.addEventListener('click', () => {
+        navToggle.classList.remove('active');
+        navLinks.classList.remove('open');
+      });
+    });
+
+    // --- Scroll reveal ---
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+    document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+    // --- Billing toggle ---
+    const prices = {
+      starter: { monthly: 24,  annual: 18,  annualTotal: 216  },
+      pro:     { monthly: 59,  annual: 44,  annualTotal: 528  },
+      elite:   { monthly: 129, annual: 97,  annualTotal: 1164 }
+    };
+
+    function toggleBilling() {
+      const isAnnual = document.getElementById('billingToggle').checked;
+      document.getElementById('lbl-monthly').classList.toggle('active', !isAnnual);
+      document.getElementById('lbl-annual').classList.toggle('active', isAnnual);
+
+      ['starter', 'pro', 'elite'].forEach(plan => {
+        const p = prices[plan];
+        document.getElementById('price-' + plan).textContent = isAnnual ? p.annual : p.monthly;
+        const noteEl = document.getElementById('note-' + plan);
+        if (isAnnual) {
+          noteEl.textContent = `$${p.annualTotal}/year billed annually`;
+          noteEl.classList.add('active');
+        } else {
+          noteEl.innerHTML = '&nbsp;';
+          noteEl.classList.remove('active');
+        }
+      });
+    }
+
+    // --- Trial signup ---
+    // TODO: Replace with real Stripe checkout links when Stripe is configured in Phase 4
+    function startTrial(plan) {
+      alert(`Starting 14-day free trial for the ${plan.charAt(0).toUpperCase() + plan.slice(1)} plan.\n\nStripe checkout will be connected in Phase 4.`);
+    }
+
+    // --- FAQ accordion ---
+    function toggleFaq(btn) {
+      const item   = btn.closest('.faq-item');
+      const answer = item.querySelector('.faq-answer');
+      const isOpen = item.classList.contains('open');
+
+      // Close all
+      document.querySelectorAll('.faq-item.open').forEach(openItem => {
+        openItem.classList.remove('open');
+        openItem.querySelector('.faq-answer').style.maxHeight = null;
+      });
+
+      // Open clicked if it was closed
+      if (!isOpen) {
+        item.classList.add('open');
+        answer.style.maxHeight = answer.scrollHeight + 'px';
+      }
+    }
+
+    // --- Smooth scroll ---
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function(e) {
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          e.preventDefault();
+          window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - 80, behavior: 'smooth' });
+        }
+      });
+    });
+  </script>
+
+</body>
+</html>
