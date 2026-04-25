@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="PA360 Proton Blog — Insights on sports training, performance science, athlete mindset, institute management and platform updates." />
+  <title>Blog — PA360 Proton</title>
+
+  <link rel="stylesheet" href="../css/global.css" />
+
+  <style>
+    /* ============================================================
+       BLOG PAGE HERO
+       ============================================================ */
+    .blog-hero {
+      padding: calc(var(--nav-height) + var(--space-16)) 0 var(--space-16);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .blog-hero-bg {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 60% 80% at 20% 50%, rgba(45,58,140,0.18) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 60% at 80% 20%, rgba(163,230,53,0.05) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .blog-hero-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(26,42,69,0.3) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(26,42,69,0.3) 1px, transparent 1px);
+      background-size: 60px 60px;
+      mask-image: radial-gradient(ellipse 100% 80% at 0% 50%, black 10%, transparent 70%);
+    }
+
+    .blog-hero .container {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-16);
+      align-items: center;
+    }
+
+    .blog-hero-content h1 {
+      font-size: clamp(40px, 5vw, 68px);
+      line-height: 1.02;
+      margin-bottom: var(--space-5);
+    }
+
+    .blog-hero-content p {
+      font-size: 17px;
+      color: var(--color-text-secondary);
+      line-height: 1.7;
+      max-width: 420px;
+      margin-bottom: var(--space-8);
+    }
+
+    /* Search bar */
+    .blog-search {
+      position: relative;
+      max-width: 400px;
+    }
+
+    .blog-search input {
+      width: 100%;
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-full);
+      padding: 13px 20px 13px 48px;
+      font-size: 15px;
+      color: var(--color-text-primary);
+      outline: none;
+      transition: all var(--transition-base);
+    }
+
+    .blog-search input::placeholder {
+      color: var(--color-text-muted);
+    }
+
+    .blog-search input:focus {
+      border-color: var(--color-accent);
+      box-shadow: 0 0 0 3px rgba(163,230,53,0.08);
+      background: var(--color-bg-elevated);
+    }
+
+    .blog-search-icon {
+      position: absolute;
+      left: 18px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--color-text-muted);
+      pointer-events: none;
+    }
+
+    /* Hero right — featured topic cards */
+    .blog-hero-topics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-3);
+    }
+
+    .topic-card {
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-5);
+      cursor: pointer;
+      transition: all var(--transition-base);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .topic-card::before {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--tc-color, var(--color-accent));
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform var(--transition-base);
+    }
+
+    .topic-card:hover {
+      border-color: rgba(163,230,53,0.2);
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .topic-card:hover::before {
+      transform: scaleX(1);
+    }
+
+    .topic-icon {
+      font-size: 24px;
+      margin-bottom: var(--space-3);
+      display: block;
+    }
+
+    .topic-name {
+      font-family: var(--font-display);
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--color-text-primary);
+      margin-bottom: 3px;
+    }
+
+    .topic-count {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--color-text-muted);
+      letter-spacing: 0.06em;
+    }
+
+    /* ============================================================
+       CATEGORY FILTER BAR
+       ============================================================ */
+    .category-bar {
+      padding: var(--space-8) 0;
+      border-bottom: 1px solid var(--color-bg-border);
+      position: sticky;
+      top: var(--nav-height);
+      background: rgba(8,13,26,0.92);
+      backdrop-filter: blur(12px);
+      z-index: 100;
+    }
+
+    .category-bar .container {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      overflow-x: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    .category-bar .container::-webkit-scrollbar {
+      display: none;
+    }
+
+    .cat-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: 8px 18px;
+      border-radius: var(--radius-full);
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all var(--transition-base);
+      border: 1px solid var(--color-bg-border);
+      background: transparent;
+      color: var(--color-text-muted);
+      font-family: var(--font-body);
+    }
+
+    .cat-btn:hover {
+      color: var(--color-text-primary);
+      border-color: var(--color-text-muted);
+    }
+
+    .cat-btn.active {
+      background: var(--color-accent);
+      color: #080d1a;
+      border-color: var(--color-accent);
+      font-weight: 600;
+    }
+
+    .cat-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      opacity: 0.6;
+    }
+
+    /* ============================================================
+       FEATURED POST (TOP)
+       ============================================================ */
+    .featured-section {
+      padding: var(--space-16) 0 var(--space-8);
+    }
+
+    .featured-post {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 0;
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      transition: all var(--transition-base);
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .featured-post:hover {
+      border-color: rgba(163,230,53,0.25);
+      box-shadow: 0 24px 64px rgba(0,0,0,0.4);
+      transform: translateY(-3px);
+    }
+
+    /* Thumbnail with gradient overlay */
+    .featured-thumb {
+      position: relative;
+      min-height: 380px;
+      overflow: hidden;
+    }
+
+    .featured-thumb-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.6s ease;
+    }
+
+    .featured-post:hover .featured-thumb-img {
+      transform: scale(1.04);
+    }
+
+    /* Gradient placeholder when no image */
+    .thumb-gradient {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 80px;
+    }
+
+    .thumb-gradient.perf {
+      background: linear-gradient(135deg, #0d1526 0%, #1a2d52 50%, #0d1f3c 100%);
+    }
+    .thumb-gradient.science {
+      background: linear-gradient(135deg, #0d1526 0%, #1a3340 50%, #0d2030 100%);
+    }
+    .thumb-gradient.mindset {
+      background: linear-gradient(135deg, #1a1526 0%, #2d1a45 50%, #1a0d30 100%);
+    }
+    .thumb-gradient.news {
+      background: linear-gradient(135deg, #0d1a1a 0%, #0d3326 50%, #0d1a14 100%);
+    }
+
+    .thumb-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent 60%, var(--color-bg-surface) 100%);
+    }
+
+    .featured-content {
+      padding: var(--space-10) var(--space-8);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .featured-label {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-5);
+    }
+
+    .post-category {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: var(--radius-full);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      font-weight: 500;
+      border: 1px solid;
+    }
+
+    .cat-perf    { color: #a3e635; border-color: rgba(163,230,53,0.3); background: rgba(163,230,53,0.08); }
+    .cat-science { color: #38bdf8; border-color: rgba(56,189,248,0.3); background: rgba(56,189,248,0.08); }
+    .cat-mindset { color: #c084fc; border-color: rgba(192,132,252,0.3); background: rgba(192,132,252,0.08); }
+    .cat-news    { color: #fb923c; border-color: rgba(251,146,60,0.3);  background: rgba(251,146,60,0.08); }
+
+    .featured-badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      color: var(--color-accent);
+      text-transform: uppercase;
+    }
+
+    .featured-content h2 {
+      font-size: clamp(22px, 2.5vw, 32px);
+      line-height: 1.15;
+      margin-bottom: var(--space-4);
+      transition: color var(--transition-fast);
+    }
+
+    .featured-post:hover .featured-content h2 {
+      color: var(--color-accent);
+    }
+
+    .featured-content .excerpt {
+      font-size: 15px;
+      color: var(--color-text-secondary);
+      line-height: 1.7;
+      margin-bottom: var(--space-6);
+    }
+
+    .post-meta {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      font-size: 13px;
+      color: var(--color-text-muted);
+    }
+
+    .post-meta-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+
+    .post-author-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-bg-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--color-accent);
+      flex-shrink: 0;
+    }
+
+    .read-more-arrow {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--color-accent);
+      margin-top: var(--space-4);
+      transition: gap var(--transition-base);
+    }
+
+    .featured-post:hover .read-more-arrow {
+      gap: var(--space-3);
+    }
+
+    /* ============================================================
+       BLOG GRID
+       ============================================================ */
+    .blog-grid-section {
+      padding: var(--space-8) 0 var(--space-24);
+    }
+
+    .grid-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-8);
+    }
+
+    .grid-header h3 {
+      font-size: 20px;
+    }
+
+    .grid-count {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--color-text-muted);
+      letter-spacing: 0.08em;
+    }
+
+    .blog-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-6);
+    }
+
+    /* Blog card */
+    .blog-card {
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      transition: all var(--transition-base);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      text-decoration: none;
+      color: inherit;
+      position: relative;
+    }
+
+    .blog-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--color-accent);
+      opacity: 0;
+      transition: opacity var(--transition-base);
+      pointer-events: none;
+    }
+
+    .blog-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 20px 48px rgba(0,0,0,0.35);
+    }
+
+    .blog-card:hover::after {
+      opacity: 0.3;
+    }
+
+    /* Card thumbnail */
+    .card-thumb {
+      position: relative;
+      height: 180px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .card-thumb-inner {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 52px;
+      transition: transform 0.5s ease;
+    }
+
+    .blog-card:hover .card-thumb-inner {
+      transform: scale(1.06);
+    }
+
+    .card-thumb-inner.perf    { background: linear-gradient(135deg, #0d1f3c, #1e3a5f); }
+    .card-thumb-inner.science { background: linear-gradient(135deg, #0d2030, #1a3a4a); }
+    .card-thumb-inner.mindset { background: linear-gradient(135deg, #1a0d30, #2d1a45); }
+    .card-thumb-inner.news    { background: linear-gradient(135deg, #0d1a14, #1a3326); }
+
+    /* Reading time pill on image */
+    .card-read-time {
+      position: absolute;
+      bottom: var(--space-3);
+      right: var(--space-3);
+      background: rgba(8,13,26,0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-full);
+      padding: 3px 10px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--color-text-muted);
+      letter-spacing: 0.06em;
+    }
+
+    /* Card body */
+    .card-body {
+      padding: var(--space-5);
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-3);
+    }
+
+    .card-title {
+      font-family: var(--font-display);
+      font-size: 17px;
+      font-weight: 700;
+      line-height: 1.25;
+      margin-bottom: var(--space-3);
+      color: var(--color-text-primary);
+      transition: color var(--transition-fast);
+    }
+
+    .blog-card:hover .card-title {
+      color: var(--color-accent);
+    }
+
+    .card-excerpt {
+      font-size: 13px;
+      color: var(--color-text-secondary);
+      line-height: 1.65;
+      flex: 1;
+      margin-bottom: var(--space-4);
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: var(--space-4);
+      border-top: 1px solid var(--color-bg-border);
+    }
+
+    .card-date {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--color-text-muted);
+      letter-spacing: 0.06em;
+    }
+
+    .card-arrow {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 1px solid var(--color-bg-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-text-muted);
+      transition: all var(--transition-base);
+      flex-shrink: 0;
+    }
+
+    .blog-card:hover .card-arrow {
+      background: var(--color-accent);
+      border-color: var(--color-accent);
+      color: #080d1a;
+    }
+
+    /* ============================================================
+       NEWSLETTER STRIP
+       ============================================================ */
+    .newsletter-strip {
+      background: var(--color-bg-surface);
+      border-top: 1px solid var(--color-bg-border);
+      border-bottom: 1px solid var(--color-bg-border);
+      padding: var(--space-12) 0;
+      margin-bottom: var(--space-16);
+    }
+
+    .newsletter-inner {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-12);
+      align-items: center;
+    }
+
+    .newsletter-copy h3 {
+      font-size: clamp(22px, 2.5vw, 32px);
+      margin-bottom: var(--space-3);
+    }
+
+    .newsletter-copy p {
+      font-size: 15px;
+      color: var(--color-text-secondary);
+      line-height: 1.7;
+    }
+
+    .newsletter-form {
+      display: flex;
+      gap: var(--space-3);
+    }
+
+    .newsletter-input {
+      flex: 1;
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-md);
+      padding: 13px 16px;
+      font-size: 15px;
+      color: var(--color-text-primary);
+      outline: none;
+      transition: all var(--transition-base);
+      font-family: var(--font-body);
+    }
+
+    .newsletter-input::placeholder {
+      color: var(--color-text-muted);
+    }
+
+    .newsletter-input:focus {
+      border-color: var(--color-accent);
+      box-shadow: 0 0 0 3px rgba(163,230,53,0.08);
+    }
+
+    .newsletter-note {
+      font-size: 12px;
+      color: var(--color-text-muted);
+      margin-top: var(--space-3);
+    }
+
+    /* ============================================================
+       EMPTY STATE (when filter has no results)
+       ============================================================ */
+    .empty-state {
+      text-align: center;
+      padding: var(--space-16) 0;
+      display: none;
+    }
+
+    .empty-state.visible {
+      display: block;
+    }
+
+    .empty-icon {
+      font-size: 48px;
+      margin-bottom: var(--space-4);
+    }
+
+    .empty-state h3 {
+      font-size: 22px;
+      margin-bottom: var(--space-3);
+    }
+
+    .empty-state p {
+      color: var(--color-text-secondary);
+      font-size: 15px;
+    }
+
+    /* ============================================================
+       RESPONSIVE
+       ============================================================ */
+    @media (max-width: 1024px) {
+      .blog-grid { grid-template-columns: repeat(2, 1fr); }
+      .featured-post { grid-template-columns: 1fr; }
+      .featured-thumb { min-height: 240px; }
+      .thumb-overlay { background: linear-gradient(180deg, transparent 60%, var(--color-bg-surface) 100%); }
+      .newsletter-inner { grid-template-columns: 1fr; gap: var(--space-6); }
+    }
+
+    @media (max-width: 768px) {
+      .blog-hero .container { grid-template-columns: 1fr; }
+      .blog-hero-topics { display: none; }
+      .blog-grid { grid-template-columns: 1fr; }
+      .newsletter-form { flex-direction: column; }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ============================================================
+       NAVIGATION
+       ============================================================ -->
+  <nav class="navbar" id="navbar">
+    <div class="container">
+      <a href="index.html" class="nav-logo">
+        <img src="../assets/images/logo-icon.png" alt="PA360 Proton" style="height:40px;width:auto;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" />
+        <span class="nav-logo-text" style="display:none;">PA360 <span style="margin-left:4px;">Proton</span></span>
+      </a>
+
+      <ul class="nav-links" id="navLinks">
+        <li><a href="index.html#features" class="nav-link">Features</a></li>
+        <li><a href="index.html#how-it-works" class="nav-link">How It Works</a></li>
+        <li><a href="pricing.html" class="nav-link">Pricing</a></li>
+        <li><a href="blog.html" class="nav-link" style="color:var(--color-accent);">Blog</a></li>
+        <li><a href="about.html" class="nav-link">About</a></li>
+        <li><a href="pricing.html" class="btn btn-primary btn-sm">Start Free Trial</a></li>
+      </ul>
+
+      <div class="nav-actions">
+        <a href="login.html" class="btn btn-secondary btn-sm">Log In</a>
+      </div>
+
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ============================================================
+       HERO
+       ============================================================ -->
+  <section class="blog-hero">
+    <div class="blog-hero-bg"></div>
+    <div class="blog-hero-grid"></div>
+    <div class="container">
+      <div class="blog-hero-content">
+        <span class="badge badge-accent animate-fade-up" style="margin-bottom:var(--space-5);display:inline-flex;">
+          Knowledge for the Sports World
+        </span>
+        <h1 class="animate-fade-up delay-1">
+          Insights that<br /><span class="gradient-text">move athletes</span><br />forward.
+        </h1>
+        <p class="animate-fade-up delay-2">
+          Training science, performance strategies, athlete mindset, institute management and platform news — written for everyone in sports.
+        </p>
+        <div class="blog-search animate-fade-up delay-3">
+          <span class="blog-search-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          </span>
+          <input type="text" id="searchInput" placeholder="Search articles..." oninput="filterPosts()" />
+        </div>
+      </div>
+
+      <!-- Topic cards -->
+      <div class="blog-hero-topics animate-fade-up delay-2">
+        <div class="topic-card" style="--tc-color:#a3e635;" onclick="filterByCategory('perf')">
+          <span class="topic-icon">⚡</span>
+          <div class="topic-name">Training & Performance</div>
+          <div class="topic-count">3 articles</div>
+        </div>
+        <div class="topic-card" style="--tc-color:#38bdf8;" onclick="filterByCategory('science')">
+          <span class="topic-icon">🔬</span>
+          <div class="topic-name">Sports Science</div>
+          <div class="topic-count">2 articles</div>
+        </div>
+        <div class="topic-card" style="--tc-color:#c084fc;" onclick="filterByCategory('mindset')">
+          <span class="topic-icon">🧠</span>
+          <div class="topic-name">Motivation & Mindset</div>
+          <div class="topic-count">2 articles</div>
+        </div>
+        <div class="topic-card" style="--tc-color:#fb923c;" onclick="filterByCategory('news')">
+          <span class="topic-icon">📡</span>
+          <div class="topic-name">News & Updates</div>
+          <div class="topic-count">2 articles</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       CATEGORY FILTER BAR
+       ============================================================ -->
+  <div class="category-bar">
+    <div class="container">
+      <button class="cat-btn active" onclick="filterByCategory('all')" data-cat="all">
+        All Articles
+      </button>
+      <button class="cat-btn" onclick="filterByCategory('perf')" data-cat="perf">
+        <div class="cat-dot" style="background:#a3e635;"></div>
+        Training & Performance
+      </button>
+      <button class="cat-btn" onclick="filterByCategory('science')" data-cat="science">
+        <div class="cat-dot" style="background:#38bdf8;"></div>
+        Sports Science
+      </button>
+      <button class="cat-btn" onclick="filterByCategory('mindset')" data-cat="mindset">
+        <div class="cat-dot" style="background:#c084fc;"></div>
+        Motivation & Mindset
+      </button>
+      <button class="cat-btn" onclick="filterByCategory('news')" data-cat="news">
+        <div class="cat-dot" style="background:#fb923c;"></div>
+        News & Updates
+      </button>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       FEATURED POST
+       ============================================================ -->
+  <section class="featured-section">
+    <div class="container">
+      <a href="blog-post.html" class="featured-post reveal" id="featured-post" data-cat="perf" data-title="Why Progressive Overload Is the Most Important Principle in Sports Training">
+        <div class="featured-thumb">
+          <div class="thumb-gradient perf">⚡</div>
+          <div class="thumb-overlay"></div>
+        </div>
+        <div class="featured-content">
+          <div class="featured-label">
+            <span class="featured-badge">✦ Featured Article</span>
+          </div>
+          <span class="post-category cat-perf" style="margin-bottom:var(--space-4);display:inline-flex;">
+            <span>⚡</span> Training & Performance
+          </span>
+          <h2>Why Progressive Overload Is the Most Important Principle in Sports Training</h2>
+          <p class="excerpt">Every coach knows the word. Few apply it systematically. Progressive overload — the gradual increase of stress placed on the body during training — is the single most evidence-backed driver of athletic improvement across every sport and every age group.</p>
+          <div class="post-meta">
+            <div class="post-meta-item">
+              <div class="post-author-avatar">PA</div>
+              <span>PA360 Editorial</span>
+            </div>
+            <div class="post-meta-item">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+              <span>Jan 2025</span>
+            </div>
+            <div class="post-meta-item">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              <span>7 min read</span>
+            </div>
+          </div>
+          <span class="read-more-arrow">
+            Read Article
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+          </span>
+        </div>
+      </a>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       BLOG GRID
+       ============================================================ -->
+  <section class="blog-grid-section">
+    <div class="container">
+      <div class="grid-header">
+        <h3>All Articles</h3>
+        <span class="grid-count" id="post-count">9 articles</span>
+      </div>
+
+      <div class="blog-grid" id="blogGrid">
+
+        <!-- POST 1 — Performance -->
+        <a href="blog-post.html" class="blog-card reveal delay-1" data-cat="perf" data-title="The 5-Step Attendance System That Top Coaches Swear By">
+          <div class="card-thumb">
+            <div class="card-thumb-inner perf">🏃</div>
+            <span class="card-read-time">5 min read</span>
+          </div>
+          <div class="card-body">
+            <div class="card-top">
+              <span class="post-category cat-perf">⚡ Training & Performance</span>
+            </div>
+            <div class="card-title">The 5-Step Attendance System That Top Coaches Swear By</div>
+            <div class="card-excerpt">Attendance is the silent performance metric. Athletes who show up consistently outperform talented athletes who don't — every single time. Here's how elite coaches build systems around it.</div>
+            <div class="card-footer">
+              <span class="card-date">Dec 2024</span>
+              <div class="card-arrow">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              </div>
+            </div>
+          </div>
+        </a>
+
+        <!-- POST 2 — Science -->
+        <a href="blog-post.html" class="blog-card reveal delay-2" data-cat="science" data-title="VO2 Max Explained: What It Means and How to Improve It">
+          <div class="card-thumb">
+            <div class="card-thumb-inner science">🔬</div>
+            <span class="card-read-time">8 min read</span>
+          </div>
+          <div class="card-body">
+            <div class="card-top">
+              <span class="post-category cat-science">🔬 Sports Science</span>
+            </div>
+            <div class="card-title">VO2 Max Explained: What It Means and How to Improve It</div>
+            <div class="card-excerpt">VO2 max is the gold standard of aerobic fitness. Understanding it — and knowing how to systematically improve it — can transform how coaches design training programs across all endurance sports.</div>
+            <div class="card-footer">
+              <span class="card-date">Dec 2024</span>
+              <div class="card-arrow">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              </div>
+            </div>
+          </div>
+        </a>
+
+        <!-- POST 3 — Mindset -->
+        <a href="blog-post.html" class="blog-card reveal delay-3" data-cat="mindset" data-title="The Psychology of Losing: How Champions Process Defeat">
+          <div class="card-thumb">
+            <div class="card-thumb-inner mindset">🧠</div>
+            <span class="card-read-time">6 min read</span>
+          </div>
+          <div class="card-body">
+            <div class="card-top">
+              <span class="post-category cat-mindset">🧠 Motivation & Mindset</span>
+            </div>
+            <div class="card-title">The Psychology of Losing: How Champions Process Defeat</div>
+            <div class="card-excerpt">Every athlete loses. The difference between those who rise and those who quit lies entirely in how they interpret and respond to failure. Sports psychology research reveals a clear pattern.</div>
+            <div class="card-footer">
+              <span class="card-date">Nov 2024</span>
+              <div class="card-arrow">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              </div>
+            </div>
+          </div>
+        </a>
+
+        <!-- POST 4 — News -->
+        <a href="blog-post.html" class="blog-card reveal delay-1" data-cat="news" data-title="Introducing PA360 Proton: Sports Management Built for Everyone">
+          <div class="card-thumb">
+            <div class="card-thumb-inner news">📡</div>
+            <span class="card-read-time">4 min read</span>
+          </div>
+          <div class="card-body">
+            <div class="card-top">
+              <span class="post-category cat-news">📡 News & Updates</span>
+            </div>
+            <div class="card-title">Introducing PA360 Proton: Sports Management Built for Everyone</div>
+            <div class="card-excerpt">Today we're launching PA360 Proton — our complete sports institute record management platform. Here's what we built, why we built it, and what's coming next for institutes and athletes.</div>
+            <div class="card-footer">
+              <span class="card-date">Nov 2024</span>
+              <div class="card-arrow">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              </div>
+            </div>
+          </div>
+        </a>
+
+        <!-- POST 5 — Performance -->
+        <a href="blog-post.html" class="blog-card reveal delay-2" data-cat="perf" data-title="How to Design a Weekly Training Load That Actually Works">
+          <div class="card-thumb">
+            <div class="card-thumb-inner perf">📊</div>
+            <span class="card-read-time">6 min read</span>
+          </div>
+          <div class="card-body">
+            <div class="card-top">
+              <span class="post-category cat-perf">⚡ Training & Performance</span>
+            </div>
+            <div class="card-title">How to Design a Weekly Training Load That Actually Works</div>
+            <div class="card-excerpt">Training load mismanagement is the number one cause of athlete burnout and injury. A well-structured weekly load balances stress and recovery — and the science on how to do this is clearer than ever.</div>
+            <div class="card-footer">
+              <span class="card-date">Oct 2024</span>
+              <div class="card-arrow">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              </div>
+            </div>
+          </div>
+        </a>
+
+        <!-- POST 6 — Science -->
+        <a href="blog-post.html" class="blog-card reveal delay-3" data-cat="science" data-title="Sleep Science for Athletes: Why 8 Hours Is Just the Beginning">
+          <div class="card-thumb">
+            <div class="card-thumb-inner science">😴</div>
+            <span class="card-read-time">7 min read</span>
+          </div>
+          <div class="card-body">
+            <div class="card-top">
+              <span class="post-category cat-science">🔬 Sports Science</span>
+            </div>
+            <div class="card-title">Sleep Science for Athletes: Why 8 Hours Is Just the Beginning</div>
+            <div class="card-excerpt">Sleep is the most underrated performance enhancer available to every athlete — completely free, no equipment required. Research shows elite athletes need more than most people think, and the quality matters as much as the quantity.</div>
+            <div class="card-footer">
+              <span class="card-date">Oct 2024</span>
+              <div class="card-arrow">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              </div>
+            </div>
+          </div>
+        </a>
+
+        <!-- POST 7 — Mindset -->
+        <a href="blog-post.html" class="blog-card reveal delay-1" data-cat="mindset" data-title="Building Intrinsic Motivation in Young Athletes: A Coach's Guide">
+          <div class="card-thumb">
+            <div class="card-thumb-inner mindset">🔥</div>
+            <span class="card-read-time">5 min read</span>
+          </div>
+          <div class="card-body">
+            <div class="card-top">
+              <span class="post-category cat-mindset">🧠 Motivation & Mindset</span>
+            </div>
+            <div class="card-title">Building Intrinsic Motivation in Young Athletes: A Coach's Guide</div>
+            <div class="card-excerpt">Young athletes who train because they love the sport outperform those who train for external rewards — in the long run. Here's how coaches can nurture the internal drive that sustains careers.</div>
+            <div class="card-footer">
+              <span class="card-date">Sep 2024</span>
+              <div class="card-arrow">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              </div>
+            </div>
+          </div>
+        </a>
+
+        <!-- POST 8 — Performance -->
+        <a href="blog-post.html" class="blog-card reveal delay-2" data-cat="perf" data-title="Warm-Up Science: The 15-Minute Protocol That Reduces Injury Risk">
+          <div class="card-thumb">
+            <div class="card-thumb-inner perf">🏋️</div>
+            <span class="card-read-time">5 min read</span>
+          </div>
+          <div class="card-body">
+            <div class="card-top">
+              <span class="post-category cat-perf">⚡ Training & Performance</span>
+            </div>
+            <div class="card-title">Warm-Up Science: The 15-Minute Protocol That Reduces Injury Risk</div>
+            <div class="card-excerpt">Most athletes warm up wrong. Static stretching before exercise reduces power output. Dynamic warm-up protocols, backed by research, can cut soft-tissue injury rates by up to 50% across field sports.</div>
+            <div class="card-footer">
+              <span class="card-date">Sep 2024</span>
+              <div class="card-arrow">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              </div>
+            </div>
+          </div>
+        </a>
+
+        <!-- POST 9 — News -->
+        <a href="blog-post.html" class="blog-card reveal delay-3" data-cat="news" data-title="PA360 Proton Roadmap: What's Coming in 2025">
+          <div class="card-thumb">
+            <div class="card-thumb-inner news">🗺️</div>
+            <span class="card-read-time">3 min read</span>
+          </div>
+          <div class="card-body">
+            <div class="card-top">
+              <span class="post-category cat-news">📡 News & Updates</span>
+            </div>
+            <div class="card-title">PA360 Proton Roadmap: What's Coming in 2025</div>
+            <div class="card-excerpt">Parent access, mobile app, in-app messaging, wearable integrations and more. Here's our transparent look at what we're building next and the timeline we're working toward.</div>
+            <div class="card-footer">
+              <span class="card-date">Aug 2024</span>
+              <div class="card-arrow">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              </div>
+            </div>
+          </div>
+        </a>
+
+      </div>
+
+      <!-- Empty state -->
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">🔍</div>
+        <h3>No articles found</h3>
+        <p>Try a different search term or browse all categories.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================
+       NEWSLETTER
+       ============================================================ -->
+  <div class="newsletter-strip">
+    <div class="container">
+      <div class="newsletter-inner reveal">
+        <div class="newsletter-copy">
+          <span class="text-label" style="display:block;margin-bottom:var(--space-3);">Stay in the loop</span>
+          <h3>Get the best sports insights<br /><span class="gradient-text">delivered to you.</span></h3>
+          <p>New articles on training, science, mindset and platform updates — straight to your inbox. No spam, ever.</p>
+        </div>
+        <div>
+          <form class="newsletter-form" id="newsletterForm" onsubmit="subscribeNewsletter(event)">
+            <input
+              type="email"
+              class="newsletter-input"
+              placeholder="your@email.com"
+              required
+              id="newsletter-email"
+            />
+            <button type="submit" class="btn btn-primary" style="white-space:nowrap;">Subscribe Free</button>
+          </form>
+          <p class="newsletter-note" id="newsletter-msg">
+            Join athletes, coaches and institute admins who read PA360 Proton insights.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       FOOTER
+       ============================================================ -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <div class="nav-logo" style="margin-bottom:var(--space-4);">
+            <img src="../assets/images/logo-icon.png" alt="Project Athlete 360" style="height:36px;width:auto;" onerror="this.style.display='none';" />
+          </div>
+          <p>PA360 Proton is a product of Project Athlete 360 — dedicated to making sports management affordable and accessible for every institute.</p>
+          <div class="social-links">
+            <a href="https://www.instagram.com/projectathlete360" target="_blank" rel="noopener" class="social-link" title="Instagram"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg></a>
+            <a href="https://x.com/theathlete360" target="_blank" rel="noopener" class="social-link" title="X"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>
+            <a href="https://www.youtube.com/@projectathlete360" target="_blank" rel="noopener" class="social-link" title="YouTube"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46a2.78 2.78 0 0 0-1.95 1.96A29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58A2.78 2.78 0 0 0 3.41 19.6C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.95A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"></path><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02"></polygon></svg></a>
+            <a href="https://m.facebook.com/projectathlete360" target="_blank" rel="noopener" class="social-link" title="Facebook"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg></a>
+            <a href="https://www.linkedin.com/company/project-athlete-360" target="_blank" rel="noopener" class="social-link" title="LinkedIn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg></a>
+            <a href="https://medium.com/@projectathlete360" target="_blank" rel="noopener" class="social-link" title="Medium"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M13.54 12a6.8 6.8 0 01-6.77 6.82A6.8 6.8 0 010 12a6.8 6.8 0 016.77-6.82A6.8 6.8 0 0113.54 12zM20.96 12c0 3.54-1.51 6.42-3.38 6.42-1.87 0-3.39-2.88-3.39-6.42s1.52-6.42 3.39-6.42 3.38 2.88 3.38 6.42M24 12c0 3.17-.53 5.75-1.19 5.75-.66 0-1.19-2.58-1.19-5.75s.53-5.75 1.19-5.75C23.47 6.25 24 8.83 24 12z"/></svg></a>
+          </div>
+        </div>
+        <div>
+          <div class="footer-heading">Product</div>
+          <ul class="footer-links">
+            <li><a href="index.html#features">Features</a></li>
+            <li><a href="pricing.html">Pricing</a></li>
+            <li><a href="index.html#how-it-works">How It Works</a></li>
+            <li><a href="login.html">Log In</a></li>
+            <li><a href="pricing.html">Start Free Trial</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-heading">Company</div>
+          <ul class="footer-links">
+            <li><a href="about.html">About PA360</a></li>
+            <li><a href="blog.html">Blog</a></li>
+            <li><a href="mailto:projectathlete360@gmail.com">Contact Us</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-heading">Legal</div>
+          <ul class="footer-links">
+            <li><a href="#">Privacy Policy</a></li>
+            <li><a href="#">Terms of Service</a></li>
+            <li><a href="#">Refund Policy</a></li>
+            <li><a href="#">Cookie Policy</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>© 2025 Project Athlete 360. All rights reserved. PA360 Proton is a product of Project Athlete 360.</p>
+        <p>Made with ❤️ for athletes everywhere.</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ============================================================
+       JAVASCRIPT
+       ============================================================ -->
+  <script>
+    // --- Navbar scroll ---
+    const navbar = document.getElementById('navbar');
+    window.addEventListener('scroll', () => {
+      navbar.classList.toggle('scrolled', window.scrollY > 20);
+    });
+
+    // --- Mobile menu ---
+    const navToggle = document.getElementById('navToggle');
+    const navLinks  = document.getElementById('navLinks');
+    navToggle.addEventListener('click', () => {
+      navToggle.classList.toggle('active');
+      navLinks.classList.toggle('open');
+    });
+    navLinks.querySelectorAll('a').forEach(link => {
+      link.addEventListener('click', () => {
+        navToggle.classList.remove('active');
+        navLinks.classList.remove('open');
+      });
+    });
+
+    // --- Scroll reveal ---
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.08, rootMargin: '0px 0px -30px 0px' });
+    document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+    // --- Active category state ---
+    let activeCategory = 'all';
+
+    // --- Filter by category ---
+    function filterByCategory(cat) {
+      activeCategory = cat;
+
+      // Update category buttons
+      document.querySelectorAll('.cat-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.cat === cat);
+      });
+
+      // Apply filter
+      applyFilters();
+
+      // Smooth scroll to grid
+      document.querySelector('.blog-grid-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // --- Search filter ---
+    function filterPosts() {
+      applyFilters();
+    }
+
+    // --- Combined filter logic ---
+    function applyFilters() {
+      const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
+      const cards      = document.querySelectorAll('.blog-card');
+      const featured   = document.getElementById('featured-post');
+      let visibleCount = 0;
+
+      // Filter cards
+      cards.forEach(card => {
+        const cat   = card.dataset.cat;
+        const title = card.dataset.title.toLowerCase();
+        const catMatch   = activeCategory === 'all' || cat === activeCategory;
+        const searchMatch = !searchTerm || title.includes(searchTerm);
+        const visible = catMatch && searchMatch;
+
+        card.style.display = visible ? '' : 'none';
+        if (visible) visibleCount++;
+      });
+
+      // Filter featured post
+      if (featured) {
+        const featCat   = featured.dataset.cat;
+        const featTitle = featured.dataset.title.toLowerCase();
+        const featVisible = (activeCategory === 'all' || featCat === activeCategory) &&
+                            (!searchTerm || featTitle.includes(searchTerm));
+        featured.closest('section').style.display = featVisible ? '' : 'none';
+        if (featVisible) visibleCount++;
+      }
+
+      // Update count
+      document.getElementById('post-count').textContent =
+        visibleCount === 1 ? '1 article' : `${visibleCount} articles`;
+
+      // Empty state
+      document.getElementById('emptyState').classList.toggle('visible', visibleCount === 0);
+    }
+
+    // --- Newsletter subscribe ---
+    function subscribeNewsletter(e) {
+      e.preventDefault();
+      const email   = document.getElementById('newsletter-email').value;
+      const msgEl   = document.getElementById('newsletter-msg');
+      // TODO Phase 4: connect to real email list API
+      msgEl.style.color = 'var(--color-accent)';
+      msgEl.textContent = `✓ You're subscribed! We'll send insights to ${email}`;
+      document.getElementById('newsletter-email').value = '';
+      document.getElementById('newsletter-email').disabled = true;
+    }
+  </script>
+
+</body>
+</html>
