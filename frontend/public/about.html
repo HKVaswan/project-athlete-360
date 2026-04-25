@@ -1,0 +1,1484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="About Project Athlete 360 — The mission, the story, and the platform behind PA360 Proton. Built by H.K. Vaswan to make sports management affordable for every institute." />
+  <title>About — Project Athlete 360 & PA360 Proton</title>
+
+  <link rel="stylesheet" href="../css/global.css" />
+
+  <style>
+    /* ============================================================
+       ABOUT HERO
+       ============================================================ */
+    .about-hero {
+      padding: calc(var(--nav-height) + var(--space-16)) 0 var(--space-20);
+      position: relative;
+      overflow: hidden;
+      text-align: center;
+    }
+
+    .about-hero-bg {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% 0%, rgba(45,58,140,0.2) 0%, transparent 65%),
+        radial-gradient(ellipse 40% 40% at 20% 80%, rgba(163,230,53,0.05) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .about-hero-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(26,42,69,0.3) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(26,42,69,0.3) 1px, transparent 1px);
+      background-size: 60px 60px;
+      mask-image: radial-gradient(ellipse 100% 60% at 50% 0%, black 0%, transparent 80%);
+    }
+
+    .about-hero .container {
+      position: relative;
+      z-index: 1;
+      max-width: 780px;
+    }
+
+    .about-hero h1 {
+      font-size: clamp(40px, 6vw, 72px);
+      line-height: 1.05;
+      margin-bottom: var(--space-5);
+    }
+
+    .about-hero p {
+      font-size: clamp(16px, 2vw, 19px);
+      color: var(--color-text-secondary);
+      line-height: 1.7;
+      max-width: 580px;
+      margin: 0 auto;
+    }
+
+    /* ============================================================
+       MISSION SECTION
+       ============================================================ */
+    .mission-section {
+      padding: var(--space-20) 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .mission-section::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 60% 80% at 80% 50%, rgba(45,58,140,0.1) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .mission-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-16);
+      align-items: center;
+    }
+
+    .mission-content .text-label {
+      display: block;
+      margin-bottom: var(--space-4);
+    }
+
+    .mission-content h2 {
+      font-size: clamp(30px, 4vw, 48px);
+      margin-bottom: var(--space-5);
+      line-height: 1.1;
+    }
+
+    .mission-content p {
+      font-size: 16px;
+      color: var(--color-text-secondary);
+      line-height: 1.8;
+      margin-bottom: var(--space-5);
+    }
+
+    .mission-content p:last-child {
+      margin-bottom: 0;
+    }
+
+    /* Mission visual */
+    .mission-visual {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-4);
+    }
+
+    .mission-stat-card {
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-6);
+      display: flex;
+      align-items: center;
+      gap: var(--space-5);
+      transition: all var(--transition-base);
+    }
+
+    .mission-stat-card:hover {
+      border-color: rgba(163,230,53,0.2);
+      transform: translateX(4px);
+    }
+
+    .mission-stat-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: var(--radius-md);
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-bg-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      flex-shrink: 0;
+      transition: all var(--transition-base);
+    }
+
+    .mission-stat-card:hover .mission-stat-icon {
+      background: var(--color-accent-glow);
+      border-color: rgba(163,230,53,0.3);
+    }
+
+    .mission-stat-val {
+      font-family: var(--font-display);
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--color-accent);
+      line-height: 1;
+      margin-bottom: 3px;
+    }
+
+    .mission-stat-label {
+      font-size: 13px;
+      color: var(--color-text-secondary);
+      line-height: 1.4;
+    }
+
+    /* ============================================================
+       ORIGIN STORY
+       ============================================================ */
+    .story-section {
+      padding: var(--space-20) 0;
+      background: var(--color-bg-surface);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .story-section::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 50% 80% at 10% 50%, rgba(45,58,140,0.1) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .story-inner {
+      display: grid;
+      grid-template-columns: 1fr 1.4fr;
+      gap: var(--space-16);
+      align-items: start;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Founder card */
+    .founder-card {
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-xl);
+      padding: var(--space-8);
+      text-align: center;
+      position: sticky;
+      top: calc(var(--nav-height) + var(--space-6));
+    }
+
+    .founder-avatar {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-size: 36px;
+      font-weight: 700;
+      color: #080d1a;
+      margin: 0 auto var(--space-5);
+      border: 3px solid var(--color-bg-border);
+      position: relative;
+    }
+
+    .founder-avatar::after {
+      content: '✦';
+      position: absolute;
+      bottom: -4px;
+      right: -4px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--color-accent);
+      color: #080d1a;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid var(--color-bg-elevated);
+    }
+
+    .founder-name {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: var(--space-1);
+    }
+
+    .founder-role {
+      font-size: 13px;
+      color: var(--color-accent);
+      font-family: var(--font-mono);
+      letter-spacing: 0.08em;
+      margin-bottom: var(--space-5);
+    }
+
+    .founder-divider {
+      height: 1px;
+      background: var(--color-bg-border);
+      margin: var(--space-5) 0;
+    }
+
+    .founder-credentials {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      text-align: left;
+    }
+
+    .founder-credential {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-3);
+      font-size: 13px;
+      color: var(--color-text-secondary);
+      line-height: 1.4;
+    }
+
+    .credential-icon {
+      font-size: 14px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .founder-social {
+      display: flex;
+      justify-content: center;
+      gap: var(--space-3);
+      margin-top: var(--space-5);
+    }
+
+    /* Story content */
+    .story-content .text-label {
+      display: block;
+      margin-bottom: var(--space-4);
+    }
+
+    .story-content h2 {
+      font-size: clamp(28px, 3.5vw, 44px);
+      margin-bottom: var(--space-6);
+      line-height: 1.1;
+    }
+
+    .story-paragraph {
+      font-size: 16px;
+      color: var(--color-text-secondary);
+      line-height: 1.85;
+      margin-bottom: var(--space-6);
+    }
+
+    .story-paragraph strong {
+      color: var(--color-text-primary);
+    }
+
+    /* Pull quote */
+    .story-pullquote {
+      background: var(--color-bg);
+      border: 1px solid var(--color-bg-border);
+      border-left: 4px solid var(--color-accent);
+      border-radius: 0 var(--radius-md) var(--radius-md) 0;
+      padding: var(--space-6) var(--space-8);
+      margin: var(--space-8) 0;
+      position: relative;
+    }
+
+    .story-pullquote::before {
+      content: '"';
+      position: absolute;
+      top: -8px;
+      left: var(--space-5);
+      font-family: var(--font-display);
+      font-size: 56px;
+      color: var(--color-accent);
+      line-height: 1;
+      opacity: 0.4;
+    }
+
+    .story-pullquote p {
+      font-size: 18px;
+      color: var(--color-text-primary);
+      font-style: italic;
+      line-height: 1.6;
+      margin: 0;
+    }
+
+    /* ============================================================
+       VALUES SECTION
+       ============================================================ */
+    .values-section {
+      padding: var(--space-20) 0;
+    }
+
+    .values-header {
+      text-align: center;
+      margin-bottom: var(--space-12);
+    }
+
+    .values-header .text-label {
+      display: block;
+      margin-bottom: var(--space-3);
+    }
+
+    .values-header h2 {
+      font-size: clamp(30px, 4vw, 48px);
+    }
+
+    .values-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-5);
+    }
+
+    .value-card {
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-7);
+      position: relative;
+      overflow: hidden;
+      transition: all var(--transition-base);
+    }
+
+    .value-card::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: var(--vc-color, var(--color-accent));
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform var(--transition-base);
+    }
+
+    .value-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
+      border-color: rgba(163,230,53,0.15);
+    }
+
+    .value-card:hover::after {
+      transform: scaleX(1);
+    }
+
+    .value-number {
+      font-family: var(--font-display);
+      font-size: 48px;
+      font-weight: 700;
+      color: var(--color-bg-elevated);
+      line-height: 1;
+      margin-bottom: var(--space-4);
+      letter-spacing: -0.02em;
+    }
+
+    .value-icon {
+      font-size: 28px;
+      margin-bottom: var(--space-4);
+      display: block;
+    }
+
+    .value-title {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: var(--space-3);
+      color: var(--color-text-primary);
+    }
+
+    .value-desc {
+      font-size: 14px;
+      color: var(--color-text-secondary);
+      line-height: 1.7;
+    }
+
+    /* ============================================================
+       PLATFORM SECTION
+       ============================================================ */
+    .platform-section {
+      padding: var(--space-20) 0;
+      background: var(--color-bg-surface);
+    }
+
+    .platform-inner {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: var(--space-16);
+      align-items: center;
+    }
+
+    .platform-content .text-label {
+      display: block;
+      margin-bottom: var(--space-4);
+    }
+
+    .platform-content h2 {
+      font-size: clamp(28px, 3.5vw, 44px);
+      margin-bottom: var(--space-5);
+      line-height: 1.1;
+    }
+
+    .platform-content p {
+      font-size: 16px;
+      color: var(--color-text-secondary);
+      line-height: 1.8;
+      margin-bottom: var(--space-5);
+    }
+
+    .platform-features {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      margin-bottom: var(--space-8);
+    }
+
+    .platform-feature {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      font-size: 14px;
+      color: var(--color-text-secondary);
+    }
+
+    .platform-feature::before {
+      content: '✓';
+      color: var(--color-accent);
+      font-weight: 700;
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+
+    /* Platform visual — mini dashboard */
+    .platform-visual {
+      background: var(--color-bg);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .pv-bar {
+      background: var(--color-bg-elevated);
+      border-bottom: 1px solid var(--color-bg-border);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pv-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+    }
+
+    .pv-body {
+      padding: var(--space-5);
+    }
+
+    .pv-title {
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: var(--space-4);
+      color: var(--color-text-secondary);
+    }
+
+    .pv-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-3);
+      margin-bottom: var(--space-4);
+    }
+
+    .pv-stat {
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-3);
+      text-align: center;
+    }
+
+    .pv-stat-val {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--color-accent);
+      line-height: 1;
+      margin-bottom: 2px;
+    }
+
+    .pv-stat-lbl {
+      font-size: 9px;
+      color: var(--color-text-muted);
+      font-family: var(--font-mono);
+      letter-spacing: 0.05em;
+    }
+
+    .pv-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .pv-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-3);
+      background: var(--color-bg-elevated);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--color-bg-border);
+    }
+
+    .pv-avatar {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .pv-name {
+      font-size: 12px;
+      font-weight: 500;
+      flex: 1;
+      color: var(--color-text-primary);
+    }
+
+    .pv-sport {
+      font-size: 10px;
+      color: var(--color-text-muted);
+      font-family: var(--font-mono);
+    }
+
+    .pv-attend {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--color-accent);
+      font-family: var(--font-mono);
+    }
+
+    /* ============================================================
+       CONTACT SECTION
+       ============================================================ */
+    .contact-section {
+      padding: var(--space-20) 0;
+    }
+
+    .contact-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.4fr;
+      gap: var(--space-16);
+      align-items: start;
+    }
+
+    .contact-info .text-label {
+      display: block;
+      margin-bottom: var(--space-4);
+    }
+
+    .contact-info h2 {
+      font-size: clamp(28px, 3.5vw, 44px);
+      margin-bottom: var(--space-4);
+      line-height: 1.1;
+    }
+
+    .contact-info p {
+      font-size: 15px;
+      color: var(--color-text-secondary);
+      line-height: 1.7;
+      margin-bottom: var(--space-8);
+    }
+
+    .contact-details {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-4);
+      margin-bottom: var(--space-8);
+    }
+
+    .contact-detail {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+    }
+
+    .contact-detail-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-md);
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-bg-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-accent);
+      flex-shrink: 0;
+    }
+
+    .contact-detail-label {
+      font-size: 11px;
+      color: var(--color-text-muted);
+      font-family: var(--font-mono);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+
+    .contact-detail-value {
+      font-size: 14px;
+      color: var(--color-text-primary);
+      font-weight: 500;
+    }
+
+    .contact-detail-value a {
+      color: var(--color-accent);
+      transition: opacity var(--transition-fast);
+    }
+
+    .contact-detail-value a:hover {
+      opacity: 0.8;
+    }
+
+    /* Social grid */
+    .contact-socials {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-3);
+    }
+
+    .contact-social-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: 8px 16px;
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      color: var(--color-text-secondary);
+      transition: all var(--transition-base);
+      text-decoration: none;
+    }
+
+    .contact-social-btn:hover {
+      border-color: var(--color-accent);
+      color: var(--color-accent);
+      transform: translateY(-2px);
+    }
+
+    /* Contact form */
+    .contact-form-wrap {
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-xl);
+      padding: var(--space-8);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .contact-form-wrap::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--color-accent), transparent);
+    }
+
+    .contact-form-title {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: var(--space-6);
+    }
+
+    .form-row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-4);
+    }
+
+    .form-group {
+      margin-bottom: var(--space-5);
+    }
+
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--color-text-secondary);
+      margin-bottom: var(--space-2);
+      letter-spacing: 0.02em;
+    }
+
+    .form-input,
+    .form-select,
+    .form-textarea {
+      width: 100%;
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-bg-border);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      font-size: 15px;
+      color: var(--color-text-primary);
+      outline: none;
+      transition: all var(--transition-base);
+      font-family: var(--font-body);
+    }
+
+    .form-input::placeholder,
+    .form-textarea::placeholder {
+      color: var(--color-text-muted);
+    }
+
+    .form-input:focus,
+    .form-select:focus,
+    .form-textarea:focus {
+      border-color: var(--color-accent);
+      background: var(--color-bg);
+      box-shadow: 0 0 0 3px rgba(163,230,53,0.08);
+    }
+
+    .form-select {
+      -webkit-appearance: none;
+      appearance: none;
+      cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%234a6080' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      padding-right: 40px;
+    }
+
+    .form-select option {
+      background: var(--color-bg-elevated);
+      color: var(--color-text-primary);
+    }
+
+    .form-textarea {
+      resize: vertical;
+      min-height: 120px;
+      line-height: 1.6;
+    }
+
+    .form-submit-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-4);
+      flex-wrap: wrap;
+    }
+
+    .form-submit-note {
+      font-size: 12px;
+      color: var(--color-text-muted);
+    }
+
+    .contact-form-success {
+      display: none;
+      text-align: center;
+      padding: var(--space-8) 0;
+    }
+
+    .contact-form-success .success-icon {
+      font-size: 48px;
+      margin-bottom: var(--space-4);
+    }
+
+    .contact-form-success h3 {
+      font-size: 22px;
+      margin-bottom: var(--space-3);
+    }
+
+    .contact-form-success p {
+      font-size: 14px;
+      color: var(--color-text-secondary);
+      line-height: 1.6;
+    }
+
+    /* ============================================================
+       BOTTOM CTA
+       ============================================================ */
+    .about-cta {
+      padding: var(--space-20) 0;
+      background: var(--color-bg-surface);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .about-cta::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 60% 80% at 50% 50%, rgba(45,58,140,0.15) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .about-cta-inner {
+      position: relative;
+      text-align: center;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .about-cta-inner h2 {
+      font-size: clamp(30px, 4vw, 48px);
+      margin-bottom: var(--space-4);
+    }
+
+    .about-cta-inner p {
+      font-size: 16px;
+      color: var(--color-text-secondary);
+      line-height: 1.7;
+      margin-bottom: var(--space-8);
+    }
+
+    /* ============================================================
+       RESPONSIVE
+       ============================================================ */
+    @media (max-width: 1024px) {
+      .mission-grid    { grid-template-columns: 1fr; }
+      .story-inner     { grid-template-columns: 1fr; }
+      .platform-inner  { grid-template-columns: 1fr; }
+      .contact-grid    { grid-template-columns: 1fr; }
+      .founder-card    { position: relative; top: 0; max-width: 400px; }
+      .values-grid     { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 768px) {
+      .values-grid   { grid-template-columns: 1fr; }
+      .form-row-2    { grid-template-columns: 1fr; }
+      .form-submit-row { flex-direction: column; align-items: stretch; }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ============================================================
+       NAVIGATION
+       ============================================================ -->
+  <nav class="navbar" id="navbar">
+    <div class="container">
+      <a href="index.html" class="nav-logo">
+        <img src="../assets/images/logo-icon.png" alt="PA360 Proton" style="height:40px;width:auto;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" />
+        <span class="nav-logo-text" style="display:none;">PA360 <span style="margin-left:4px;">Proton</span></span>
+      </a>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="index.html#features" class="nav-link">Features</a></li>
+        <li><a href="index.html#how-it-works" class="nav-link">How It Works</a></li>
+        <li><a href="pricing.html" class="nav-link">Pricing</a></li>
+        <li><a href="blog.html" class="nav-link">Blog</a></li>
+        <li><a href="about.html" class="nav-link" style="color:var(--color-accent);">About</a></li>
+        <li><a href="pricing.html" class="btn btn-primary btn-sm">Start Free Trial</a></li>
+      </ul>
+      <div class="nav-actions">
+        <a href="login.html" class="btn btn-secondary btn-sm">Log In</a>
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ============================================================
+       HERO
+       ============================================================ -->
+  <section class="about-hero">
+    <div class="about-hero-bg"></div>
+    <div class="about-hero-grid"></div>
+    <div class="container">
+      <span class="badge badge-accent animate-fade-up" style="margin-bottom:var(--space-5);display:inline-flex;">
+        Our Story & Mission
+      </span>
+      <h1 class="animate-fade-up delay-1">
+        Built for athletes.<br /><span class="gradient-text">By someone who understands them.</span>
+      </h1>
+      <p class="animate-fade-up delay-2">
+        Project Athlete 360 exists because too many talented athletes fall through the cracks of a system that was never properly built for them. PA360 Proton is our answer to that problem.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       MISSION
+       ============================================================ -->
+  <section class="mission-section">
+    <div class="container">
+      <div class="mission-grid">
+        <div class="mission-content reveal">
+          <span class="text-label">Why We Exist</span>
+          <h2>The sports world has a <span class="gradient-text">management problem.</span></h2>
+          <p>
+            Across India and around the world, sports institutes are managing hundreds of athletes with spreadsheets, paper registers, and WhatsApp groups. Performance data gets lost. Attendance is guessed. Coaches have no visibility into which athletes are improving and which are quietly falling behind.
+          </p>
+          <p>
+            The tools that exist are either too expensive for most institutes to afford, too complex for coaches to actually use daily, or built for professional clubs — not the grassroots academies where most athletes actually develop.
+          </p>
+          <p>
+            <strong style="color:var(--color-text-primary);">PA360 Proton was built to solve this.</strong> Professional-grade sports management, at a price that makes it accessible to every institute that needs it.
+          </p>
+        </div>
+
+        <div class="mission-visual reveal delay-2">
+          <div class="mission-stat-card">
+            <div class="mission-stat-icon">🏟️</div>
+            <div>
+              <div class="mission-stat-val">15+</div>
+              <div class="mission-stat-label">Sports supported out of the box — from Cricket and Football to Kabaddi and Badminton</div>
+            </div>
+          </div>
+          <div class="mission-stat-card">
+            <div class="mission-stat-icon">👥</div>
+            <div>
+              <div class="mission-stat-val">4</div>
+              <div class="mission-stat-label">Role-based dashboards — built specifically for owners, admins, coaches and athletes</div>
+            </div>
+          </div>
+          <div class="mission-stat-card">
+            <div class="mission-stat-icon">💰</div>
+            <div>
+              <div class="mission-stat-val">$24</div>
+              <div class="mission-stat-label">Starting price per month — deliberately affordable, because access matters</div>
+            </div>
+          </div>
+          <div class="mission-stat-card">
+            <div class="mission-stat-icon">🔒</div>
+            <div>
+              <div class="mission-stat-val">100%</div>
+              <div class="mission-stat-label">Data protection — especially for young and minor athletes on the platform</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       ORIGIN STORY
+       ============================================================ -->
+  <section class="story-section">
+    <div class="container">
+      <div class="story-inner">
+
+        <!-- Founder card -->
+        <div class="founder-card reveal">
+          <div class="founder-avatar">HK</div>
+          <div class="founder-name">H.K. Vaswan</div>
+          <div class="founder-role">Founder — Project Athlete 360</div>
+
+          <div class="founder-divider"></div>
+
+          <div class="founder-credentials">
+            <div class="founder-credential">
+              <span class="credential-icon">🎓</span>
+              <span>B.P.Ed (Bachelor of Physical Education & Sports)</span>
+            </div>
+            <div class="founder-credential">
+              <span class="credential-icon">📚</span>
+              <span>M.P.Ed (Master of Physical Education) — Pursuing</span>
+            </div>
+            <div class="founder-credential">
+              <span class="credential-icon">🪖</span>
+              <span>NCC 'B' & 'C' Certificate Holder</span>
+            </div>
+            <div class="founder-credential">
+              <span class="credential-icon">⭐</span>
+              <span>Studied Physical Education from Class 11 — with PCM + Physical Education</span>
+            </div>
+            <div class="founder-credential">
+              <span class="credential-icon">🏅</span>
+              <span>From a family with three generations of Army service</span>
+            </div>
+          </div>
+
+          <div class="founder-divider"></div>
+
+          <div class="founder-social">
+            <a href="https://www.linkedin.com/in/hkvaswan" target="_blank" rel="noopener" class="social-link" title="LinkedIn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg>
+            </a>
+            <a href="https://www.instagram.com/projectathlete360" target="_blank" rel="noopener" class="social-link" title="Instagram">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+            </a>
+            <a href="https://x.com/theathlete360" target="_blank" rel="noopener" class="social-link" title="X">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            </a>
+          </div>
+        </div>
+
+        <!-- Story content -->
+        <div class="story-content reveal delay-1">
+          <span class="text-label">The Founder's Story</span>
+          <h2>A problem seen on a <span class="gradient-text">dusty field.</span></h2>
+
+          <p class="story-paragraph">
+            This journey didn't begin in a boardroom or a startup accelerator. <strong>It began on a field</strong> — watching a talented young athlete with undeniable ability and nowhere to go. The path forward was invisible. Blocked by a lack of structure, guidance, and opportunity. That moment was the seed.
+          </p>
+
+          <p class="story-paragraph">
+            For H.K. Vaswan, sports and discipline aren't abstract concepts. Growing up in a family with three generations of Army service — father, grandfather, and great-grandfather — the values of structure, commitment, and service were foundational. Those values shaped how he approaches everything, including the mission of Project Athlete 360.
+          </p>
+
+          <div class="story-pullquote">
+            <p>We set out to build the system we wish had existed — one that gives every athlete, in every institute, the structure and visibility they deserve to reach their potential.</p>
+          </div>
+
+          <p class="story-paragraph">
+            With a background in Physical Education stretching back to Class 11 — where he chose Physical Education alongside PCM — and academic grounding through a Bachelor's in Physical Education and Sports, and a Master's currently in progress, the founding of Project Athlete 360 was a natural progression. Backed by NCC 'B' and 'C' certification, the discipline and structure of the NCC further shaped the systems-thinking behind the platform.
+          </p>
+
+          <p class="story-paragraph">
+            The problem was clear: <strong>India's sports institutes were managing athletes with tools built for offices, not training grounds.</strong> Spreadsheets, paper registers, WhatsApp messages — and talent slipping through the gaps because no one had the full picture. PA360 Proton is the answer. A proper, affordable, purpose-built platform for every sports institute that takes its athletes seriously.
+          </p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       VALUES
+       ============================================================ -->
+  <section class="values-section">
+    <div class="container">
+      <div class="values-header reveal">
+        <span class="text-label">What Drives Us</span>
+        <h2>Principles we build <span class="gradient-text">everything around</span></h2>
+      </div>
+
+      <div class="values-grid">
+        <div class="value-card reveal delay-1" style="--vc-color:#a3e635;">
+          <span class="value-icon">🎯</span>
+          <div class="value-title">Accessibility First</div>
+          <div class="value-desc">Professional sports management shouldn't be reserved for institutes with large budgets. Every feature we build, every price we set, is guided by the question: can the small academy on a tight budget afford this?</div>
+        </div>
+
+        <div class="value-card reveal delay-2" style="--vc-color:#38bdf8;">
+          <span class="value-icon">🔬</span>
+          <div class="value-title">Science-Backed</div>
+          <div class="value-desc">Every feature in PA360 Proton is grounded in how sports performance actually works — progressive overload, attendance as a performance metric, data-driven coaching. We don't guess. We build on evidence.</div>
+        </div>
+
+        <div class="value-card reveal delay-3" style="--vc-color:#c084fc;">
+          <span class="value-icon">🛡️</span>
+          <div class="value-title">Athlete Protection</div>
+          <div class="value-desc">Athletes — especially young ones — deserve to have their data handled with care. We build privacy and protection into the foundation of the platform, not as an afterthought. Every safeguard is intentional.</div>
+        </div>
+
+        <div class="value-card reveal delay-1" style="--vc-color:#fb923c;">
+          <span class="value-icon">⚡</span>
+          <div class="value-title">Practical by Design</div>
+          <div class="value-desc">A coach shouldn't need a training session to mark attendance. The daily workflow must be completable in minutes — not because we simplified the features, but because we thought deeply about how coaches actually work.</div>
+        </div>
+
+        <div class="value-card reveal delay-2" style="--vc-color:#a3e635;">
+          <span class="value-icon">📈</span>
+          <div class="value-title">Transparency</div>
+          <div class="value-desc">No hidden fees. No surprise limits. No locked features that only appear after you've signed up. What you see on our pricing page is exactly what you get. We believe trust is earned through honesty.</div>
+        </div>
+
+        <div class="value-card reveal delay-3" style="--vc-color:#38bdf8;">
+          <span class="value-icon">🌱</span>
+          <div class="value-title">Built to Grow</div>
+          <div class="value-desc">PA360 Proton is built to scale alongside the institutes that use it. From 20 athletes to 2,000 — the platform grows with you. And as we grow, we reinvest in features that matter to our users most.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       PLATFORM SECTION
+       ============================================================ -->
+  <section class="platform-section">
+    <div class="container">
+      <div class="platform-inner">
+        <div class="platform-content reveal">
+          <span class="text-label">The Platform</span>
+          <h2>PA360 Proton —<br /><span class="gradient-text">Manage Better. Perform Better.</span></h2>
+          <p>
+            PA360 Proton is our flagship sports institute management platform. Built under the Project Athlete 360 umbrella, it gives sports institutes everything they need to manage athletes properly — from enrollment to competition results.
+          </p>
+
+          <div class="platform-features">
+            <div class="platform-feature">Athlete profiles, enrollment and unique athlete IDs</div>
+            <div class="platform-feature">Daily attendance with streaks and threshold alerts</div>
+            <div class="platform-feature">Sport-specific performance tracking and progress charts</div>
+            <div class="platform-feature">Competition panel, events calendar and result logging</div>
+            <div class="platform-feature">Leaderboards — class-wide and institute-wide</div>
+            <div class="platform-feature">Automated and coach-awarded achievement badges</div>
+            <div class="platform-feature">Role-based dashboards for admins, coaches and athletes</div>
+            <div class="platform-feature">PDF reports for scholarship applications and selection trials</div>
+          </div>
+
+          <div style="display:flex; gap:var(--space-3); flex-wrap:wrap;">
+            <a href="pricing.html" class="btn btn-primary">Start Free Trial</a>
+            <a href="index.html#features" class="btn btn-secondary">See All Features</a>
+          </div>
+        </div>
+
+        <!-- Mini dashboard visual -->
+        <div class="platform-visual reveal delay-2">
+          <div class="pv-bar">
+            <div class="pv-dot" style="background:#ef4444;"></div>
+            <div class="pv-dot" style="background:#f59e0b;"></div>
+            <div class="pv-dot" style="background:#22c55e;"></div>
+          </div>
+          <div class="pv-body">
+            <div class="pv-title">Institute Admin — Today's Overview</div>
+            <div class="pv-stats">
+              <div class="pv-stat">
+                <div class="pv-stat-val">142</div>
+                <div class="pv-stat-lbl">Athletes</div>
+              </div>
+              <div class="pv-stat">
+                <div class="pv-stat-val" style="color:#7b8fde;">91%</div>
+                <div class="pv-stat-lbl">Attendance</div>
+              </div>
+              <div class="pv-stat">
+                <div class="pv-stat-val">12</div>
+                <div class="pv-stat-lbl">Coaches</div>
+              </div>
+            </div>
+            <div class="pv-list">
+              <div class="pv-row">
+                <div class="pv-avatar" style="background:linear-gradient(135deg,#2d3a8c,#a3e635);border-radius:50%;"></div>
+                <div class="pv-name">Rahul Sharma</div>
+                <div class="pv-sport">Cricket</div>
+                <div class="pv-attend">98%</div>
+              </div>
+              <div class="pv-row">
+                <div class="pv-avatar" style="background:linear-gradient(135deg,#a3e635,#2d3a8c);border-radius:50%;"></div>
+                <div class="pv-name">Priya Mehta</div>
+                <div class="pv-sport">Athletics</div>
+                <div class="pv-attend">94%</div>
+              </div>
+              <div class="pv-row">
+                <div class="pv-avatar" style="background:linear-gradient(135deg,#4a5568,#a3e635);border-radius:50%;"></div>
+                <div class="pv-name">Arjun Singh</div>
+                <div class="pv-sport">Kabaddi</div>
+                <div class="pv-attend">87%</div>
+              </div>
+              <div class="pv-row">
+                <div class="pv-avatar" style="background:linear-gradient(135deg,#2d3a8c,#38bdf8);border-radius:50%;"></div>
+                <div class="pv-name">Meera Patel</div>
+                <div class="pv-sport">Badminton</div>
+                <div class="pv-attend">100%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       CONTACT
+       ============================================================ -->
+  <section class="contact-section" id="contact">
+    <div class="container">
+      <div class="contact-grid">
+
+        <!-- Left info -->
+        <div class="contact-info reveal">
+          <span class="text-label">Get in Touch</span>
+          <h2>We'd love to <span class="gradient-text">hear from you.</span></h2>
+          <p>Whether you have a question about the platform, want to discuss a plan for your institute, or just want to say hello — we're here and we respond to every message personally.</p>
+
+          <div class="contact-details">
+            <div class="contact-detail">
+              <div class="contact-detail-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+              </div>
+              <div>
+                <div class="contact-detail-label">Email</div>
+                <div class="contact-detail-value">
+                  <a href="mailto:projectathlete360@gmail.com">projectathlete360@gmail.com</a>
+                </div>
+              </div>
+            </div>
+            <div class="contact-detail">
+              <div class="contact-detail-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              </div>
+              <div>
+                <div class="contact-detail-label">Response Time</div>
+                <div class="contact-detail-value">Usually within 24–48 hours</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="contact-socials">
+            <a href="https://www.instagram.com/projectathlete360" target="_blank" rel="noopener" class="contact-social-btn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+              Instagram
+            </a>
+            <a href="https://x.com/theathlete360" target="_blank" rel="noopener" class="contact-social-btn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+              Twitter / X
+            </a>
+            <a href="https://www.linkedin.com/company/project-athlete-360" target="_blank" rel="noopener" class="contact-social-btn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg>
+              LinkedIn
+            </a>
+            <a href="https://www.youtube.com/@projectathlete360" target="_blank" rel="noopener" class="contact-social-btn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46a2.78 2.78 0 0 0-1.95 1.96A29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58A2.78 2.78 0 0 0 3.41 19.6C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.95A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"></path><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02"></polygon></svg>
+              YouTube
+            </a>
+            <a href="https://medium.com/@projectathlete360" target="_blank" rel="noopener" class="contact-social-btn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M13.54 12a6.8 6.8 0 01-6.77 6.82A6.8 6.8 0 010 12a6.8 6.8 0 016.77-6.82A6.8 6.8 0 0113.54 12zM20.96 12c0 3.54-1.51 6.42-3.38 6.42-1.87 0-3.39-2.88-3.39-6.42s1.52-6.42 3.39-6.42 3.38 2.88 3.38 6.42M24 12c0 3.17-.53 5.75-1.19 5.75-.66 0-1.19-2.58-1.19-5.75s.53-5.75 1.19-5.75C23.47 6.25 24 8.83 24 12z"/></svg>
+              Medium
+            </a>
+          </div>
+        </div>
+
+        <!-- Contact form -->
+        <div class="contact-form-wrap reveal delay-2">
+          <div id="contactFormInner">
+            <div class="contact-form-title">Send us a message</div>
+            <form id="contactForm" novalidate>
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label class="form-label" for="cf-name">Your Name</label>
+                  <input type="text" id="cf-name" class="form-input" placeholder="Full name" required />
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="cf-email">Email Address</label>
+                  <input type="email" id="cf-email" class="form-input" placeholder="your@email.com" required />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="cf-subject">Subject</label>
+                <select id="cf-subject" class="form-select" required>
+                  <option value="" disabled selected>Select a topic</option>
+                  <option value="trial">I want to start a free trial</option>
+                  <option value="pricing">Question about pricing / plans</option>
+                  <option value="platform">Question about the platform</option>
+                  <option value="partnership">Partnership or collaboration</option>
+                  <option value="support">Technical support</option>
+                  <option value="other">Something else</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="cf-institute">Institute Name <span style="color:var(--color-text-muted);font-weight:400;">(optional)</span></label>
+                <input type="text" id="cf-institute" class="form-input" placeholder="Your sports institute name" />
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="cf-message">Message</label>
+                <textarea id="cf-message" class="form-textarea" placeholder="Tell us how we can help..." required></textarea>
+              </div>
+
+              <div class="form-submit-row">
+                <button type="submit" class="btn btn-primary" id="cfSubmitBtn">
+                  <span class="btn-text">Send Message</span>
+                </button>
+                <span class="form-submit-note">We reply within 24–48 hours</span>
+              </div>
+            </form>
+          </div>
+
+          <!-- Success state -->
+          <div class="contact-form-success" id="contactSuccess">
+            <div class="success-icon">✉️</div>
+            <h3>Message received!</h3>
+            <p>Thank you for reaching out. We'll get back to you at your email address within 24–48 hours.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       BOTTOM CTA
+       ============================================================ -->
+  <section class="about-cta">
+    <div class="container">
+      <div class="about-cta-inner reveal">
+        <span class="text-label" style="display:block;margin-bottom:var(--space-4);">Ready to Start?</span>
+        <h2>Give your institute the<br /><span class="gradient-text">management it deserves.</span></h2>
+        <p>Join sports institutes already using PA360 Proton to manage athletes properly, track performance, and develop champions — at a price that makes sense.</p>
+        <div style="display:flex;align-items:center;justify-content:center;gap:var(--space-4);flex-wrap:wrap;">
+          <a href="pricing.html" class="btn btn-primary btn-lg">Start Free for 14 Days</a>
+          <a href="#contact" class="btn btn-secondary btn-lg">Contact Us First</a>
+        </div>
+        <p style="margin-top:var(--space-5);font-size:13px;color:var(--color-text-muted);">No credit card · Cancel anytime · Full access from day one</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       FOOTER
+       ============================================================ -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <div class="nav-logo" style="margin-bottom:var(--space-4);">
+            <img src="../assets/images/logo-icon.png" alt="Project Athlete 360" style="height:36px;width:auto;" onerror="this.style.display='none';" />
+          </div>
+          <p>PA360 Proton is a product of Project Athlete 360 — dedicated to making sports management affordable and accessible for every institute.</p>
+          <div class="social-links">
+            <a href="https://www.instagram.com/projectathlete360" target="_blank" rel="noopener" class="social-link" title="Instagram"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg></a>
+            <a href="https://x.com/theathlete360" target="_blank" rel="noopener" class="social-link" title="X"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>
+            <a href="https://www.youtube.com/@projectathlete360" target="_blank" rel="noopener" class="social-link" title="YouTube"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46a2.78 2.78 0 0 0-1.95 1.96A29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58A2.78 2.78 0 0 0 3.41 19.6C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.95A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"></path><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02"></polygon></svg></a>
+            <a href="https://m.facebook.com/projectathlete360" target="_blank" rel="noopener" class="social-link" title="Facebook"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg></a>
+            <a href="https://www.linkedin.com/company/project-athlete-360" target="_blank" rel="noopener" class="social-link" title="LinkedIn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg></a>
+            <a href="https://medium.com/@projectathlete360" target="_blank" rel="noopener" class="social-link" title="Medium"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M13.54 12a6.8 6.8 0 01-6.77 6.82A6.8 6.8 0 010 12a6.8 6.8 0 016.77-6.82A6.8 6.8 0 0113.54 12zM20.96 12c0 3.54-1.51 6.42-3.38 6.42-1.87 0-3.39-2.88-3.39-6.42s1.52-6.42 3.39-6.42 3.38 2.88 3.38 6.42M24 12c0 3.17-.53 5.75-1.19 5.75-.66 0-1.19-2.58-1.19-5.75s.53-5.75 1.19-5.75C23.47 6.25 24 8.83 24 12z"/></svg></a>
+          </div>
+        </div>
+        <div>
+          <div class="footer-heading">Product</div>
+          <ul class="footer-links">
+            <li><a href="index.html#features">Features</a></li>
+            <li><a href="pricing.html">Pricing</a></li>
+            <li><a href="index.html#how-it-works">How It Works</a></li>
+            <li><a href="login.html">Log In</a></li>
+            <li><a href="pricing.html">Start Free Trial</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-heading">Company</div>
+          <ul class="footer-links">
+            <li><a href="about.html">About PA360</a></li>
+            <li><a href="blog.html">Blog</a></li>
+            <li><a href="mailto:projectathlete360@gmail.com">Contact Us</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-heading">Legal</div>
+          <ul class="footer-links">
+            <li><a href="#">Privacy Policy</a></li>
+            <li><a href="#">Terms of Service</a></li>
+            <li><a href="#">Refund Policy</a></li>
+            <li><a href="#">Cookie Policy</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>© 2025 Project Athlete 360. All rights reserved. PA360 Proton is a product of Project Athlete 360.</p>
+        <p>Made with ❤️ for athletes everywhere.</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ============================================================
+       JAVASCRIPT
+       ============================================================ -->
+  <script>
+    // --- Navbar scroll ---
+    const navbar = document.getElementById('navbar');
+    window.addEventListener('scroll', () => {
+      navbar.classList.toggle('scrolled', window.scrollY > 20);
+    });
+
+    // --- Mobile menu ---
+    const navToggle = document.getElementById('navToggle');
+    const navLinks  = document.getElementById('navLinks');
+    navToggle.addEventListener('click', () => {
+      navToggle.classList.toggle('active');
+      navLinks.classList.toggle('open');
+    });
+    navLinks.querySelectorAll('a').forEach(link => {
+      link.addEventListener('click', () => {
+        navToggle.classList.remove('active');
+        navLinks.classList.remove('open');
+      });
+    });
+
+    // --- Scroll reveal ---
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.08, rootMargin: '0px 0px -30px 0px' });
+    document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+    // --- Smooth scroll ---
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function(e) {
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          e.preventDefault();
+          window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - 90, behavior: 'smooth' });
+        }
+      });
+    });
+
+    // --- Contact form ---
+    document.getElementById('contactForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      const name    = document.getElementById('cf-name').value.trim();
+      const email   = document.getElementById('cf-email').value.trim();
+      const subject = document.getElementById('cf-subject').value;
+      const message = document.getElementById('cf-message').value.trim();
+
+      if (!name || !email || !subject || !message) return;
+
+      const btn = document.getElementById('cfSubmitBtn');
+      btn.disabled = true;
+      btn.querySelector('.btn-text').textContent = 'Sending...';
+
+      try {
+        // TODO Phase 4: Replace with real API call to backend contact route
+        // await fetch('/api/contact', {
+        //   method: 'POST',
+        //   headers: { 'Content-Type': 'application/json' },
+        //   body: JSON.stringify({ name, email, subject, message, institute: document.getElementById('cf-institute').value })
+        // });
+
+        // Placeholder — remove in Phase 4
+        await new Promise(r => setTimeout(r, 1000));
+
+        document.getElementById('contactFormInner').style.display = 'none';
+        document.getElementById('contactSuccess').style.display = 'block';
+
+      } catch (err) {
+        btn.disabled = false;
+        btn.querySelector('.btn-text').textContent = 'Send Message';
+        alert('Something went wrong. Please email us directly at projectathlete360@gmail.com');
+      }
+    });
+  </script>
+
+</body>
+</html>
